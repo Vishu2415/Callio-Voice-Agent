@@ -1089,12 +1089,12 @@ app.get('/api/public/branding', (req, res) => {
 
 app.post('/api/admin/branding', (req, res) => {
   const { id, customDomain, subdomain, appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText } = req.body;
-  if (!id) {
+  if (!id && !req.headers.host) {
     return res.status(400).json({ success: false, error: 'Tenant ID is required.' });
   }
 
   const brandingData = {
-    id,
+    id: id || 'default',
     customDomain: customDomain || '',
     subdomain: subdomain || '',
     appName: appName || 'Callio',
@@ -1107,11 +1107,28 @@ app.post('/api/admin/branding', (req, res) => {
     copyrightText: copyrightText || '© 2026 Callio. All rights reserved.'
   };
 
-  brandingDb.set(id, brandingData);
+  brandingDb.set(brandingData.id, brandingData);
   saveBranding();
+
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const currentReseller = getResellerFromHost(host);
+  if (currentReseller) {
+    currentReseller.branding = {
+      appName: brandingData.appName,
+      logoUrl: brandingData.logoUrl,
+      faviconUrl: brandingData.faviconUrl,
+      primaryColor: brandingData.primaryColor,
+      secondaryColor: brandingData.secondaryColor,
+      supportEmail: brandingData.supportEmail,
+      copyrightText: brandingData.copyrightText
+    };
+    resellersDb.set(currentReseller.id, currentReseller);
+    saveResellers();
+  }
 
   res.json({ success: true, branding: brandingData });
 });
+
 
 app.post('/api/upload-branding-asset', (req, res) => {
   const { fileName, fileData } = req.body;

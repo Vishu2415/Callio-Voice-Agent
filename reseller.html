@@ -699,36 +699,71 @@
     if (!file) return;
     const targetInput = document.getElementById(targetInputId);
     if (targetInput) {
-      targetInput.value = 'Uploading...';
+      targetInput.value = 'Compressing & Uploading...';
       targetInput.disabled = true;
     }
     const reader = new FileReader();
-    reader.onload = async function(e) {
-      const fullDataUrl = e.target.result;
-      const base64Data = fullDataUrl.split(',')[1];
-      let uploadedUrl = null;
-      try {
-        const res = await fetch('/api/upload-branding-asset', {
+    reader.onload = function(e) {
+      const rawDataUrl = e.target.result;
+      const img = new Image();
+      img.onload = function() {
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 600;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        const compressedDataUrl = canvas.toDataURL(mimeType, 0.85);
+        const base64Data = compressedDataUrl.split(',')[1];
+        fetch('/api/upload-branding-asset', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fileName: file.name, fileData: base64Data })
+        })
+        .then(res => res.json())
+        .then(data => {
+          const finalUrl = (data && data.success && data.url) ? data.url : compressedDataUrl;
+          if (targetInput) {
+            targetInput.value = finalUrl;
+            targetInput.disabled = false;
+            targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+            targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          if (typeof updateBrandPreview === 'function') updateBrandPreview();
+        })
+        .catch(err => {
+          if (targetInput) {
+            targetInput.value = compressedDataUrl;
+            targetInput.disabled = false;
+            targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+            targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          if (typeof updateBrandPreview === 'function') updateBrandPreview();
         });
-        const data = await res.json();
-        if (data && data.success && data.url) uploadedUrl = data.url;
-      } catch (err) {
-        console.warn('Server upload error, using Data URL fallback:', err);
-      }
-      const finalUrl = uploadedUrl || fullDataUrl;
-      if (targetInput) {
-        targetInput.value = finalUrl;
-        targetInput.disabled = false;
-        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-        targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      if (typeof updateBrandPreview === 'function') updateBrandPreview();
+      };
+      img.onerror = function() {
+        if (targetInput) {
+          targetInput.value = rawDataUrl;
+          targetInput.disabled = false;
+        }
+      };
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
   };
+
 
   document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
