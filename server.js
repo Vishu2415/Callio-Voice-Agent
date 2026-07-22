@@ -3580,7 +3580,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     }
   }
 
-  function initializeGemini(voice, systemInstruction, name = '', callSid = '', model = 'gemini-3.1-flash-live-preview') {
+  function initializeGemini(voice, systemInstruction, name = '', callSid = '', model = 'gemini-2.0-flash-exp') {
     let inactivityTimeout = null;
     agentSpeakingUntil = Date.now();
     
@@ -3638,11 +3638,11 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     
     console.log(`[WebSocket Stream Setup] Voice: ${voice}, Model: ${model}, Instruction: ${finalInstruction.substring(0, 45)}...`);
     
-    // Map unsupported model 'gemini-2.5-flash' to 'gemini-3.1-flash-live-preview'
+    // Map unsupported or generic model names to 'gemini-2.0-flash-exp'
     let resolvedModel = model;
-    if (resolvedModel === 'gemini-2.5-flash') {
-      console.log(`[Gemini Live API] Mapping unsupported model '${resolvedModel}' to 'gemini-3.1-flash-live-preview'`);
-      resolvedModel = 'gemini-3.1-flash-live-preview';
+    if (!resolvedModel || resolvedModel === 'gemini-2.5-flash' || resolvedModel.includes('3.1')) {
+      console.log(`[Gemini Live API] Mapping model '${resolvedModel}' to 'gemini-2.0-flash-exp'`);
+      resolvedModel = 'gemini-2.0-flash-exp';
     }
 
     const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
