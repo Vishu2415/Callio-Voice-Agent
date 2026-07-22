@@ -266,7 +266,7 @@
       display: none !important;
     }
 
-    /* Reseller role specific visibility */
+    /* Reseller role specific visibility — Same UI as Super Admin without Whitelabel subtab */
     html[data-user-role="reseller"] #nav-dashboard,
     html[data-user-role="reseller"] #nav-agents,
     html[data-user-role="reseller"] #nav-contacts,
@@ -274,12 +274,17 @@
     html[data-user-role="reseller"] #nav-quick-call,
     html[data-user-role="reseller"] #nav-crm-automation,
     html[data-user-role="reseller"] #nav-api-sharing,
-    html[data-user-role="reseller"] #nav-reseller-portal {
+    html[data-user-role="reseller"] #nav-admin-panel {
       display: flex !important;
     }
     html[data-user-role="reseller"] #nav-settings,
-    html[data-user-role="reseller"] #nav-admin-panel,
-    html[data-user-role="reseller"] #nav-billing {
+    html[data-user-role="reseller"] #nav-billing,
+    html[data-user-role="reseller"] #nav-reseller-portal {
+      display: none !important;
+    }
+    
+    /* Hide Whitelabel Resellers tab inside Admin Console for Resellers */
+    html[data-user-role="reseller"] #admin-subtab-resellers {
       display: none !important;
     }
     

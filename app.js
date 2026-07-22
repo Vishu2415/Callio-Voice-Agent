@@ -4350,10 +4350,6 @@ function applyUserRole(user) {
   hideAuthModal();
   
   if (user) {
-    if (user.role === 'reseller') {
-      window.location.href = '/reseller';
-      return;
-    }
     document.documentElement.setAttribute('data-user-role', user.role || 'client');
     // Auto-fill client assigned number in Calling tab
     if (user.phone_number) {

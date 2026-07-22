@@ -2927,9 +2927,13 @@ app.post('/api/client/request-number', (req, res) => {
 
 // 5. Get Pending Requests (Admin)
 app.get('/api/admin/pending-requests', (req, res) => {
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const currentReseller = getResellerFromHost(host);
+
   const pending = [];
   for (const client of clientsDb.values()) {
     if (client.status === 'number_requested') {
+      if (currentReseller && client.reseller_id !== currentReseller.id) continue;
       pending.push(client);
     }
   }
@@ -2938,12 +2942,23 @@ app.get('/api/admin/pending-requests', (req, res) => {
 
 // 6. Get All Clients (Admin)
 app.get('/api/admin/clients', (req, res) => {
-  const list = Array.from(clientsDb.values()).map(c => {
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const currentReseller = getResellerFromHost(host);
+
+  let list = Array.from(clientsDb.values());
+  if (currentReseller) {
+    list = list.filter(c => c.reseller_id === currentReseller.id);
+  } else {
+    // On main Callio portal, show all clients or direct clients
+  }
+
+  const safeList = list.map(c => {
     const { password, ...safeClient } = c;
     return safeClient;
   });
-  res.json({ success: true, clients: list });
+  res.json({ success: true, clients: safeList });
 });
+
 
 // 7. Approve Request Endpoint (Admin)
 app.post('/api/admin/approve-request', async (req, res) => {
@@ -3202,8 +3217,12 @@ app.post('/api/client/recharge', express.json(), (req, res) => {
 
 // 10C. Admin API - Get All Transactions
 app.get('/api/admin/transactions', (req, res) => {
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const currentReseller = getResellerFromHost(host);
+
   const allTxns = [];
   for (const client of clientsDb.values()) {
+    if (currentReseller && client.reseller_id !== currentReseller.id) continue;
     const history = client.billing_history || [];
     history.forEach(txn => {
       allTxns.push({
@@ -3218,6 +3237,7 @@ app.get('/api/admin/transactions', (req, res) => {
   allTxns.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   res.json({ success: true, transactions: allTxns });
 });
+
 
 
 // 11. Admin Billing - Update Pricing Rates
