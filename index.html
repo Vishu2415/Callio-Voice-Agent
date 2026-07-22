@@ -575,14 +575,16 @@
            Light mode overrides applied here via html:not(.dark) selectors.
         ============================================= */
         html:not(.dark) header > div {
-            background: rgba(255, 255, 255, 0.82) !important;
-            border-color: rgba(0, 0, 0, 0.08) !important;
-            box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.08) !important;
+            background: rgba(255, 255, 255, 0.60) !important;
+            backdrop-filter: blur(24px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+            border-color: rgba(255, 255, 255, 0.75) !important;
+            box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255,255,255,0.9) !important;
         }
         /* Nav links inner capsule */
         html:not(.dark) header nav {
-            background: rgba(0, 0, 0, 0.04) !important;
-            border-color: rgba(0, 0, 0, 0.08) !important;
+            background: rgba(0, 0, 0, 0.05) !important;
+            border-color: rgba(0, 0, 0, 0.07) !important;
         }
         /* Nav link text */
         html:not(.dark) header nav a,
@@ -605,12 +607,12 @@
         /* Theme toggle button */
         html:not(.dark) header #themeToggleBtn {
             color: #374151 !important;
-            background: rgba(0, 0, 0, 0.04) !important;
+            background: rgba(255, 255, 255, 0.5) !important;
             border-color: rgba(0, 0, 0, 0.10) !important;
         }
         html:not(.dark) header #themeToggleBtn:hover {
             color: #111827 !important;
-            background: rgba(0, 0, 0, 0.08) !important;
+            background: rgba(255, 255, 255, 0.75) !important;
         }
         /* SVG chevron icons */
         html:not(.dark) header nav svg {
@@ -619,6 +621,7 @@
         html:not(.dark) header nav button:hover svg {
             color: #6b7280 !important; /* gray-500 */
         }
+
     </style>
 </head>
 <body class="text-on-surface">
