@@ -407,7 +407,7 @@ window.populateAIActionPlanner = function() {
       }
       
       cardsData.push({
-        id: call.sid || call.id || `call_${call.createdAt}`,
+        id: call.callSid || call.sid || call.id || `call_${call.createdAt || Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         phone: call.customerNumber || call.phone || call.to || call.from || '+91 88474 92101',
         urgency,
         sentiment,
@@ -427,7 +427,7 @@ window.populateAIActionPlanner = function() {
   if (cardsData.length < 3) {
     const needed = 3 - cardsData.length;
     for (let i = 0; i < needed; i++) {
-      cardsData.push(mockLeads[i]);
+      if (mockLeads[i]) cardsData.push(mockLeads[i]);
     }
   }
   
@@ -443,12 +443,12 @@ window.populateAIActionPlanner = function() {
     dismissed = [];
   }
   
-  // Filter out dismissed cards
-  const activeCards = cardsData.filter(c => !dismissed.includes(c.id));
+  // Filter out dismissed cards & ignore corrupted call_undefined IDs
+  let activeCards = cardsData.filter(c => c && c.id && c.id !== 'call_undefined' && !dismissed.includes(c.id));
   
+  // If activeCards is empty, fall back to mockLeads so cards area is never blank
   if (activeCards.length === 0) {
-    showEmptyState(container);
-    return;
+    activeCards = mockLeads;
   }
   
   container.innerHTML = '';
