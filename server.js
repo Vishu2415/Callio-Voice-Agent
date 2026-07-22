@@ -1089,12 +1089,28 @@ app.get('/api/public/branding', (req, res) => {
 
 app.post('/api/admin/branding', (req, res) => {
   const { id, customDomain, subdomain, appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText } = req.body;
-  if (!id && !req.headers.host) {
-    return res.status(400).json({ success: false, error: 'Tenant ID is required.' });
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const currentReseller = getResellerFromHost(host);
+
+  if (currentReseller) {
+    // If request is made from a reseller portal (e.g. growvo.in), ONLY update this reseller's branding
+    currentReseller.branding = {
+      appName: appName || currentReseller.branding.appName,
+      logoUrl: logoUrl !== undefined ? logoUrl : currentReseller.branding.logoUrl,
+      faviconUrl: faviconUrl !== undefined ? faviconUrl : currentReseller.branding.faviconUrl,
+      primaryColor: primaryColor || currentReseller.branding.primaryColor,
+      secondaryColor: secondaryColor || currentReseller.branding.secondaryColor,
+      supportEmail: supportEmail !== undefined ? supportEmail : currentReseller.branding.supportEmail,
+      copyrightText: copyrightText !== undefined ? copyrightText : currentReseller.branding.copyrightText
+    };
+    resellersDb.set(currentReseller.id, currentReseller);
+    saveResellers();
+    return res.json({ success: true, branding: currentReseller.branding });
   }
 
+  // Super Admin updating default Callio portal branding
   const brandingData = {
-    id: id || 'default',
+    id: 'default',
     customDomain: customDomain || '',
     subdomain: subdomain || '',
     appName: appName || 'Callio',
@@ -1107,27 +1123,12 @@ app.post('/api/admin/branding', (req, res) => {
     copyrightText: copyrightText || '© 2026 Callio. All rights reserved.'
   };
 
-  brandingDb.set(brandingData.id, brandingData);
+  brandingDb.set('default', brandingData);
   saveBranding();
-
-  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
-  const currentReseller = getResellerFromHost(host);
-  if (currentReseller) {
-    currentReseller.branding = {
-      appName: brandingData.appName,
-      logoUrl: brandingData.logoUrl,
-      faviconUrl: brandingData.faviconUrl,
-      primaryColor: brandingData.primaryColor,
-      secondaryColor: brandingData.secondaryColor,
-      supportEmail: brandingData.supportEmail,
-      copyrightText: brandingData.copyrightText
-    };
-    resellersDb.set(currentReseller.id, currentReseller);
-    saveResellers();
-  }
 
   res.json({ success: true, branding: brandingData });
 });
+
 
 
 app.post('/api/upload-branding-asset', (req, res) => {
