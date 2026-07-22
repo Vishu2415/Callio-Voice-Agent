@@ -2659,9 +2659,14 @@ app.post('/api/auth/signup', async (req, res) => {
     console.log(`[Vobiz API] Master credentials missing. Using test sub-account: ${subAuthId}`);
   }
 
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const currentReseller = getResellerFromHost(host);
+  const resellerId = currentReseller ? currentReseller.id : null;
+
   const tenantId = req.headers['x-tenant-id'] || req.body.tenantId || '';
   const clientData = {
     tenantId: tenantId || null,
+    reseller_id: resellerId,
     id: clientId,
     name,
     email,
@@ -2677,6 +2682,7 @@ app.post('/api/auth/signup', async (req, res) => {
     status: 'pending_number',
     created_at: new Date().toISOString()
   };
+
 
   clientsDb.set(clientId, clientData);
   saveClients();
