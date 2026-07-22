@@ -1,0 +1,35 @@
+{
+  "basic": {
+    "id": "basic",
+    "name": "Basic Plan",
+    "price_per_month": 1499,
+    "max_minutes": 100,
+    "max_agents": 2,
+    "rate_per_minute": 5,
+    "crm_integration": false,
+    "api_sharing": false,
+    "description": "Perfect for small startup experiments & testing voice workflows"
+  },
+  "pro": {
+    "id": "pro",
+    "name": "Pro Plan",
+    "price_per_month": 2499,
+    "max_minutes": 350,
+    "max_agents": 10,
+    "rate_per_minute": 4.24,
+    "crm_integration": true,
+    "api_sharing": true,
+    "description": "Excellent for growing agencies and sales automations"
+  },
+  "custom": {
+    "id": "custom",
+    "name": "Custom Plan",
+    "price_per_month": 9999,
+    "max_minutes": 99999,
+    "max_agents": 99999,
+    "rate_per_minute": 2,
+    "crm_integration": true,
+    "api_sharing": true,
+    "description": "Unlimited enterprise scale control, custom LLMs & high-priority support"
+  }
+}

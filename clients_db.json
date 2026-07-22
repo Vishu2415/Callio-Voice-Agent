@@ -1,0 +1,115 @@
+{
+  "client_1782736216157": {
+    "id": "client_1782736216157",
+    "name": "Testing",
+    "email": "test@gmail.com",
+    "password": "96cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e",
+    "vobiz_sub_auth_id": "SA_G0OY05TV",
+    "vobiz_sub_auth_token": "token_test_subaccount",
+    "phone_number": "+917971442441",
+    "agent_config": {
+      "system_prompt": "Tum rahul ho or tum ek diginext marketing agency ke ai agent ho tumhara kaam hai  logo ko diginext ke bare me smjhana or iss topic ke bahar kuch baat mt krna agar koi jyada details mange to bolna aap chahe to diginext ki website diginext360.com pr jake explore kr skte hai . or haan koi free trial nhi hai agar koi puche ki free trial hai ki nhi",
+      "voice": "Aoede",
+      "language": "Hinglish"
+    },
+    "status": "active",
+    "created_at": "2026-06-29T12:30:16.714Z",
+    "requested_number": null,
+    "balance": 193,
+    "pricing": {
+      "rate_per_minute": 5,
+      "rate_recording_per_minute": 1,
+      "rate_per_session": 0
+    },
+    "billing_history": [
+      {
+        "id": "txn_1784016714440_drjck",
+        "timestamp": "2026-07-14T08:11:54.440Z",
+        "type": "recharge",
+        "amount": 100,
+        "totalCharge": -100,
+        "description": "Wallet Self-Recharge of 100 Mins via UPI (Paid ₹500.00 at ₹5/min)"
+      },
+      {
+        "id": "txn_1784015788168_arazi",
+        "timestamp": "2026-07-14T07:56:28.168Z",
+        "type": "call_charge",
+        "callSid": "5dff79b3-65f4-4ef7-9316-fc2615b3a166",
+        "phone": "8273176799",
+        "duration": 62,
+        "callCost": 0,
+        "recordingCost": 0,
+        "sessionCost": 0,
+        "totalCharge": 2,
+        "description": "Call to 8273176799 (62s → billed 2 min) with recording"
+      },
+      {
+        "id": "txn_1784013584308_7qj8b",
+        "timestamp": "2026-07-14T07:19:44.308Z",
+        "type": "call_charge",
+        "callSid": "2838f2d6-60a5-4cce-9796-148f8b16535c",
+        "phone": "8273176799",
+        "duration": 54,
+        "callCost": 0,
+        "recordingCost": 0,
+        "sessionCost": 0,
+        "totalCharge": 1,
+        "description": "Call to 8273176799 (54s → billed 1 min) with recording"
+      },
+      {
+        "id": "txn_1784013172210_5od5a",
+        "timestamp": "2026-07-14T07:12:52.210Z",
+        "type": "call_charge",
+        "callSid": "934bfcb0-85eb-4a92-9268-26fa95bd3476",
+        "phone": "8273176799",
+        "duration": 26,
+        "callCost": 0,
+        "recordingCost": 0,
+        "sessionCost": 0,
+        "totalCharge": 1,
+        "description": "Call to 8273176799 (26s → billed 1 min) with recording"
+      },
+      {
+        "id": "txn_1784012284365_1mygt",
+        "timestamp": "2026-07-14T06:58:04.365Z",
+        "type": "call_charge",
+        "callSid": "50460c84-61f0-44dc-9d7c-d12a9c1212ae",
+        "phone": "8273176799",
+        "duration": 12,
+        "callCost": 0,
+        "recordingCost": 0,
+        "sessionCost": 0,
+        "totalCharge": 1,
+        "description": "Call to 8273176799 (12s → billed 1 min) with recording"
+      },
+      {
+        "id": "txn_1784011636394_heixx",
+        "timestamp": "2026-07-14T06:47:16.394Z",
+        "type": "call_charge",
+        "callSid": "038f859c-c610-4dff-95c2-4d2add271f12",
+        "phone": "8273176799",
+        "duration": 16,
+        "callCost": 0,
+        "recordingCost": 0,
+        "sessionCost": 0,
+        "totalCharge": 1,
+        "description": "Call to 8273176799 (16s → billed 1 min) with recording"
+      },
+      {
+        "id": "txn_1784011558596_0y00h",
+        "timestamp": "2026-07-14T06:45:58.596Z",
+        "type": "call_charge",
+        "callSid": "a2d99af6-7eb7-4d35-a303-fcd94d8343eb",
+        "phone": "8273176799",
+        "duration": 18,
+        "callCost": 0,
+        "recordingCost": 0,
+        "sessionCost": 0,
+        "totalCharge": 1,
+        "description": "Call to 8273176799 (18s → billed 1 min) with recording"
+      }
+    ],
+    "plan": "basic",
+    "used_minutes": 7
+  }
+}

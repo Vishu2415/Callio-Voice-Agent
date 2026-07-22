@@ -1,0 +1,662 @@
+{
+  "log_1782295387894_qsmr2": {
+    "id": "log_1782295387894_qsmr2",
+    "timestamp": "2026-06-24T10:03:07.894Z",
+    "leadName": "Deadpool",
+    "leadPhone": "918273117066",
+    "transition": "New ➔ Qualified",
+    "agentName": "Sneha Sharma",
+    "status": "Call Failed: Missing destination (to) or publicUrl parameters.",
+    "callSid": null
+  },
+  "log_1782296773544_pg4kf": {
+    "id": "log_1782296773544_pg4kf",
+    "timestamp": "2026-06-24T10:26:13.544Z",
+    "leadName": "Deadpool",
+    "leadPhone": "918273117066",
+    "transition": "Qualified ➔ New",
+    "agentName": "None",
+    "status": "Skipped (Rule disabled or mismatch)",
+    "callSid": null
+  },
+  "log_1782296841069_9nvfq": {
+    "id": "log_1782296841069_9nvfq",
+    "timestamp": "2026-06-24T10:27:21.069Z",
+    "leadName": "Deadpool",
+    "leadPhone": "918273117066",
+    "transition": "New ➔ Qualified",
+    "agentName": "Sneha Sharma",
+    "status": "Call Initiated",
+    "callSid": "c7aaf81a-929d-4e01-b4e3-474b508ea168"
+  },
+  "log_1782296867433_7ddm2": {
+    "id": "log_1782296867433_7ddm2",
+    "timestamp": "2026-06-24T10:27:47.433Z",
+    "leadName": "Vaibhav",
+    "leadPhone": "918630301466",
+    "transition": "Qualified ➔ New",
+    "agentName": "None",
+    "status": "Skipped (Rule disabled or mismatch)",
+    "callSid": null
+  },
+  "log_1782296868963_vnc8b": {
+    "id": "log_1782296868963_vnc8b",
+    "timestamp": "2026-06-24T10:27:48.964Z",
+    "leadName": "Vaibhav",
+    "leadPhone": "918630301466",
+    "transition": "New ➔ Qualified",
+    "agentName": "Sneha Sharma",
+    "status": "Call Initiated",
+    "callSid": "d3a0626a-a2dc-4a14-879b-15c8bd6526c5"
+  },
+  "log_1782299214858_jl2i3": {
+    "id": "log_1782299214858_jl2i3",
+    "timestamp": "2026-06-24T11:06:54.858Z",
+    "leadName": "john the don",
+    "leadPhone": "918384828654",
+    "transition": "Qualified ➔ New",
+    "agentName": "None",
+    "status": "Skipped (Rule disabled or mismatch)",
+    "callSid": null
+  },
+  "log_1782299218201_3vfco": {
+    "id": "log_1782299218201_3vfco",
+    "timestamp": "2026-06-24T11:06:58.201Z",
+    "leadName": "Vaibhav",
+    "leadPhone": "918630301466",
+    "transition": "Qualified ➔ New",
+    "agentName": "None",
+    "status": "Skipped (Rule disabled or mismatch)",
+    "callSid": null
+  },
+  "log_1782299281673_52wah": {
+    "id": "log_1782299281673_52wah",
+    "timestamp": "2026-06-24T11:08:01.673Z",
+    "leadName": "Deadpool",
+    "leadPhone": "918273117066",
+    "transition": "Qualified ➔ New",
+    "agentName": "None",
+    "status": "Skipped (Rule disabled or mismatch)",
+    "callSid": null
+  },
+  "log_1782302039032_ppjqm": {
+    "id": "log_1782302039032_ppjqm",
+    "timestamp": "2026-06-24T11:53:59.032Z",
+    "leadName": "john the don",
+    "leadPhone": "918384828654",
+    "transition": "New ➔ Qualified",
+    "agentName": "Sneha Sharma",
+    "status": "Call Initiated",
+    "callSid": "f41f2d84-875b-4565-94b4-250095aa3bf3"
+  },
+  "log_1782302038861_8gzrt": {
+    "id": "log_1782302038861_8gzrt",
+    "timestamp": "2026-06-24T11:53:58.862Z",
+    "leadName": "Aachal",
+    "leadPhone": "8126970906",
+    "transition": "New ➔ Qualified",
+    "agentName": "Sneha Sharma",
+    "status": "Call Initiated",
+    "callSid": "796d7aec-7558-41ea-a284-994400b94bfd"
+  },
+  "log_1782302040249_2wr28": {
+    "id": "log_1782302040249_2wr28",
+    "timestamp": "2026-06-24T11:54:00.249Z",
+    "leadName": "Deadpool",
+    "leadPhone": "918273176799",
+    "transition": "New ➔ Qualified",
+    "agentName": "Sneha Sharma",
+    "status": "Call Initiated",
+    "callSid": "81042188-80f6-45cd-ab40-46ca2cb0a4ba"
+  },
+  "log_1782302041315_3kn1s": {
+    "id": "log_1782302041315_3kn1s",
+    "timestamp": "2026-06-24T11:54:01.315Z",
+    "leadName": "Vaibhav",
+    "leadPhone": "918630301466",
+    "transition": "New ➔ Qualified",
+    "agentName": "Sneha Sharma",
+    "status": "Call Initiated",
+    "callSid": "bef044c8-a62d-4b4e-ac38-b5c1944145b7"
+  },
+  "log_1782303130452_ut2l4": {
+    "id": "log_1782303130452_ut2l4",
+    "timestamp": "2026-06-24T12:12:10.454Z",
+    "leadName": "917411567513",
+    "leadPhone": "917411567513",
+    "transition": "? ➔ New",
+    "agentName": "None",
+    "status": "Skipped (Rule disabled or mismatch)",
+    "callSid": null
+  },
+  "log_1782376939339_holmy": {
+    "id": "log_1782376939339_holmy",
+    "timestamp": "2026-06-25T08:42:19.339Z",
+    "leadName": "Test Customer",
+    "leadPhone": "918273176799",
+    "transition": "Direct Trigger ( ➔ TEST_STAGE)",
+    "agentName": "Sneha Sharma",
+    "status": "Call Initiated",
+    "callSid": "36d03f11-ef8f-452e-b802-6c0502ceb1c5"
+  },
+  "log_1782377130225_gc589": {
+    "id": "log_1782377130225_gc589",
+    "timestamp": "2026-06-25T08:45:30.225Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Qualified)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "3922dcbe-564c-4f2d-b76d-d1c587bcf774"
+  },
+  "log_1782377566283_kiquf": {
+    "id": "log_1782377566283_kiquf",
+    "timestamp": "2026-06-25T08:52:46.284Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ New)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "63b4dae5-4184-43bc-a8b7-e3efe89e4c29"
+  },
+  "log_1782378479598_pjqvu": {
+    "id": "log_1782378479598_pjqvu",
+    "timestamp": "2026-06-25T09:07:59.598Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Qualified)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "383a532e-1b8d-419d-8a19-b8fa9cbe039a"
+  },
+  "log_1782378768836_ekxhy": {
+    "id": "log_1782378768836_ekxhy",
+    "timestamp": "2026-06-25T09:12:48.836Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Qualified)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "858fc7a3-1ef4-450e-8f7d-acd4c344b494"
+  },
+  "log_1782378783747_cjhdn": {
+    "id": "log_1782378783747_cjhdn",
+    "timestamp": "2026-06-25T09:13:03.747Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "2ec575d2-8d03-4f07-9415-1ee0367e1f80"
+  },
+  "log_1782382787039_7tuis": {
+    "id": "log_1782382787039_7tuis",
+    "timestamp": "2026-06-25T10:19:47.039Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Won)",
+    "agentName": "Thanos",
+    "status": "Call Initiated",
+    "callSid": "769faf06-9b7d-49c9-adb3-74c51f437ba5"
+  },
+  "log_1782382936510_3t41w": {
+    "id": "log_1782382936510_3t41w",
+    "timestamp": "2026-06-25T10:22:16.510Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "36bf8e77-6d91-4f05-852a-2151708ed76f"
+  },
+  "log_1782383267044_t4jrv": {
+    "id": "log_1782383267044_t4jrv",
+    "timestamp": "2026-06-25T10:27:47.044Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Won)",
+    "agentName": "Thanos",
+    "status": "Call Initiated",
+    "callSid": "a5ccb4e3-4805-4aa0-ba45-45c9321a403a"
+  },
+  "log_1782383465484_1ymw0": {
+    "id": "log_1782383465484_1ymw0",
+    "timestamp": "2026-06-25T10:31:05.484Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "7ce0f4be-612c-4cc7-8622-bc0afa985bb1"
+  },
+  "log_1782383627027_xy9sg": {
+    "id": "log_1782383627027_xy9sg",
+    "timestamp": "2026-06-25T10:33:47.027Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Thanos",
+    "status": "Call Initiated",
+    "callSid": "8b299936-6fb1-4868-8203-f975af59c9b1"
+  },
+  "log_1782384167029_q3yhf": {
+    "id": "log_1782384167029_q3yhf",
+    "timestamp": "2026-06-25T10:42:47.029Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Won)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "9422bae0-a28d-4034-bda0-5b0aefc2feae"
+  },
+  "log_1782384286977_7synl": {
+    "id": "log_1782384286977_7synl",
+    "timestamp": "2026-06-25T10:44:46.977Z",
+    "leadName": "Vaibhav",
+    "leadPhone": "918630301466",
+    "transition": "Direct Trigger ( ➔ Won)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "f298465c-780b-4179-9900-ea33c77939c1"
+  },
+  "log_1782992179823_509dl": {
+    "id": "log_1782992179823_509dl",
+    "timestamp": "2026-07-02T11:36:19.823Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "1df41acd-491b-418e-805d-1189e479219a"
+  },
+  "log_1782992332839_j5x6s": {
+    "id": "log_1782992332839_j5x6s",
+    "timestamp": "2026-07-02T11:38:52.839Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "4d42d0b9-177d-41a8-9fe6-e2dc4bce00d8"
+  },
+  "log_1782992571665_jsls6": {
+    "id": "log_1782992571665_jsls6",
+    "timestamp": "2026-07-02T11:42:51.665Z",
+    "leadName": "Vishnu Verma",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "3031c828-846c-4924-823e-55e6dcde6781"
+  },
+  "log_1782992648155_h5dbh": {
+    "id": "log_1782992648155_h5dbh",
+    "timestamp": "2026-07-02T11:44:08.155Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "55c0625f-d6a1-40da-9aed-47211562b87c"
+  },
+  "log_1782992812863_sh11d": {
+    "id": "log_1782992812863_sh11d",
+    "timestamp": "2026-07-02T11:46:52.863Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "f6ef61f6-cbee-4643-a613-21c612f68987"
+  },
+  "log_1782993112663_buwd5": {
+    "id": "log_1782993112663_buwd5",
+    "timestamp": "2026-07-02T11:51:52.663Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "5c972da8-43fe-4c41-a330-042785ffb690"
+  },
+  "log_1782993232748_q035d": {
+    "id": "log_1782993232748_q035d",
+    "timestamp": "2026-07-02T11:53:52.748Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "bd0f9f43-8763-4675-b302-8983a8cc1293"
+  },
+  "log_1783063493139_3o65h": {
+    "id": "log_1783063493139_3o65h",
+    "timestamp": "2026-07-03T07:24:53.139Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Won)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "967cecff-aada-4456-bf0a-18503c544bbe"
+  },
+  "log_1783063499110_mdstp": {
+    "id": "log_1783063499110_mdstp",
+    "timestamp": "2026-07-03T07:24:59.110Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "9f0c98b8-0776-45ec-8165-05864a8be5ee"
+  },
+  "log_1783063509138_m2rax": {
+    "id": "log_1783063509138_m2rax",
+    "timestamp": "2026-07-03T07:25:09.138Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "f28d413a-c940-4410-b961-3620ca6bc417"
+  },
+  "log_1783063672782_whjv3": {
+    "id": "log_1783063672782_whjv3",
+    "timestamp": "2026-07-03T07:27:52.782Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "4fa65e12-6f0d-438b-a21d-522a154f639d"
+  },
+  "log_1783064938003_43kly": {
+    "id": "log_1783064938003_43kly",
+    "timestamp": "2026-07-03T07:48:58.003Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Won)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "e3af21d4-18db-48c9-91a9-5738b87a89e7"
+  },
+  "log_1783066459012_28wt6": {
+    "id": "log_1783066459012_28wt6",
+    "timestamp": "2026-07-03T08:14:19.012Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "3656a760-8dbf-49d6-9774-f86b1028fc6f"
+  },
+  "log_1783066617837_08acx": {
+    "id": "log_1783066617837_08acx",
+    "timestamp": "2026-07-03T08:16:57.837Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "b9418b39-18d2-433e-b385-798b49cf516e"
+  },
+  "log_1783067330296_697ff": {
+    "id": "log_1783067330296_697ff",
+    "timestamp": "2026-07-03T08:28:50.296Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "ac923f2c-801a-4d40-a3f3-b1e55bda4bcf"
+  },
+  "log_1783067492414_qiv5m": {
+    "id": "log_1783067492414_qiv5m",
+    "timestamp": "2026-07-03T08:31:32.414Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "47ea5174-f981-4b56-ba60-c7b0809b134b"
+  },
+  "log_1783073667526_984s6": {
+    "id": "log_1783073667526_984s6",
+    "timestamp": "2026-07-03T10:14:27.526Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Won)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "ee5ebb17-47c4-43bf-ac46-da904a5f3c17"
+  },
+  "log_1783073670650_bqpu7": {
+    "id": "log_1783073670650_bqpu7",
+    "timestamp": "2026-07-03T10:14:30.650Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "81f02b09-c4e8-404b-b212-536d8064d443"
+  },
+  "log_1783073725327_abqd1": {
+    "id": "log_1783073725327_abqd1",
+    "timestamp": "2026-07-03T10:15:25.327Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "caf59d51-eebd-44bc-800f-0d66509b9ee8"
+  },
+  "log_1783073847617_zc6ly": {
+    "id": "log_1783073847617_zc6ly",
+    "timestamp": "2026-07-03T10:17:27.617Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "911a10eb-0534-435a-b4af-d3b0f712e32c"
+  },
+  "log_1783075182373_wfb4c": {
+    "id": "log_1783075182373_wfb4c",
+    "timestamp": "2026-07-03T10:39:42.373Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "131d9dfb-d456-48b3-ae7b-111ee52fa267"
+  },
+  "log_1783075331096_mnfty": {
+    "id": "log_1783075331096_mnfty",
+    "timestamp": "2026-07-03T10:42:11.096Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "1b7be8b5-d95c-4fd0-952d-a9c4ef2baa76"
+  },
+  "log_1783076814471_i1obd": {
+    "id": "log_1783076814471_i1obd",
+    "timestamp": "2026-07-03T11:06:54.471Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "61c1c4b7-5e7a-4c0e-a569-07db15b33c99"
+  },
+  "log_1783076827184_5ln26": {
+    "id": "log_1783076827184_5ln26",
+    "timestamp": "2026-07-03T11:07:07.184Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "dcda4cd3-48e0-474a-97e5-c7ba9baf3280"
+  },
+  "log_1783076951120_h3seg": {
+    "id": "log_1783076951120_h3seg",
+    "timestamp": "2026-07-03T11:09:11.120Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "625ec024-f105-4ff7-a95d-ac07fa7cb02c"
+  },
+  "log_1783077552705_8ufvt": {
+    "id": "log_1783077552705_8ufvt",
+    "timestamp": "2026-07-03T11:19:12.705Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "a166e396-a5b0-4388-b341-eb07a18f3fdd"
+  },
+  "log_1783077610207_2qamc": {
+    "id": "log_1783077610207_2qamc",
+    "timestamp": "2026-07-03T11:20:10.207Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "2a0959dd-1906-405a-bfa9-d1a7be610a48"
+  },
+  "log_1783077731017_zzqlh": {
+    "id": "log_1783077731017_zzqlh",
+    "timestamp": "2026-07-03T11:22:11.017Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "d4dff67f-3495-4fe5-8ed6-1ad69408c7e7"
+  },
+  "log_1783079901846_owfgi": {
+    "id": "log_1783079901846_owfgi",
+    "timestamp": "2026-07-03T11:58:21.847Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "4a72a0c2-6657-4418-82d1-a1f5f756b452"
+  },
+  "log_1783080055134_gu4xl": {
+    "id": "log_1783080055134_gu4xl",
+    "timestamp": "2026-07-03T12:00:55.134Z",
+    "leadName": "Unknown Lead",
+    "leadPhone": "+918273176799",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Kalua",
+    "status": "Call Initiated",
+    "callSid": "24aefbc5-8ec0-4a20-a4a4-e7573ee11e1c"
+  },
+  "log_1783163538870_ehsj9": {
+    "id": "log_1783163538870_ehsj9",
+    "timestamp": "2026-07-04T11:12:18.871Z",
+    "leadName": "Test Customer",
+    "leadPhone": "918273117066",
+    "transition": "Direct Trigger ( ➔ TEST_STAGE)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "e30d75b2-246f-48fc-907a-868bb98a82a7"
+  },
+  "log_1783163615303_7cqb5": {
+    "id": "log_1783163615303_7cqb5",
+    "timestamp": "2026-07-04T11:13:35.303Z",
+    "leadName": "Vishnu  Verma",
+    "leadPhone": "918273117066",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "b40812c3-f3da-4488-99aa-589a04b11ebc"
+  },
+  "log_1783164422955_dcykn": {
+    "id": "log_1783164422955_dcykn",
+    "timestamp": "2026-07-04T11:27:02.955Z",
+    "leadName": "Vishnu  Verma",
+    "leadPhone": "918273117066",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "985a81e9-e68f-444d-8fbd-7f58e46680a5"
+  },
+  "log_1783167378022_uh1or": {
+    "id": "log_1783167378022_uh1or",
+    "timestamp": "2026-07-04T12:16:18.022Z",
+    "leadName": "Vishnu  Verma",
+    "leadPhone": "918273117066",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "786c4635-1e67-46a3-bae4-e3912a32e358"
+  },
+  "log_1783168500219_d1o33": {
+    "id": "log_1783168500219_d1o33",
+    "timestamp": "2026-07-04T12:35:00.219Z",
+    "leadName": "Vishnu  Verma",
+    "leadPhone": "918273117066",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "34c3d059-6124-4d64-b060-23357ffa5e61"
+  },
+  "log_1783320080522_b9pdh": {
+    "id": "log_1783320080522_b9pdh",
+    "timestamp": "2026-07-06T06:41:20.522Z",
+    "leadName": "Vishnu  Verma",
+    "leadPhone": "918273117066",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "e24d2219-3e68-49b2-aa65-c56b948b9a21"
+  },
+  "log_1783589313347_8h73b": {
+    "id": "log_1783589313347_8h73b",
+    "timestamp": "2026-07-09T09:28:33.347Z",
+    "leadName": "Vishnu  Verma",
+    "leadPhone": "918273117066",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Jarvis",
+    "status": "Call Initiated",
+    "callSid": "87718957-7102-4dce-ad11-cbed42268299"
+  },
+  "log_1783589347966_1sonh": {
+    "id": "log_1783589347966_1sonh",
+    "timestamp": "2026-07-09T09:29:07.966Z",
+    "leadName": "Vishnu  Verma",
+    "leadPhone": "918273117066",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Sneha Sharma",
+    "status": "Call Initiated",
+    "callSid": "799d5413-d817-4714-bce9-1dda2bd84c5f"
+  },
+  "log_1783592249560_2luh7": {
+    "id": "log_1783592249560_2luh7",
+    "timestamp": "2026-07-09T10:17:29.560Z",
+    "leadName": "Vishnu  Verma",
+    "leadPhone": "918273117066",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Sneha Sharma",
+    "status": "Call Initiated",
+    "callSid": "50558a14-096f-4a3a-98b7-1fb2bc0f17ab"
+  },
+  "log_1783592345893_greio": {
+    "id": "log_1783592345893_greio",
+    "timestamp": "2026-07-09T10:19:05.893Z",
+    "leadName": "Vishnu  Verma",
+    "leadPhone": "918273117066",
+    "transition": "Direct Trigger ( ➔ Proposition)",
+    "agentName": "Sneha Sharma",
+    "status": "Call Initiated",
+    "callSid": "47fe7439-5098-4bc3-8abc-e3b2ca27b7c7"
+  }
+}

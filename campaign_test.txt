@@ -1,0 +1,6 @@
+Sample campaign list for broadcast:
+Contact 1: +919999988888 (Primary)
+Contact 2: 9876543210
+Contact 3: +1 (312) 555-0143
+Duplicate 1: 9876543210
+Invalid number: 12345

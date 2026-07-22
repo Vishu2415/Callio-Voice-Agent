@@ -1,0 +1,28 @@
+{
+  "default": {
+    "id": "default",
+    "customDomain": "localhost",
+    "subdomain": "default.localhost",
+    "appName": "Callio",
+    "logoUrl": "logo_new.png",
+    "faviconUrl": "favicon.ico",
+    "primaryColor": "#FF6B4A",
+    "secondaryColor": "#ae3115",
+    "supportEmail": "support@callio.com",
+    "supportPhone": "+91",
+    "copyrightText": "© 2026 Callio. All rights reserved."
+  },
+  "partner1": {
+    "id": "partner1",
+    "customDomain": "partner.local",
+    "subdomain": "partner.localhost",
+    "appName": "Partner AI",
+    "logoUrl": "https://raw.githubusercontent.com/google/material-design-icons/master/png/action/settings/ios/production_res/1x/ic_settings_36pt.png",
+    "faviconUrl": "https://raw.githubusercontent.com/google/material-design-icons/master/png/action/settings/ios/production_res/1x/ic_settings_36pt.png",
+    "primaryColor": "#10B981",
+    "secondaryColor": "#059669",
+    "supportEmail": "support@partner.com",
+    "supportPhone": "+911234567890",
+    "copyrightText": "© 2026 Partner AI. All rights reserved."
+  }
+}

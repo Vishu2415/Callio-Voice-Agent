@@ -1,0 +1,37 @@
+{
+  "cb_1783080261193_oxwdh": {
+    "id": "cb_1783080261193_oxwdh",
+    "callSid": "3ddf9284-673a-49b5-818f-b08cae558cdf",
+    "phone": "918273176799",
+    "name": "Vishnu",
+    "requestedTime": "in 4 days at 10 am",
+    "isoTime": "2026-07-07T04:30:00Z",
+    "notes": "User was traveling and requested callback.",
+    "scheduledAt": "2026-07-07T04:30:00Z",
+    "status": "dialed",
+    "leadId": 4378,
+    "saasApiUrl": "https://diginext360.com/api",
+    "agentId": null,
+    "provider": "vobiz",
+    "createdAt": "2026-07-03T12:04:21.193Z",
+    "dialedAt": "2026-07-08T16:03:57.075Z"
+  },
+  "cb_1784013581301_q7b08": {
+    "id": "cb_1784013581301_q7b08",
+    "callSid": "100daf7b-e2eb-4d02-8759-e9b64565426b",
+    "phone": "8273176799",
+    "name": "Vishnu",
+    "requestedTime": "1 ghante baad",
+    "isoTime": "2026-07-14T13:30:00Z",
+    "notes": "User requested a callback in one hour. Current time is 2026-07-14T12:30:00Z.",
+    "scheduledAt": "2026-07-14T13:30:00Z",
+    "status": "dialed",
+    "leadId": null,
+    "saasApiUrl": null,
+    "agentId": null,
+    "provider": "vobiz",
+    "clientId": "client_1782736216157",
+    "createdAt": "2026-07-14T07:19:41.301Z",
+    "dialedAt": "2026-07-15T06:18:59.735Z"
+  }
+}

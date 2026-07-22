@@ -1,0 +1,11 @@
+{
+  "default_rule": {
+    "id": "default_rule",
+    "enabled": true,
+    "fromStage": "new",
+    "toStage": "qualified",
+    "agentId": "agent_1781958457888",
+    "provider": "vobiz",
+    "updatedAt": "2026-06-24T10:25:27.282Z"
+  }
+}

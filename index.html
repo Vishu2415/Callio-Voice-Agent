@@ -1,0 +1,1909 @@
+<!DOCTYPE html>
+<html class="scroll-smooth" lang="en">
+<head>
+    <script>
+        (function() {
+            const hostname = window.location.host;
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/public/branding?domain=' + encodeURIComponent(hostname), false);
+            try {
+                xhr.send();
+                if (xhr.status === 200) {
+                    const branding = JSON.parse(xhr.responseText);
+                    window.BrandingContext = branding;
+                    
+                    const styleTag = document.createElement('style');
+                    styleTag.id = 'dynamic-branding-colors';
+                    styleTag.innerHTML = `
+                        :root {
+                            --color-primary: ${branding.primaryColor} !important;
+                            --color-secondary: ${branding.secondaryColor} !important;
+                            --grad-coral: linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor}) !important;
+                        }
+                    `;
+                    document.head.appendChild(styleTag);
+                    document.title = branding.appName + ' - AI Calling Agents';
+                }
+            } catch (e) {
+                console.error('Branding resolution failed:', e);
+            }
+        })();
+    </script>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Callio - AI Calling Agents That Actually Close Deals</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "var(--color-primary)",
+                        "primary-container": "var(--color-primary-container)",
+                        "primary-btn": "var(--color-primary-btn)",
+                        "primary-btn-hover": "var(--color-primary-btn-hover)",
+                        "secondary": "var(--color-secondary)",
+                        "background": "var(--color-background)",
+                        "surface": "var(--color-surface)",
+                        "surface-dim": "var(--color-surface-dim)",
+                        "surface-bright": "var(--color-surface-bright)",
+                        "surface-container": "var(--color-surface-container)",
+                        "on-surface": "var(--color-on-surface)",
+                        "on-surface-variant": "var(--color-on-surface-variant)",
+                        "surface-container-low": "var(--color-surface-container-low)",
+                        "surface-container-high": "var(--color-surface-container-high)",
+                        "surface-container-highest": "var(--color-surface-container-highest)",
+                        "surface-container-lowest": "var(--color-surface-container-lowest)",
+                        "outline": "var(--color-outline)",
+                        "outline-variant": "var(--color-outline-variant)",
+                        "inverse-surface": "var(--color-inverse-surface)",
+                        "inverse-on-surface": "var(--color-inverse-on-surface)"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px",
+                        "card": "24px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "20px",
+                        "section-gap": "120px",
+                        "container-max": "1280px",
+                        "unit": "8px",
+                        "gutter": "24px",
+                        "margin-desktop": "64px"
+                    },
+                    "fontFamily": {
+                        "display-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "display-lg-mobile": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-sm": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "300"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "300"}],
+                        "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "headline-md": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+    
+    <script>
+        // Inline blocking script to prevent theme flickering on reload
+        (function() {
+            const currentTheme = localStorage.getItem('theme') || 'dark';
+            if (currentTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        })();
+    </script>
+    
+    <style>
+        :root {
+            --color-primary: #ae3115;
+            --color-primary-container: #ff6b4a;
+            --color-secondary: #595e6c;
+            --color-background: #fff8f6;
+            --color-surface: #fff8f6;
+            --color-surface-dim: #fff8f6;
+            --color-surface-bright: #ffffff;
+            --color-surface-container: #ffe9e5;
+            --color-surface-container-low: #fff0ed;
+            --color-surface-container-lowest: #ffffff;
+            --color-outline: #8d716a;
+            --color-outline-variant: #e1bfb8;
+            --color-inverse-surface: #3c2d29;
+            --color-inverse-on-surface: #ffede9;
+            --color-on-surface: #261815;
+            --color-on-surface-variant: #595e6c;
+            
+            /* Custom Select Dropdown - Light Theme */
+            --color-dropdown-bg: #ffffff;
+            --color-dropdown-border: rgba(0, 0, 0, 0.15);
+            --color-dropdown-text: #261815;
+            --color-dropdown-option-hover: rgba(0, 0, 0, 0.05);
+            --color-dropdown-option-selected: rgba(0, 0, 0, 0.08);
+            
+            --color-input-bg: #ffffff;
+            --color-input-border: rgba(0, 0, 0, 0.15);
+            --color-input-text: #261815;
+            
+            --color-sim-bg: radial-gradient(100% 100% at 0% 0%, #fff0ed 0%, #fff8f6 100%);
+            --color-sim-border: #e1bfb8;
+            --color-sim-notch: #e1bfb8;
+            --color-sim-title: #261815;
+            --color-sim-bubble-user-bg: rgba(174, 49, 21, 0.1);
+            --color-sim-bubble-user-text: #ae3115;
+            --color-sim-bubble-ai-bg: rgba(89, 94, 108, 0.1);
+            --color-sim-bubble-ai-text: #595e6c;
+            --color-sim-card-bg: rgba(0, 0, 0, 0.03);
+            --color-sim-card-border: rgba(0, 0, 0, 0.08);
+            --color-sim-card-text: #261815;
+            --color-sim-card-muted: #595e6c;
+
+            /* Light Mode Pastel Gradients & Solid Card Colors */
+            --color-card-teal: linear-gradient(135deg, rgb(230, 244, 241) 0%, rgb(255, 255, 255) 100%);
+            --color-card-rose: linear-gradient(135deg, rgb(253, 226, 228) 0%, rgb(255, 255, 255) 100%);
+            --color-card-lavender: linear-gradient(135deg, rgb(226, 226, 251) 0%, rgb(255, 255, 255) 100%);
+            --color-card-purple: linear-gradient(135deg, rgb(243, 232, 255) 0%, rgb(255, 255, 255) 100%);
+            --color-card-pink: linear-gradient(135deg, rgb(255, 228, 230) 0%, rgb(255, 255, 255) 100%);
+            --color-card-green: linear-gradient(135deg, rgb(220, 252, 231) 0%, rgb(255, 255, 255) 100%);
+            --color-card-solid: #ffffff;
+            --color-card-blue: linear-gradient(135deg, rgb(224, 242, 254) 0%, rgb(255, 255, 255) 100%);
+            --color-card-yellow: linear-gradient(135deg, rgb(254, 249, 195) 0%, rgb(255, 255, 255) 100%);
+            --color-card-peach: linear-gradient(135deg, rgb(255, 233, 229) 0%, rgb(255, 255, 255) 100%);
+            
+            --color-primary-btn: #ff6b4a;
+            --color-primary-btn-hover: #ff8566;
+
+            --color-testimonial-bg: #ffffff;
+            --color-testimonial-border: rgba(225, 191, 184, 0.25);
+
+            /* Pricing Card adaptive styles */
+            --color-card-rose-border: #ff6b4a;
+            --color-btn-outline-border: #8d716a;
+            --color-card-enterprise: var(--color-inverse-surface);
+            --color-text-enterprise: var(--color-inverse-on-surface);
+            --color-border-enterprise: transparent;
+            --color-btn-enterprise-bg: var(--color-surface-container-lowest);
+            --color-btn-enterprise-text: var(--color-on-surface);
+
+            /* Section 3 adaptive styles */
+            --color-s3-card-1: var(--color-card-teal);
+            --color-s3-card-2: var(--color-card-rose);
+            --color-s3-card-3: var(--color-card-lavender);
+            --color-s3-card-4: var(--color-inverse-surface);
+            --color-s3-text-4: var(--color-inverse-on-surface);
+            --color-s3-icon-1: var(--color-primary);
+            --color-s3-icon-2: var(--color-primary);
+            --color-s3-icon-3: var(--color-primary);
+            --color-s3-icon-bg: var(--color-surface-container-lowest);
+            --color-s3-icon-border: 1px solid rgba(0, 0, 0, 0.08);
+            --color-workflow-pill-bg: var(--color-surface-container-lowest);
+            --color-workflow-pill-border: var(--color-outline-variant);
+        }
+        
+        html.dark {
+            --color-primary: #FF6B4A;
+            --color-primary-container: #FF6B4A;
+            --color-secondary: #94A3B8;
+            --color-background: #0B0F19;
+            --color-surface: #111827;
+            --color-surface-dim: #0B0F19;
+            --color-surface-bright: #1F2937;
+            --color-surface-container: #171C28;
+            --color-on-surface: #F9FAFB;
+            --color-on-surface-variant: #9CA3AF;
+            
+            --color-surface-container-low: #111827;
+            --color-surface-container-lowest: #0B0F19;
+            --color-outline: #94A3B8;
+            --color-outline-variant: rgba(255, 255, 255, 0.05); /* border border-white/5 as requested */
+            --color-inverse-surface: #F9FAFB;
+            --color-inverse-on-surface: #111827;
+            
+            /* Custom Select Dropdown - Dark Theme */
+            --color-dropdown-bg: #111827;
+            --color-dropdown-border: rgba(255, 255, 255, 0.1);
+            --color-dropdown-text: #F9FAFB;
+            --color-dropdown-option-hover: rgba(255, 255, 255, 0.08);
+            --color-dropdown-option-selected: rgba(255, 255, 255, 0.12);
+            
+            --color-input-bg: #111827;
+            --color-input-border: rgba(255, 255, 255, 0.1);
+            --color-input-text: #F9FAFB;
+            
+            --color-sim-bg: radial-gradient(100% 100% at 0% 0%, #171C28 0%, #0B0F19 100%);
+            --color-sim-border: rgba(255, 255, 255, 0.1);
+            --color-sim-notch: rgba(255, 255, 255, 0.1);
+            --color-sim-title: #F9FAFB;
+            --color-sim-bubble-user-bg: rgba(255, 107, 74, 0.15);
+            --color-sim-bubble-user-text: #FF6B4A;
+            --color-sim-bubble-ai-bg: rgba(148, 163, 184, 0.1);
+            --color-sim-bubble-ai-text: #94A3B8;
+            --color-sim-card-bg: rgba(255, 255, 255, 0.04);
+            --color-sim-card-border: rgba(255, 255, 255, 0.08);
+            --color-sim-card-text: #F9FAFB;
+            --color-sim-card-muted: #94A3B8;
+
+            /* Luminous Depth Glow gradients for Bento Cards (using user specified accent bases + surface-dim) */
+            --color-card-teal: var(--color-surface-container); /* Solid dark container */
+            --color-card-rose: linear-gradient(180deg, rgba(255, 107, 74, 0.05) 0%, var(--color-surface-container) 100%); /* Mockup peach glow overlay */
+            --color-card-lavender: var(--color-surface-container); /* Solid dark container */
+            --color-card-purple: linear-gradient(135deg, #181726 0%, var(--color-surface-dim) 100%); /* Purple Glow */
+            --color-card-pink: linear-gradient(135deg, #221420 0%, var(--color-surface-dim) 100%); /* Pink Glow */
+            --color-card-green: linear-gradient(135deg, #0C181C 0%, var(--color-surface-dim) 100%); /* Green Glow */
+            --color-card-solid: linear-gradient(135deg, var(--color-surface-container) 0%, var(--color-surface-dim) 100%); /* Base Style */
+            --color-card-blue: linear-gradient(135deg, #0B1724 0%, var(--color-surface-dim) 100%); /* Blue Glow */
+            --color-card-yellow: linear-gradient(135deg, #14130E 0%, var(--color-surface-dim) 100%); /* Yellow Glow */
+            --color-card-peach: linear-gradient(135deg, #17141C 0%, var(--color-surface-dim) 100%); /* Peach Glow */
+            
+            --color-primary-btn: #FF6B4A;
+            --color-primary-btn-hover: #ff8566;
+
+            /* Testimonial Card Styling */
+            --color-testimonial-bg: transparent;
+            --color-testimonial-border: transparent;
+
+            /* Pricing Card adaptive styles */
+            --color-card-rose-border: rgba(255, 107, 74, 0.5);
+            --color-btn-outline-border: rgba(255, 255, 255, 0.15);
+            --color-card-enterprise: rgba(255, 255, 255, 0.05);
+            --color-text-enterprise: var(--color-on-surface);
+            --color-border-enterprise: rgba(255, 255, 255, 0.1);
+            --color-btn-enterprise-bg: #FFFFFF;
+            --color-btn-enterprise-text: #0B0F19;
+
+            /* Section 3 adaptive styles */
+            --color-s3-card-1: linear-gradient(135deg, rgba(45, 106, 79, 0.1) 0%, var(--color-surface-container) 100%);
+            --color-s3-card-2: linear-gradient(135deg, rgba(255, 107, 74, 0.1) 0%, var(--color-surface-container) 100%);
+            --color-s3-card-3: linear-gradient(135deg, rgba(93, 95, 239, 0.1) 0%, var(--color-surface-container) 100%);
+            --color-s3-card-4: var(--color-surface-container);
+            --color-s3-text-4: var(--color-on-surface);
+            --color-s3-icon-1: #4ADE80;
+            --color-s3-icon-2: var(--color-primary);
+            --color-s3-icon-3: #818CF8;
+            --color-s3-icon-bg: rgba(255, 255, 255, 0.05);
+            --color-s3-icon-border: none;
+            --color-workflow-pill-bg: var(--color-surface-container);
+            --color-workflow-pill-border: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-background);
+            color: var(--color-on-surface);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .bento-card {
+            border-radius: 24px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--color-surface-container-lowest);
+            border: 1px solid var(--color-outline-variant);
+            box-shadow: 0px 4px 20px rgba(26, 31, 43, 0.04);
+        }
+        .bento-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0px 12px 40px rgba(26, 31, 43, 0.08);
+        }
+        .ai-pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--color-primary);
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            animation: pulse 2s infinite ease-in-out;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ----------------------------------------------------
+           iPhone Simulator (Custom Styled Variables integration)
+           ---------------------------------------------------- */
+        .lp-iphone-simulator {
+            background: var(--color-sim-bg);
+            border: 8px solid var(--color-sim-border);
+            border-radius: 44px;
+            box-shadow: 0 20px 50px -10px rgba(0,0,0,0.15), 0 0 40px rgba(174, 49, 21, 0.05), inset 0 1px 1px rgba(255,255,255,0.05);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        .lp-iphone-notch {
+            width: 110px;
+            height: 28px;
+            background: var(--color-sim-notch);
+            border-radius: 0 0 16px 16px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 50;
+            box-shadow: inset 0 -1px 1px rgba(0,0,0,0.3);
+            transition: background 0.3s ease;
+        }
+
+        .lp-iphone-camera {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #0f172a;
+            position: absolute;
+            right: 20px;
+        }
+
+        .lp-iphone-screen {
+            flex: 1;
+            padding: 1.25rem 1rem 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            color: var(--color-on-surface);
+            position: relative;
+            height: calc(100% - 36px);
+        }
+
+        .lp-sim-header {
+            text-align: center;
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .lp-sim-avatar-container {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(174, 49, 21, 0.1) 0%, rgba(89, 94, 108, 0.1) 100%);
+            border: 1.5px solid var(--color-outline-variant);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            box-shadow: 0 0 30px rgba(174, 49, 21, 0.12);
+            font-size: 1.6rem;
+            position: relative;
+        }
+
+        .lp-sim-avatar-container::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 1px solid var(--color-primary);
+            animation: lp-ripple 2s infinite ease-out;
+            opacity: 0;
+        }
+
+        @keyframes lp-ripple {
+            0% { transform: scale(1); opacity: 0.5; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+
+        .lp-sim-caller-name {
+            font-weight: 600;
+            font-size: 1.15rem;
+            color: var(--color-sim-title);
+            letter-spacing: -0.3px;
+            transition: color 0.3s ease;
+        }
+
+        .lp-sim-caller-status {
+            font-size: 0.72rem;
+            color: var(--color-secondary);
+            margin-top: 5px;
+            letter-spacing: 0.5px;
+            transition: color 0.3s ease;
+        }
+
+        /* Waveform visualizer */
+        .lp-sim-wave {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            height: 36px;
+            margin: 15px 0;
+        }
+
+        .lp-sim-wave span {
+            width: 4px;
+            height: 6px;
+            background: linear-gradient(to top, var(--color-primary), var(--color-secondary));
+            border-radius: 2px;
+            transition: transform 0.25s ease, background 0.3s ease;
+        }
+
+        .lp-sim-wave.active span {
+            animation: lp-wave-anim 1.2s infinite ease-in-out alternate;
+        }
+
+        .lp-sim-wave.active span:nth-child(1) { animation-delay: 0.1s; }
+        .lp-sim-wave.active span:nth-child(2) { animation-delay: 0.25s; }
+        .lp-sim-wave.active span:nth-child(3) { animation-delay: 0.4s; }
+        .lp-sim-wave.active span:nth-child(4) { animation-delay: 0.25s; }
+        .lp-sim-wave.active span:nth-child(5) { animation-delay: 0.1s; }
+
+        @keyframes lp-wave-anim {
+            0% { transform: scaleY(1); }
+            100% { transform: scaleY(4.5); }
+        }
+
+        .lp-sim-transcript {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.12);
+            border-radius: 16px;
+            border: 1px solid var(--color-outline-variant);
+            padding: 12px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+            scrollbar-width: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: border-color 0.3s ease;
+        }
+
+        html.dark .lp-sim-transcript {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .lp-sim-transcript::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Speech bubbles */
+        .lp-bubble {
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 0.78rem;
+            line-height: 1.4;
+            max-width: 85%;
+            word-wrap: break-word;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        .lp-bubble-user {
+            margin-left: auto;
+            background: var(--color-sim-bubble-user-bg);
+            color: var(--color-sim-bubble-user-text);
+            text-align: right;
+        }
+
+        .lp-bubble-ai {
+            margin-right: auto;
+            background: var(--color-sim-bubble-ai-bg);
+            color: var(--color-sim-bubble-ai-text);
+            text-align: left;
+        }
+
+        /* Custom Dropdown select */
+        .custom-select-trigger {
+            background: var(--color-dropdown-bg);
+            border: 1px solid var(--color-dropdown-border);
+            color: var(--color-dropdown-text);
+            transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+        .custom-options {
+            background: var(--color-dropdown-bg);
+            border: 1px solid var(--color-dropdown-border);
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        .custom-option {
+            color: var(--color-dropdown-text);
+            padding: 8px 12px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .custom-option:hover {
+            background: var(--color-dropdown-option-hover);
+        }
+        .custom-option.selected {
+            background: var(--color-dropdown-option-selected);
+        }
+        .lp-sim-input, .lp-sim-textarea {
+            background: var(--color-input-bg) !important;
+            border: 1px solid var(--color-input-border) !important;
+            color: var(--color-input-text) !important;
+            transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease !important;
+        }
+        .lp-sim-input:focus, .lp-sim-textarea:focus {
+            border-color: var(--color-primary) !important;
+            box-shadow: 0 0 0 2px rgba(174, 49, 21, 0.15) !important;
+        }
+        .lp-sim-input::placeholder, .lp-sim-textarea::placeholder {
+            color: #64748b !important;
+            opacity: 0.75 !important;
+        }
+
+        /* Brand Logo - Transparent, adapts to dark/light mode */
+        .brand-logo {
+            height: 38px;
+            width: auto;
+            display: block;
+            object-fit: contain;
+            transition: filter 0.3s ease, opacity 0.3s ease;
+            mix-blend-mode: multiply;
+            filter: none;
+        }
+        /* Dark mode: show normally with shadow to frame on dark bg */
+        html.dark .brand-logo {
+            mix-blend-mode: normal;
+            filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+        }
+        .brand-logo:hover {
+            opacity: 0.82;
+        }
+    </style>
+</head>
+<body class="text-on-surface">
+<!-- Section 1: Navbar -->
+<header class="fixed top-0 left-0 w-full z-50 bg-surface/80 backdrop-blur-md border-b border-outline-variant/10 shadow-sm transition-all duration-300">
+    <div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-4 flex items-center justify-between">
+        <div class="flex items-center gap-8">
+            <a href="/" class="flex items-center gap-2 font-bold text-lg text-on-surface">
+                <img src="logo_new.png" alt="Callio" class="brand-logo" style="height: 36px; width: auto;">
+                <span class="brand-name font-bold text-2xl tracking-tight font-display-lg bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Callio</span>
+            </a>
+            <nav class="hidden lg:flex items-center gap-6">
+                <a class="font-label-md text-label-md text-secondary hover:text-primary transition-colors" href="#features">Features</a>
+                <a class="font-label-md text-label-md text-secondary hover:text-primary transition-colors" href="#pricing">Pricing</a>
+                <a class="font-label-md text-label-md text-secondary hover:text-primary transition-colors" href="#">Blog</a>
+                <a class="font-label-md text-label-md text-secondary hover:text-primary transition-colors" href="#">About</a>
+                <div class="relative group">
+                    <button class="font-label-md text-label-md text-secondary hover:text-primary transition-colors flex items-center gap-1">
+                        Use cases <span class="text-[8px] opacity-60">▼</span>
+                    </button>
+                </div>
+                <div class="relative group">
+                    <button class="font-label-md text-label-md text-secondary hover:text-primary transition-colors flex items-center gap-1">
+                        Who it's for <span class="text-[8px] opacity-60">▼</span>
+                    </button>
+                </div>
+            </nav>
+        </div>
+        <div class="flex items-center gap-2 sm:gap-4">
+            <a href="/app" class="hidden sm:inline-block px-5 py-2 border border-outline/20 text-on-surface rounded-full font-label-md text-label-md hover:bg-surface-container transition-all">Sign In</a>
+            <button id="themeToggleBtn" onclick="toggleTheme()" class="w-10 h-10 rounded-full flex items-center justify-center border border-outline/20 text-on-surface hover:bg-surface-container transition-all" title="Toggle Theme">
+                <span class="material-symbols-outlined" id="themeToggleIcon">light_mode</span>
+            </button>
+            <a href="/app" class="px-4 py-2 sm:px-6 bg-primary-btn hover:bg-primary-btn-hover text-white rounded-full font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all text-xs sm:text-sm">Get Started</a>
+        </div>
+    </div>
+</header>
+
+<!-- Section 2: Hero -->
+<section class="pt-32 pb-20 md:pt-48 md:pb-32 px-margin-mobile md:px-margin-desktop">
+    <div class="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+        <div class="space-y-8">
+            <h1 class="font-display-lg text-display-lg-mobile md:text-display-lg leading-tight">
+                <span class="text-primary">AI Calling Agents</span> <br>
+                <span class="text-on-surface">That Actually Close Deals</span>
+            </h1>
+            <p class="font-body-lg text-body-lg text-secondary max-w-xl">
+                Not basic call bots — AI agents that manage tasks, nurture leads, and drive conversions on every call. High-performance voice automation for modern revenue teams.
+            </p>
+            <div class="flex flex-wrap gap-4">
+                <a href="#demo" class="h-14 px-8 bg-primary-btn hover:bg-primary-btn-hover text-white rounded-full font-label-md text-label-md flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(255,107,74,0.4)] transition-all active:scale-95">
+                    Get Started Today <span class="material-symbols-outlined">arrow_forward</span>
+                </a>
+                <a href="#features" class="h-14 px-8 border border-outline/30 text-on-surface rounded-full font-label-md text-label-md flex items-center justify-center hover:bg-white/5 transition-all">
+                    See features
+                </a>
+            </div>
+            <!-- Stat Strip -->
+            <div class="pt-8 border-t border-outline-variant/30 flex flex-wrap gap-x-8 gap-y-4 items-center">
+                <div class="flex items-center gap-2 text-secondary font-label-sm text-label-sm">
+                    <span class="ai-pulse"></span> 10K+ calls handled
+                </div>
+                <div class="text-secondary font-label-sm text-label-sm">• No manual dialing</div>
+                <div class="text-secondary font-label-sm text-label-sm">• 3x lead follow-up rate</div>
+                <div class="text-secondary font-label-sm text-label-sm">• Real-time CRM sync</div>
+            </div>
+        </div>
+        
+        <!-- Hero Right Visual: The iPhone Simulator -->
+        <div class="relative flex justify-center lg:translate-x-14 lg:-translate-y-4" id="demo">
+            <!-- Centered iPhone Simulator -->
+            <div class="lp-iphone-simulator w-[325px] h-[590px] md:w-[350px] md:h-[630px]">
+                <div class="lp-iphone-notch">
+                    <div class="lp-iphone-camera"></div>
+                </div>
+                
+                <div class="lp-iphone-screen" id="lp-iphone-screen-content">
+                    <!-- Outbound Trial Form -->
+                    <div id="lp-trial-form" style="display: flex; flex-direction: column; height: 100%; justify-content: space-between;">
+                        <div class="lp-sim-header" style="margin-top: 10px;">
+                            <div class="lp-sim-avatar-container" id="lp-form-avatar" style="width: 54px; height: 54px; font-size: 1.4rem; margin-bottom: 6px;">🎙️</div>
+                            <div class="lp-sim-caller-name" style="font-size: 1.05rem;">Callio Live Demo</div>
+                            <div class="lp-sim-caller-status" style="font-size: 0.72rem; margin-top: 2px;">Choose voice & speak live with Callio AI</div>
+                        </div>
+
+                        <!-- Clean Premium Custom Voice Dropdown -->
+                        <div style="margin: 10px 0 6px; position: relative;">
+                            <div style="font-size: 0.68rem; color: var(--color-secondary); text-align: center; margin-bottom: 5px; letter-spacing: 0.06em; text-transform: uppercase;">AI Voice</div>
+                            <div class="custom-select-wrapper" style="position: relative; user-select: none;">
+                                <div class="custom-select-trigger" onclick="toggleCustomVoiceDropdown()"
+                                    style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; font-size: 0.8rem; border-radius: 10px; font-weight: 600; cursor: pointer; transition: border-color 0.2s;">
+                                    <span id="selected-voice-label">Aoede (Female - Breezy, Middle)</span>
+                                    <span style="font-size: 0.65rem;">▼</span>
+                                </div>
+                                <!-- Hidden input to store value -->
+                                <input type="hidden" id="trial-voice" value="Aoede">
+                                
+                                <div class="custom-options" id="custom-voice-options"
+                                    style="display: none; position: absolute; top: 100%; left: 0; right: 0; margin-top: 6px; max-height: 180px; overflow-y: auto; border-radius: 10px; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.2); scrollbar-width: thin;">
+                                    <div class="custom-option selected" onclick="selectVoiceOption('Aoede', 'Aoede (Female - Breezy, Middle)')">Aoede (Female - Breezy, Middle)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Zephyr', 'Zephyr (Male - Bright, Higher)')">Zephyr (Male - Bright, Higher)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Puck', 'Puck (Female - Upbeat, Middle)')">Puck (Female - Upbeat, Middle)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Charon', 'Charon (Male - Informative, Lower)')">Charon (Male - Informative, Lower)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Kore', 'Kore (Female - Firm, Middle)')">Kore (Female - Firm, Middle)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Fenrir', 'Fenrir (Male - Excitable, Lower)')">Fenrir (Male - Excitable, Lower)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Leda', 'Leda (Female - Youthful, Higher)')">Leda (Female - Youthful, Higher)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Orus', 'Orus (Male - Firm, Lower)')">Orus (Male - Firm, Lower)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Callirrhoe', 'Callirrhoe (Female - Easy-going, Middle)')">Callirrhoe (Female - Easy-going, Middle)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Autonoe', 'Autonoe (Female - Bright, Middle)')">Autonoe (Female - Bright, Middle)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Enceladus', 'Enceladus (Male - Breathy, Lower)')">Enceladus (Male - Breathy, Lower)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Iapetus', 'Iapetus (Male - Clear, Lower)')">Iapetus (Male - Clear, Lower)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Umbriel', 'Umbriel (Male - Easy-going, Lower)')">Umbriel (Male - Easy-going, Lower)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Algieba', 'Algieba (Male - Smooth, Lower)')">Algieba (Male - Smooth, Lower)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Despina', 'Despina (Female - Smooth, Middle)')">Despina (Female - Smooth, Middle)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Erinome', 'Erinome (Female - Clear, Middle)')">Erinome (Female - Clear, Middle)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Algenib', 'Algenib (Male - Gravelly, Lower)')">Algenib (Male - Gravelly, Lower)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Rasalgethi', 'Rasalgethi (Male - Informative, Middle)')">Rasalgethi (Male - Informative, Middle)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Laomedeia', 'Laomedeia (Female - Upbeat, Higher)')">Laomedeia (Female - Upbeat, Higher)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Achernar', 'Achernar (Female - Soft, Higher)')">Achernar (Female - Soft, Higher)</div>
+                                    <div class="custom-option" onclick="selectVoiceOption('Alnilam', 'Alnilam (Male - Firm, Lower)')">Alnilam (Male - Firm, Lower)</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin: 4px 0; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 6px;">
+                            <input type="text" id="lp-trial-name" class="lp-sim-input" placeholder="Your Name" style="width:100%; padding:10px; font-size:0.8rem; border-radius:10px; outline:none;">
+                            <input type="tel" id="lp-trial-phone" class="lp-sim-input" placeholder="Your Phone Number" required style="width:100%; padding:10px; font-size:0.8rem; border-radius:10px; outline:none;">
+                            <div id="lp-trial-error" style="color: var(--color-primary); font-size: 0.75rem; text-align: center; margin-top: 4px; font-weight: 600; display: none;"></div>
+                        </div>
+                        
+                        <button class="w-full py-3 bg-primary-btn hover:bg-primary-btn-hover text-white rounded-full font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all" onclick="triggerLiveTrialCall()">
+                            Start Live Talk 🎙️
+                        </button>
+                    </div>
+                    
+                    <!-- Outbound Active Call Screen -->
+                    <div id="lp-trial-active-call" style="display: none; flex-direction: column; height: 100%; justify-content: space-between;">
+                        <div class="lp-sim-header" style="margin-top: 15px;">
+                            <div class="lp-sim-avatar-container" id="lp-trial-avatar" style="width: 72px; height: 72px; font-size: 1.8rem; margin-bottom: 12px;">📞</div>
+                            <div class="lp-sim-caller-name" id="lp-trial-active-name">Callio Assistant</div>
+                            <div class="lp-sim-caller-status" id="lp-trial-status">Connecting...</div>
+                        </div>
+
+                        <div class="lp-sim-wave" id="lp-trial-wave">
+                            <span></span><span></span><span></span><span></span><span></span>
+                        </div>
+
+                        <div class="lp-sim-transcript" id="lp-trial-transcript" style="min-height: 120px; font-size: 0.8rem; margin-bottom: 20px;">
+                            <div style="color: var(--color-secondary); text-align: center; font-size: 0.78rem; margin-top: 25px;">
+                                Outgoing call connection log...
+                            </div>
+                        </div>
+
+                        <div class="lp-sim-actions" style="margin-bottom: 10px; display: flex; justify-content: center;">
+                            <button class="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-white text-xl hover:scale-105 active:scale-95 transition-all shadow-lg" onclick="endLiveTrialCall()">❌</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- Section 3: For Sales Teams -->
+<section class="py-section-gap px-margin-mobile md:px-margin-desktop bg-surface-container-low" id="sales-teams">
+    <div class="max-w-container-max mx-auto">
+        <div class="mb-16">
+            <span class="text-primary font-label-sm tracking-widest uppercase">FOR SALES TEAMS</span>
+            <h2 class="mt-4 font-headline-md text-headline-md">Cold Follow-Ups Are Broken. <br><span class="text-primary">We Fixed It.</span></h2>
+        </div>
+        <!-- Workflow Pills -->
+        <div class="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-4 mb-16 max-w-4xl mx-auto">
+            <div class="w-full md:flex-1 py-4 md:py-6 px-6 md:px-8 rounded-xl md:rounded-full text-center font-label-md text-label-md shadow-sm border text-secondary transition-all" style="background: var(--color-workflow-pill-bg); border-color: var(--color-workflow-pill-border);">Capture Lead</div>
+            
+            <span class="material-symbols-outlined text-outline block md:hidden" style="opacity: 0.3;">arrow_downward</span>
+            <span class="material-symbols-outlined text-outline hidden md:block" style="opacity: 0.3;">arrow_forward</span>
+            
+            <div class="w-full md:flex-1 bg-primary text-white py-4 md:py-6 px-6 md:px-8 rounded-xl md:rounded-full text-center font-label-md text-label-md shadow-[0_0_15px_rgba(255,107,74,0.3)] transition-all">AI Calls &amp; Qualifies</div>
+            
+            <span class="material-symbols-outlined text-outline block md:hidden" style="opacity: 0.3;">arrow_downward</span>
+            <span class="material-symbols-outlined text-outline hidden md:block" style="opacity: 0.3;">arrow_forward</span>
+            
+            <div class="w-full md:flex-1 py-4 md:py-6 px-6 md:px-8 rounded-xl md:rounded-full text-center font-label-md text-label-md shadow-sm border text-secondary transition-all" style="background: var(--color-workflow-pill-bg); border-color: var(--color-workflow-pill-border);">Book Meeting / Close</div>
+        </div>
+        <!-- Sales Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+            <div class="bento-card p-8" style="background: var(--color-s3-card-1);">
+                <div class="w-12 h-12 rounded-xl mb-6 flex items-center justify-center" style="background: var(--color-s3-icon-bg); border: var(--color-s3-icon-border); color: var(--color-s3-icon-1);">
+                    <span class="material-symbols-outlined">filter_alt</span>
+                </div>
+                <h3 class="font-headline-sm text-headline-sm mb-2">Smart Lead Nurturing</h3>
+                <p class="font-body-md text-body-md text-secondary">Automatically follow up within 5 seconds of lead capture.</p>
+            </div>
+            <div class="bento-card p-8" style="background: var(--color-s3-card-2);">
+                <div class="w-12 h-12 rounded-xl mb-6 flex items-center justify-center" style="background: var(--color-s3-icon-bg); border: var(--color-s3-icon-border); color: var(--color-s3-icon-2);">
+                    <span class="material-symbols-outlined">forum</span>
+                </div>
+                <h3 class="font-headline-sm text-headline-sm mb-2">Human-like Conversations</h3>
+                <p class="font-body-md text-body-md text-secondary">Natural latency and tone that builds trust instantly.</p>
+            </div>
+            <div class="bento-card p-8" style="background: var(--color-s3-card-3);">
+                <div class="w-12 h-12 rounded-xl mb-6 flex items-center justify-center" style="background: var(--color-s3-icon-bg); border: var(--color-s3-icon-border); color: var(--color-s3-icon-3);">
+                    <span class="material-symbols-outlined">task_alt</span>
+                </div>
+                <h3 class="font-headline-sm text-headline-sm mb-2">Task &amp; Workflow Types</h3>
+                <p class="font-body-md text-body-md text-secondary">Handle reschedule, surveys, and complex triage flows.</p>
+            </div>
+            <div class="bento-card p-0 overflow-hidden" style="background: var(--color-s3-card-4); color: var(--color-s3-text-4);">
+                <div class="p-8 pb-0">
+                    <h3 class="font-headline-sm text-headline-sm mb-2" style="color: inherit;">Zero Setup Friction</h3>
+                    <p class="font-body-md text-body-md" style="color: inherit; opacity: 0.8;">Integrate with your current stack in under 10 minutes.</p>
+                </div>
+                <img class="mt-4 w-full h-40 object-cover opacity-40 brightness-75 mix-blend-lighten" alt="Technical integration mockup" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDv7xvbi3CRlrBGklW3FB1LHysziLvKWVuC5RMlGzHXAppgLeAXSNDQckG2N8Su-ebtQcg9z14OM2x83FORkV7m6H8CPofM9-3A4k-ikCDT6hpHcqzAozBmTlfnHIV3rN2BAvqD07QN4GCy7enO83aEeHW8_4_mTC5qnelH6c8TXNrYxbWhrwDpSxFFeQLWXWyRf4D_W-9HtIjuu7FoRaTS5SXZST794nNrY5YtSGEtMwn27xAUPylICIA6ACPnynzFvYmmvqZHvhAi">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Section 4: For Businesses (Bento Grid) -->
+<section class="py-section-gap px-margin-mobile md:px-margin-desktop" id="features">
+    <div class="max-w-container-max mx-auto">
+        <div class="mb-16">
+            <span class="text-primary font-label-sm tracking-widest uppercase">FOR BUSINESSES</span>
+            <h2 class="mt-4 font-headline-md text-headline-md">Conversion Command Center</h2>
+        </div>
+        <!-- Row 1: Visual Call Flow Builder & Live Call Monitoring -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-gutter mb-gutter">
+            <!-- Visual Call Flow -->
+            <div class="bento-card p-8 flex flex-col justify-between" style="background: var(--color-card-purple);">
+                <div>
+                    <h3 class="font-headline-sm text-headline-sm mb-2">Visual Call Flow Builder</h3>
+                    <p class="font-body-md text-body-md text-secondary">Drag-and-drop logic to design the perfect conversation path without code.</p>
+                </div>
+                <div class="mt-8 flex gap-2 overflow-hidden">
+                    <div class="bg-surface-container-lowest p-3 rounded-lg shadow-sm border border-outline-variant/20 min-w-[120px]">
+                        <div class="text-[10px] text-secondary mb-1">Trigger</div>
+                        <div class="text-label-sm font-bold">New Lead</div>
+                    </div>
+                    <div class="flex items-center text-outline">
+                        <span class="material-symbols-outlined">trending_flat</span>
+                    </div>
+                    <div class="bg-primary-btn p-3 rounded-lg shadow-sm text-white min-w-[120px]">
+                        <div class="text-[10px] opacity-80 mb-1">Action</div>
+                        <div class="text-label-sm font-bold text-white">Initiate AI Call</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Live Monitoring -->
+            <div class="bento-card p-8 flex flex-col justify-between" style="background: var(--color-card-pink);">
+                <div>
+                    <h3 class="font-headline-sm text-headline-sm mb-2">Live Call Monitoring</h3>
+                    <p class="font-body-md text-body-md text-secondary">Watch transcriptions in real-time and jump in if a human touch is needed.</p>
+                </div>
+                <div class="mt-8 bg-surface-container-lowest/40 rounded-xl p-4 space-y-3 border border-outline-variant/20">
+                    <div class="h-2 w-3/4 bg-primary rounded-full" style="opacity: 0.2;"></div>
+                    <div class="h-2 w-1/2 bg-on-surface rounded-full" style="opacity: 0.1;"></div>
+                    <div class="h-2 w-2/3 bg-primary rounded-full" style="opacity: 0.3;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: 3-column layouts for Team Management, Dynamic Script, and CRM Broadcast -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter mb-gutter">
+            <!-- Team Management -->
+            <div class="bento-card p-8" style="background: var(--color-card-green);">
+                <h3 class="font-headline-sm text-headline-sm mb-2">Team &amp; Agent Management</h3>
+                <p class="font-body-md text-body-md text-secondary">Provision and scale AI agents for specific regions or departments instantly.</p>
+            </div>
+            <!-- Dynamic Script -->
+            <div class="bento-card p-8" style="background: var(--color-card-solid);">
+                <h3 class="font-headline-sm text-headline-sm mb-2">Dynamic Script Updates</h3>
+                <p class="font-body-md text-body-md text-secondary">Update scripts on the fly and all active agents sync immediately.</p>
+            </div>
+            <!-- CRM Broadcast -->
+            <div class="bento-card p-8" style="background: var(--color-card-blue);">
+                <h3 class="font-headline-sm text-headline-sm mb-2">CRM &amp; Tool Broadcast</h3>
+                <p class="font-body-md text-body-md text-secondary">Automatically push outcomes, summaries, and recordings to your CRM.</p>
+            </div>
+        </div>
+
+        <!-- Row 3: Real-time Insights (Full Width) -->
+        <div class="grid grid-cols-1 gap-gutter">
+            <!-- Real-time Insights (Wide) -->
+            <div class="bento-card p-8 flex flex-col md:flex-row gap-8 items-center" style="background: var(--color-card-peach);">
+                <div class="flex-1">
+                    <h3 class="font-headline-sm text-headline-sm mb-2">Real-time Insights</h3>
+                    <p class="font-body-md text-body-md text-secondary">Deep analytics on sentiment, conversion rates, and call duration to optimize every word.</p>
+                </div>
+                <div class="flex-1 w-full h-32 flex items-end justify-center md:justify-end gap-3 px-4">
+                    <div class="w-6 md:w-8 bg-primary rounded-t-lg h-[35%]" style="opacity: 0.4;"></div>
+                    <div class="w-6 md:w-8 bg-primary rounded-t-lg h-[55%]" style="opacity: 0.55;"></div>
+                    <div class="w-6 md:w-8 bg-primary rounded-t-lg h-[80%]" style="opacity: 0.75;"></div>
+                    <div class="w-6 md:w-8 bg-primary rounded-t-lg h-[45%]" style="opacity: 0.5;"></div>
+                    <div class="w-6 md:w-8 bg-primary rounded-t-lg h-[95%]" style="opacity: 0.95;"></div>
+                    <div class="w-6 md:w-8 bg-primary rounded-t-lg h-[70%]" style="opacity: 0.7;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Section 5: Pricing -->
+<section class="py-section-gap px-margin-mobile md:px-margin-desktop bg-surface-container-low/50" id="pricing">
+    <div class="max-w-container-max mx-auto text-center">
+        <span class="text-primary font-label-sm tracking-widest uppercase">PRICING</span>
+        <h2 class="mt-4 font-headline-md text-headline-md mb-8">Simple, Transparent Pricing</h2>
+        
+        <!-- Toggle -->
+        <div class="flex items-center justify-center gap-4 mb-12">
+            <span class="font-label-md text-label-md text-secondary">Monthly</span>
+            <button class="w-14 h-8 bg-outline-variant/30 rounded-full relative p-1 transition-colors duration-300" id="billingToggle">
+                <div class="w-6 h-6 bg-primary rounded-full transform translate-x-6 transition-transform duration-300"></div>
+            </button>
+            <span class="font-label-md text-label-md text-on-surface font-bold">Yearly <span class="text-primary text-[10px] ml-1">Save 20%</span></span>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter text-left items-stretch">
+            <!-- Tier 1 -->
+            <div class="bento-card p-8 flex flex-col" style="background: var(--color-card-teal);">
+                <div class="mb-8">
+                    <div class="text-secondary font-label-sm text-label-sm mb-2">Starter</div>
+                    <div class="text-display-lg font-bold text-on-surface">$49<span class="text-label-md font-medium text-secondary">/mo</span></div>
+                </div>
+                <ul class="space-y-4 mb-12 flex-1">
+                    <li class="flex items-start gap-2 text-body-md text-secondary">
+                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+                        Up to 100 calls/mo
+                    </li>
+                    <li class="flex items-start gap-2 text-body-md text-secondary">
+                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+                        Standard Voice Engine
+                    </li>
+                </ul>
+                <a href="/app" class="w-full py-4 text-center border rounded-full font-label-md text-label-md hover:opacity-85 transition-all" style="border-color: var(--color-btn-outline-border); color: var(--color-on-surface);">Choose Starter</a>
+            </div>
+            
+            <!-- Tier 2 (Highlighted) -->
+            <div class="bento-card p-8 border-2 flex flex-col relative transform lg:scale-105 shadow-2xl z-10" style="background: var(--color-card-rose); border-color: var(--color-card-rose-border);">
+                <div class="absolute top-0 right-8 -translate-y-1/2 bg-primary text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Most Popular</div>
+                <div class="mb-8">
+                    <div class="text-secondary font-label-sm text-label-sm mb-2">Growth</div>
+                    <div class="text-display-lg font-bold text-on-surface">$199<span class="text-label-md font-medium text-secondary">/mo</span></div>
+                </div>
+                <ul class="space-y-4 mb-12 flex-1">
+                    <li class="flex items-start gap-2 text-body-md text-secondary">
+                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+                        Up to 1,000 calls/mo
+                    </li>
+                    <li class="flex items-start gap-2 text-body-md text-secondary">
+                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+                        Premium Natural Latency
+                    </li>
+                    <li class="flex items-start gap-2 text-body-md text-secondary">
+                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+                        CRM Integrations
+                    </li>
+                </ul>
+                <a href="/app" class="w-full py-4 text-center bg-primary-btn hover:bg-primary-btn-hover text-white rounded-full font-label-md text-label-md hover:opacity-90 shadow-lg">Choose Growth</a>
+            </div>
+            
+            <!-- Tier 3 -->
+            <div class="bento-card p-8 flex flex-col" style="background: var(--color-card-lavender);">
+                <div class="mb-8">
+                    <div class="text-secondary font-label-sm text-label-sm mb-2">Scale</div>
+                    <div class="text-display-lg font-bold text-on-surface">$599<span class="text-label-md font-medium text-secondary">/mo</span></div>
+                </div>
+                <ul class="space-y-4 mb-12 flex-1">
+                    <li class="flex items-start gap-2 text-body-md text-secondary">
+                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+                        Unlimited calls
+                    </li>
+                    <li class="flex items-start gap-2 text-body-md text-secondary">
+                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+                        Custom Voice Training
+                    </li>
+                    <li class="flex items-start gap-2 text-body-md text-secondary">
+                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+                        Priority 24/7 Support
+                    </li>
+                </ul>
+                <a href="/app" class="w-full py-4 text-center border rounded-full font-label-md text-label-md hover:opacity-85 transition-all" style="border-color: var(--color-btn-outline-border); color: var(--color-on-surface);">Choose Scale</a>
+            </div>
+            
+            <!-- Tier 4 -->
+            <div class="bento-card p-8 flex flex-col border" style="background: var(--color-card-enterprise); color: var(--color-text-enterprise); border-color: var(--color-border-enterprise);">
+                <div class="mb-8">
+                    <div class="text-secondary font-label-sm text-label-sm mb-2" style="color: inherit; opacity: 0.8;">Custom</div>
+                    <div class="text-display-lg font-bold">Enterprise</div>
+                </div>
+                <p class="font-body-md text-body-md mb-12 flex-1" style="color: inherit; opacity: 0.8;">Dedicated infrastructure, white-labeling, and advanced compliance for global organizations.</p>
+                <a href="mailto:sales@callio.ai" class="w-full py-4 text-center rounded-full font-label-md text-label-md hover:opacity-90 transition-all shadow-md" style="background: var(--color-btn-enterprise-bg); color: var(--color-btn-enterprise-text);">Contact Sales</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Section 6: Testimonials -->
+<section class="py-section-gap px-margin-mobile md:px-margin-desktop">
+    <div class="max-w-container-max mx-auto">
+        <h2 class="text-center font-headline-md text-headline-md mb-16">Trusted by High-Velocity Revenue Teams</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+            <div class="bento-card p-8" style="background: var(--color-testimonial-bg); border-color: var(--color-testimonial-border);">
+                <p class="font-body-lg text-body-lg mb-8 text-on-surface/90 italic">"We replaced our entire SDR outbound team for high-volume leads with VoiceFlow. Our booking rate went from 4% to 12% in the first month."</p>
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-primary" style="background: rgba(255, 107, 74, 0.1);">SJ</div>
+                    <div>
+                        <div class="font-bold text-on-surface">Sarah Jenkins</div>
+                        <div class="text-label-sm text-secondary">VP Sales @ TechGrowth</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bento-card p-8" style="background: var(--color-testimonial-bg); border-color: var(--color-testimonial-border);">
+                <p class="font-body-lg text-body-lg mb-8 text-on-surface/90 italic">"The human-like quality is actually frightening. Customers have no idea they are talking to an AI agent until we tell them. Truly revolutionary."</p>
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-primary" style="background: rgba(255, 107, 74, 0.1);">MT</div>
+                    <div>
+                        <div class="font-bold text-on-surface">Mark Thompson</div>
+                        <div class="text-label-sm text-secondary">CEO @ LeadVelocity</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Section 7: FAQ -->
+<section class="py-section-gap px-margin-mobile md:px-margin-desktop bg-transparent" id="faq">
+    <div class="max-w-3xl mx-auto">
+        <h2 class="text-center font-headline-md text-headline-md mb-12">Frequently Asked Questions</h2>
+        <div class="space-y-4">
+            <div class="border-b pb-4" style="border-color: var(--color-outline-variant);">
+                <button class="w-full flex justify-between items-center py-4 text-left group" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                    <span class="font-headline-sm text-headline-sm text-on-surface">How human-like is the voice quality?</span>
+                    <svg class="w-5 h-5 text-primary transform group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
+                    </svg>
+                </button>
+                <div class="hidden pt-2 pb-4 text-body-md text-secondary leading-relaxed">
+                    VoiceFlow uses state-of-the-art neural text-to-speech with integrated natural latency and emotional inflection. It sounds virtually indistinguishable from a high-quality VoIP call with a human SDR.
+                </div>
+            </div>
+            <div class="border-b pb-4" style="border-color: var(--color-outline-variant);">
+                <button class="w-full flex justify-between items-center py-4 text-left group" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                    <span class="font-headline-sm text-headline-sm text-on-surface">Does it integrate with my CRM?</span>
+                    <svg class="w-5 h-5 text-primary transform group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
+                    </svg>
+                </button>
+                <div class="hidden pt-2 pb-4 text-body-md text-secondary leading-relaxed">
+                    Yes! We offer native integrations for Salesforce, HubSpot, and Pipedrive, plus a robust Zapier app and public API for custom requirements.
+                </div>
+            </div>
+            <div class="border-b pb-4" style="border-color: var(--color-outline-variant);">
+                <button class="w-full flex justify-between items-center py-4 text-left group" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                    <span class="font-headline-sm text-headline-sm text-on-surface">Is it compliant with regulations?</span>
+                    <svg class="w-5 h-5 text-primary transform group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
+                    </svg>
+                </button>
+                <div class="hidden pt-2 pb-4 text-body-md text-secondary leading-relaxed">
+                    Yes, VoiceFlow is built with TCPA, GDPR, and HIPAA compliance in mind. We provide tools to manage opt-outs and restricted calling times automatically.
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Section 8: Final CTA -->
+<section class="py-section-gap px-margin-mobile md:px-margin-desktop">
+    <div class="max-w-container-max mx-auto">
+        <div class="bg-primary-container rounded-[40px] p-12 md:p-24 text-center text-white relative overflow-hidden shadow-2xl">
+            <!-- Abstract BG Decoration -->
+            <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+            <div class="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
+            <h2 class="relative z-10 font-display-lg text-display-lg-mobile md:text-display-lg mb-8">Ready to Turn Every Call Into a Conversion?</h2>
+            <div class="relative z-10 flex flex-col md:flex-row items-center justify-center gap-6">
+                <a href="/app" class="bg-white text-primary-container px-10 py-5 rounded-full font-bold text-lg hover:scale-105 active:scale-95 transition-all shadow-xl">Get Started Today</a>
+                <a href="mailto:sales@callio.ai" class="border border-white/30 text-white px-10 py-5 rounded-full font-bold text-lg hover:bg-white/10 transition-all">Book a Demo</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Section 9: Footer -->
+<footer class="bg-surface-container-low border-t border-outline-variant/20 pt-24 pb-12 px-margin-mobile md:px-margin-desktop">
+    <div class="max-w-container-max mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-gutter mb-20">
+        <div class="lg:col-span-2">
+            <a href="/" class="flex items-center gap-2 font-bold text-lg text-on-surface mb-6">
+                <img src="logo_new.png" alt="Callio" class="brand-logo" style="height: 36px; width: auto;">
+                <span class="brand-name font-bold text-2xl tracking-tight font-display-lg bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Callio</span>
+            </a>
+            <p class="text-body-md text-secondary max-w-xs mb-8">AI Calling agents designed for high-revenue B2B sales teams. Turn every lead into a booked meeting.</p>
+        </div>
+        <div>
+            <h4 class="font-label-md text-label-md text-on-surface font-bold uppercase mb-6">Product</h4>
+            <ul class="space-y-4">
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#features">Features</a></li>
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">Voice Training</a></li>
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">Integrations</a></li>
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#pricing">Pricing</a></li>
+            </ul>
+        </div>
+        <div>
+            <h4 class="font-label-md text-label-md text-on-surface font-bold uppercase mb-6">Legal</h4>
+            <ul class="space-y-4">
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">Privacy Policy</a></li>
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">Terms of Service</a></li>
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">Security</a></li>
+            </ul>
+        </div>
+        <div>
+            <h4 class="font-label-md text-label-md text-on-surface font-bold uppercase mb-6">Company</h4>
+            <ul class="space-y-4">
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">About Us</a></li>
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">Careers</a></li>
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">Blog</a></li>
+            </ul>
+        </div>
+        <div>
+            <h4 class="font-label-md text-label-md text-on-surface font-bold uppercase mb-6">Resources</h4>
+            <ul class="space-y-4">
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">Documentation</a></li>
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">API Reference</a></li>
+                <li class=""><a class="text-body-md text-secondary hover:text-primary" href="#">Support</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="max-w-container-max mx-auto pt-8 border-t border-outline-variant/20 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="brand-copyright text-label-sm text-secondary">© 2026 Callio Technologies Inc. All rights reserved.</div>
+        <div class="flex gap-6 text-label-sm text-secondary">
+            <a class="hover:text-primary transition-colors" href="#">Cookie Policy</a>
+            <a class="hover:text-primary transition-colors" href="#">Sitemap</a>
+        </div>
+    </div>
+</footer>
+
+<script>
+    // Simple Billing Toggle Interaction
+    const billingToggle = document.getElementById('billingToggle');
+    if (billingToggle) {
+        billingToggle.addEventListener('click', () => {
+            const circle = billingToggle.querySelector('div');
+            circle.classList.toggle('translate-x-6');
+            circle.classList.toggle('translate-x-0');
+        });
+    }
+
+    // Sticky Navbar Reveal on scroll
+    let lastScrollTop = 0;
+    window.addEventListener("scroll", function() {
+        let st = window.pageYOffset || document.documentElement.scrollTop;
+        const header = document.querySelector('header');
+        if (st > lastScrollTop && st > 100) {
+            header.classList.add('-translate-y-full');
+        } else {
+            header.classList.remove('-translate-y-full');
+        }
+        header.style.transition = 'transform 0.3s ease';
+        lastScrollTop = st <= 0 ? 0 : st;
+    }, false);
+
+    // Theme toggler methods
+    window.applyTheme = function() {
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        const html = document.documentElement;
+        const icon = document.getElementById('themeToggleIcon');
+        
+        if (currentTheme === 'dark') {
+            html.classList.add('dark');
+            if (icon) icon.textContent = 'light_mode';
+        } else {
+            html.classList.remove('dark');
+            if (icon) icon.textContent = 'dark_mode';
+        }
+    }
+
+    window.toggleTheme = function() {
+        const html = document.documentElement;
+        const isDark = html.classList.contains('dark');
+        const newTheme = isDark ? 'light' : 'dark';
+        localStorage.setItem('theme', newTheme);
+        window.applyTheme();
+    }
+</script>
+
+<script>
+// Outbound Live Trial Call Management via Browser Microphone & AudioContext
+    let ws = null;
+    let audioContext = null;
+    let micStream = null;
+    let processorNode = null;
+    let micSourceNode = null;
+    let playOutNode = null;
+    let nextPlayTime = 0;
+    let isConnected = false;
+    let activeCallTimer = null;
+    let activeCallSeconds = 0;
+    let conversationMessages = []; // collect chat turns for summary
+    let scheduledSources = []; // track active playout sources to stop them on interruption
+    let activeTrialPhone = ''; // track active trial call phone number to link summary
+    let mediaRecorder = null;
+    let recordedChunks = [];
+
+    async function triggerLiveTrialCall() {
+      const nameInput = document.getElementById('lp-trial-name');
+      const phoneInput = document.getElementById('lp-trial-phone');
+      const promptInput = document.getElementById('lp-trial-prompt');
+      const errorDiv = document.getElementById('lp-trial-error');
+
+      const name = nameInput ? nameInput.value.trim() : '';
+      const phone = phoneInput ? phoneInput.value.trim() : '';
+      const prompt = promptInput ? promptInput.value.trim() : '';
+      activeTrialPhone = phone;
+
+      errorDiv.style.display = 'none';
+
+      if (!name) {
+        errorDiv.textContent = 'Please enter your name.';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      if (!phone) {
+        errorDiv.textContent = 'Please enter your phone number.';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      // Transition to calling view
+      const selectedVoice = document.getElementById('trial-voice').value || 'Aoede';
+      const femaleVoices = ['Aoede', 'Kore', 'Puck', 'Leda', 'Callirrhoe', 'Autonoe', 'Despina', 'Erinome', 'Laomedeia', 'Achernar', 'Pulcherrima', 'Vindemiatrix', 'Sulafat'];
+      const isFemale = femaleVoices.includes(selectedVoice);
+
+      // Save lead on the backend (Trial leads database log)
+      fetch('/api/trial-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone, voice: selectedVoice, prompt })
+      }).catch(err => console.error('Failed to save trial lead:', err));
+
+      document.getElementById('lp-trial-form').style.display = 'none';
+      document.getElementById('lp-trial-active-call').style.display = 'flex';
+      document.getElementById('lp-trial-active-name').textContent = name;
+      document.getElementById('lp-trial-status').textContent = 'Connecting...';
+      document.getElementById('lp-trial-wave').classList.add('active');
+      document.getElementById('lp-trial-avatar').textContent = isFemale ? '👩' : '👨';
+      
+      const transcript = document.getElementById('lp-trial-transcript');
+      transcript.innerHTML = `<div style="color: var(--text-muted); text-align: center; font-size: 0.78rem; margin-top: 25px;">Initializing Web Audio...</div>`;
+
+      // 1. Setup AudioContext from user gesture
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        playOutNode = audioContext.createGain();
+        playOutNode.connect(audioContext.destination);
+        nextPlayTime = audioContext.currentTime;
+      } catch (err) {
+        showTrialCallError('Failed to initialize Audio: ' + err.message);
+        return;
+      }
+
+      // 2. Open Secure Proxy WebSocket to Gemini Live
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/trial-live-ws?voice=${selectedVoice}&prompt=${encodeURIComponent(prompt)}`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (err) {
+        showTrialCallError('WebSocket connection failed: ' + err.message);
+        return;
+      }
+
+      ws.onopen = () => {
+        transcript.innerHTML = `<div style="color: var(--color-cyan); text-align: center; font-size: 0.78rem; margin-top: 25px;">Connecting to Gemini Live...</div>`;
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          
+          if (message.error) {
+            showTrialCallError(message.error);
+            return;
+          }
+
+          if (message.setupComplete) {
+            isConnected = true;
+            document.getElementById('lp-trial-status').textContent = '00:00';
+            transcript.innerHTML = '';
+            startCallTimer();
+            startMicrophone();
+
+            // Send initial trigger to Gemini to speak the greeting aloud
+            const firstTrigger = {
+              clientContent: {
+                turns: [
+                  {
+                    role: "user",
+                    parts: [{ text: `Hello! I am ${name}. Please greet me by my name and ask how you can help me.` }]
+                  }
+                ],
+                turnComplete: true
+              }
+            };
+            ws.send(JSON.stringify(firstTrigger));
+            return;
+          }
+
+          if (message.callSummary) {
+            // Store summary to show after connection closes
+            ws._callSummary = message.callSummary;
+            return;
+          }
+
+          if (message.serverContent) {
+            const content = message.serverContent;
+            
+            // Play received audio output
+            if (content.modelTurn?.parts) {
+              for (const part of content.modelTurn.parts) {
+                if (part.inlineData && part.inlineData.data) {
+                  const base64Audio = part.inlineData.data;
+                  const arrayBuffer = base64ToArrayBuffer(base64Audio);
+                  const float32Data = pcmToFloat32(arrayBuffer);
+                  playPCMChunk(float32Data);
+                }
+              }
+            }
+            
+            // Append Gemini speech bubble transcription
+            if (content.outputTranscription && content.outputTranscription.text) {
+              appendSpeechBubble('ai', content.outputTranscription.text);
+            }
+
+            // Append User speech bubble transcription
+            if (content.inputTranscription && content.inputTranscription.text) {
+              appendSpeechBubble('user', content.inputTranscription.text);
+            }
+
+            // Handle user interruption
+            if (content.interrupted) {
+              clearPlaybackQueue();
+            }
+          }
+        } catch (err) {
+          console.error('Error handling WebSocket message:', err);
+        }
+      };
+
+      ws.onerror = (err) => {
+        showTrialCallError('Connection error occurred.');
+      };
+
+      ws.onclose = (event) => {
+        if (event.code === 4029) {
+          showTrialCallError('You have reached the maximum of 2 trial calls for this IP.');
+        } else {
+          endLiveTrialCall();
+        }
+      };
+    }
+
+    async function startMicrophone() {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            channelCount: 1
+          }
+        });
+        
+        micSourceNode = audioContext.createMediaStreamSource(micStream);
+        processorNode = audioContext.createScriptProcessor(2048, 1, 1);
+        micSourceNode.connect(processorNode);
+        processorNode.connect(audioContext.destination);
+        
+        processorNode.onaudioprocess = (e) => {
+          if (!isConnected) return;
+          const inputBuffer = e.inputBuffer.getChannelData(0);
+          const downsampled = downsampleBuffer(inputBuffer, audioContext.sampleRate, 16000);
+          const pcmBuffer = floatTo16BitPCM(downsampled);
+          const base64Data = arrayBufferToBase64(pcmBuffer);
+          
+          const audioMessage = {
+            realtimeInput: {
+              audio: {
+                mimeType: 'audio/pcm;rate=16000',
+                data: base64Data
+              }
+            }
+          };
+          
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(audioMessage));
+          }
+        };
+
+        // Setup MediaStream Recording of both User (Mic) and AI (Playout)
+        try {
+          const dest = audioContext.createMediaStreamDestination();
+          playOutNode.connect(dest);
+          micSourceNode.connect(dest);
+          
+          recordedChunks = [];
+          mediaRecorder = new MediaRecorder(dest.stream);
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+              recordedChunks.push(e.data);
+            }
+          };
+          mediaRecorder.start(250);
+          console.log('[Browser Recorder] MediaRecorder started.');
+        } catch (recErr) {
+          console.error('[Browser Recorder] Failed to initialize recorder:', recErr);
+        }
+      } catch (err) {
+        showTrialCallError('Microphone access denied: ' + err.message);
+      }
+    }
+
+    function playPCMChunk(float32Data) {
+      if (!audioContext || audioContext.state === 'suspended') return;
+      const audioBuffer = audioContext.createBuffer(1, float32Data.length, 24000);
+      audioBuffer.getChannelData(0).set(float32Data);
+      
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(playOutNode);
+      
+      const now = audioContext.currentTime;
+      if (nextPlayTime < now) {
+        nextPlayTime = now;
+      }
+      source.start(nextPlayTime);
+      
+      scheduledSources.push({
+        source: source,
+        endTime: nextPlayTime + audioBuffer.duration
+      });
+      
+      nextPlayTime += audioBuffer.duration;
+      
+      // Clean up finished sources from memory
+      scheduledSources = scheduledSources.filter(item => item.endTime > now);
+    }
+
+    function clearPlaybackQueue() {
+      if (audioContext) {
+        nextPlayTime = audioContext.currentTime;
+      }
+      scheduledSources.forEach(item => {
+        try {
+          item.source.stop();
+        } catch (e) {
+          // ignore if already stopped or finished
+        }
+      });
+    }
+
+    function showCallSummary(summaryText, durationText, leadQuality, actionToTake) {
+      // Hide active call items to render full-screen report inside phone simulator
+      const simHeader = document.querySelector('#lp-trial-active-call .lp-sim-header');
+      const simWave = document.querySelector('#lp-trial-active-call .lp-sim-wave');
+      const simActions = document.querySelector('#lp-trial-active-call .lp-sim-actions');
+      
+      if (simHeader) simHeader.style.display = 'none';
+      if (simWave) simWave.style.display = 'none';
+      if (simActions) simActions.style.display = 'none';
+
+      const transcript = document.getElementById('lp-trial-transcript');
+      transcript.style.minHeight = '100%';
+      transcript.style.height = '100%';
+      transcript.style.margin = '0';
+      transcript.style.display = 'flex';
+      transcript.style.flexDirection = 'column';
+      transcript.style.justifyContent = 'space-between';
+      transcript.style.padding = '10px 5px';
+      
+      transcript.innerHTML = `
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 15px;">
+          <!-- Glowing Success Checklist Circle -->
+          <div style="text-align: center; margin-bottom: 5px;">
+            <div style="width: 60px; height: 60px; background: rgba(16, 185, 129, 0.1); border: 2px solid #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 10px; color: #10b981; box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);">✓</div>
+            <h4 style="font-size: 1.15rem; color: var(--color-sim-title); margin: 0; font-family: 'Sora', sans-serif; font-weight: 600;">Call Summary</h4>
+            <p style="font-size: 0.72rem; color: var(--color-sim-card-muted); margin: 3px 0 0 0; font-weight: 500;">Demo Session Complete</p>
+          </div>
+          
+          <!-- Summary Container -->
+          <div style="background: var(--color-sim-card-bg); border: 1px solid var(--color-sim-card-border); border-radius: 16px; padding: 18px 16px; text-align: left; max-height: 280px; overflow-y: auto; font-size: 0.8rem; line-height: 1.55; box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);">
+            <strong style="color: var(--color-cyan); display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;">✨ Call Insights (4 Points)</strong>
+            <div style="color: var(--color-sim-card-text); font-weight: 500; font-family: 'Inter', sans-serif; white-space: pre-line; margin-bottom: 15px;">${summaryText}</div>
+            
+            <!-- Lead Status Section -->
+            ${leadQuality ? `
+              <div style="margin-top: 15px; padding: 12px; border-radius: 12px; background: rgba(255, 107, 74, 0.06); border: 1px solid rgba(255, 107, 74, 0.15); margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span style="font-size: 0.68rem; color: var(--color-sim-card-muted); text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">Lead Status</span>
+                  <span style="
+                    font-size: 0.72rem; font-weight: bold; padding: 2px 8px; border-radius: 6px; 
+                    background: ${leadQuality === 'Hot Lead' ? 'rgba(239, 68, 68, 0.15)' : (leadQuality === 'Warm Lead' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(59, 130, 246, 0.15)')};
+                    color: ${leadQuality === 'Hot Lead' ? '#ef4444' : (leadQuality === 'Warm Lead' ? '#f59e0b' : '#3b82f6')};
+                  ">
+                    ${leadQuality === 'Hot Lead' ? '🔥 ' : (leadQuality === 'Warm Lead' ? '⚡ ' : '❄️ ')}${leadQuality}
+                  </span>
+                </div>
+                <div style="font-size: 0.76rem; color: var(--color-sim-card-text); line-height: 1.35;">
+                  <strong>👉 Action to Take:</strong> ${actionToTake || 'No action needed.'}
+                </div>
+              </div>
+            ` : ''}
+
+            ${durationText ? `
+              <div style="margin-top: 10px; font-size: 0.72rem; color: var(--color-sim-card-muted); border-top: 1px solid var(--color-sim-card-border); padding-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span>Conversation Duration</span>
+                <strong style="color: var(--color-sim-card-text); font-family: monospace; font-size: 0.8rem;">${durationText}</strong>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+        
+        <!-- Action Button -->
+        <button class="lp-btn-primary" style="width: 100%; border-radius: 12px; font-size: 0.82rem; padding: 12px; margin-top: 15px; display: block; font-family: 'Sora', sans-serif; font-weight: 600;" onclick="resetTrialForm()">
+          Start New Call 🎙️
+        </button>
+      `;
+    }
+
+    function startCallTimer() {
+      activeCallSeconds = 0;
+      if (activeCallTimer) clearInterval(activeCallTimer);
+      activeCallTimer = setInterval(() => {
+        activeCallSeconds++;
+        const mins = Math.floor(activeCallSeconds / 60).toString().padStart(2, '0');
+        const secs = (activeCallSeconds % 60).toString().padStart(2, '0');
+        document.getElementById('lp-trial-status').textContent = `${mins}:${secs}`;
+
+        // 1m 55s warning to announce farewell
+        if (activeCallSeconds === 115) {
+          const farewellMessage = {
+            clientContent: {
+              turns: [
+                {
+                  role: "user",
+                  parts: [{ text: `[SYSTEM ALERT]: Stop whatever you are doing and say exactly in Hinglish: "Aapka time ab khatam hota hai, aapse baat karke achha laga." and then stop speaking.` }]
+                }
+              ],
+              turnComplete: true
+            }
+          };
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(farewellMessage));
+          }
+        }
+
+        // 2m auto hangup limit
+        if (activeCallSeconds >= 120) {
+          endLiveTrialCall();
+        }
+      }, 1000);
+    }
+
+    function showTrialCallError(message) {
+      cleanupResources();
+      document.getElementById('lp-trial-status').textContent = 'Blocked';
+      document.getElementById('lp-trial-wave').classList.remove('active');
+      document.getElementById('lp-trial-avatar').textContent = '⚠️';
+      
+      const transcript = document.getElementById('lp-trial-transcript');
+      transcript.innerHTML = `
+        <div style="color: var(--color-red); text-align: center; font-size: 0.8rem; line-height: 1.5; margin-top: 15px; font-weight: bold;">
+          ${message}
+        </div>
+        <button class="lp-btn-secondary" style="width: 100%; border-radius: 10px; font-size: 0.78rem; padding: 8px; margin-top: 15px; display: block;" onclick="resetTrialForm()">
+          🔄 Try Again
+        </button>
+      `;
+    }
+
+    function appendSpeechBubble(role, text) {
+      const transcript = document.getElementById('lp-trial-transcript');
+      if (transcript.innerHTML.includes('Initializing Web Audio') || transcript.innerHTML.includes('Connecting to Gemini') || transcript.innerHTML.includes('Checking trial limits')) {
+        transcript.innerHTML = '';
+        conversationMessages = [];
+      }
+      
+      const bubbles = transcript.querySelectorAll('.lp-bubble');
+      const lastBubble = bubbles[bubbles.length - 1];
+      
+      if (lastBubble && lastBubble.dataset.role === role) {
+        const textSpan = lastBubble.querySelector('.bubble-text');
+        if (textSpan) {
+          textSpan.textContent += ' ' + text;
+          if (conversationMessages.length > 0) {
+            conversationMessages[conversationMessages.length - 1].text += ' ' + text;
+          }
+        }
+      } else {
+        conversationMessages.push({ role: role === 'user' ? 'User' : 'Callio AI', text });
+        const div = document.createElement('div');
+        div.className = `lp-bubble ${role === 'user' ? 'lp-bubble-user' : 'lp-bubble-ai'}`;
+        div.dataset.role = role;
+        div.style.marginBottom = '8px';
+        div.style.padding = '8px 12px';
+        div.style.borderRadius = '12px';
+        div.style.fontSize = '0.8rem';
+        div.style.lineHeight = '1.4';
+        div.style.maxWidth = '85%';
+        
+        if (role === 'user') {
+          div.style.marginLeft = 'auto';
+          div.style.background = 'rgba(139, 92, 246, 0.15)';
+          div.style.color = 'var(--color-violet)';
+          div.style.textAlign = 'right';
+        } else {
+          div.style.marginRight = 'auto';
+          div.style.background = 'rgba(6, 182, 212, 0.1)';
+          div.style.color = 'var(--color-cyan)';
+          div.style.textAlign = 'left';
+        }
+        
+        div.innerHTML = `<strong style="display:block; font-size: 0.72rem; opacity: 0.8; margin-bottom: 2px;">${role === 'user' ? 'You' : 'Callio AI'}</strong><span class="bubble-text">${text}</span>`;
+        transcript.appendChild(div);
+      }
+      
+      transcript.scrollTop = transcript.scrollHeight;
+    }
+
+    function stopBrowserRecordingAndUpload() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        console.log('[Browser Recorder] MediaRecorder stopped.');
+        
+        mediaRecorder.onstop = async () => {
+          if (recordedChunks.length === 0) return;
+          const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+          
+          try {
+            console.log('[Browser Recorder] Uploading recording for phone: ' + activeTrialPhone);
+            const uploadResp = await fetch(`/api/upload-trial-recording?phone=${encodeURIComponent(activeTrialPhone)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'audio/webm' },
+              body: blob
+            });
+            const uploadResult = await uploadResp.json();
+            console.log('[Browser Recorder] Upload result:', uploadResult);
+          } catch (uploadErr) {
+            console.error('[Browser Recorder] Upload failed:', uploadErr);
+          }
+        };
+      }
+    }
+
+    async function endLiveTrialCall() {
+      const callLog = [...conversationMessages];
+      const durationSecs = activeCallSeconds;
+      
+      // Stop and upload browser recording
+      stopBrowserRecordingAndUpload();
+      
+      cleanupResources();
+
+      if (callLog.length === 0) {
+        resetTrialForm();
+        return;
+      }
+
+      // Show generating state on phone screen
+      document.getElementById('lp-trial-status').textContent = 'Ended';
+      document.getElementById('lp-trial-wave').classList.remove('active');
+      document.getElementById('lp-trial-avatar').textContent = '✨';
+      const transcript = document.getElementById('lp-trial-transcript');
+      transcript.innerHTML = `<div style="color:var(--text-muted);text-align:center;font-size:0.78rem;margin-top:20px;padding:10px;">✨ Generating summary...</div>`;
+
+      const durationText = (() => {
+        const m = Math.floor(durationSecs / 60).toString().padStart(2, '0');
+        const s = (durationSecs % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+      })();
+
+      try {
+        const resp = await fetch('/api/trial-summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: activeTrialPhone, messages: callLog })
+        });
+        const data = await resp.json();
+        showCallSummary(data.summary || 'Conversation completed.', durationText, data.leadQuality, data.actionToTake);
+      } catch (e) {
+        showCallSummary('Your conversation with Callio AI has ended.', durationText, 'Cold Lead', 'No action needed.');
+      }
+    }
+
+    function cleanupResources() {
+      isConnected = false;
+      if (activeCallTimer) {
+        clearInterval(activeCallTimer);
+        activeCallTimer = null;
+      }
+      if (ws) {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+        ws = null;
+      }
+      if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
+      }
+      if (processorNode) {
+        processorNode.onaudioprocess = null;
+        try { processorNode.disconnect(); } catch(e){}
+        processorNode = null;
+      }
+      if (micSourceNode) {
+        try { micSourceNode.disconnect(); } catch(e){}
+        micSourceNode = null;
+      }
+      if (playOutNode) {
+        try { playOutNode.disconnect(); } catch(e){}
+        playOutNode = null;
+      }
+      if (audioContext) {
+        audioContext.close().catch(e => console.warn(e));
+        audioContext = null;
+      }
+    }
+
+    function resetTrialForm() {
+      cleanupResources();
+      
+      // Restore elements visibility for new calls
+      const simHeader = document.querySelector('#lp-trial-active-call .lp-sim-header');
+      const simWave = document.querySelector('#lp-trial-active-call .lp-sim-wave');
+      const simActions = document.querySelector('#lp-trial-active-call .lp-sim-actions');
+      
+      if (simHeader) simHeader.style.display = 'block';
+      if (simWave) simWave.style.display = 'flex';
+      if (simActions) simActions.style.display = 'flex';
+
+      const transcript = document.getElementById('lp-trial-transcript');
+      if (transcript) {
+        transcript.style.minHeight = '120px';
+        transcript.style.height = '';
+        transcript.style.margin = '';
+        transcript.style.display = '';
+        transcript.style.padding = '';
+      }
+
+      document.getElementById('lp-trial-form').style.display = 'flex';
+      document.getElementById('lp-trial-active-call').style.display = 'none';
+      document.getElementById('lp-trial-error').style.display = 'none';
+      
+      document.getElementById('lp-trial-name').value = '';
+      document.getElementById('lp-trial-phone').value = '';
+      document.getElementById('lp-trial-prompt').value = '';
+    }
+
+    // Audio encoding helper utilities
+    function base64ToArrayBuffer(base64) {
+      const binaryString = window.atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    function pcmToFloat32(arrayBuffer) {
+      const int16 = new Int16Array(arrayBuffer);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 32768.0;
+      }
+      return float32;
+    }
+
+    function floatTo16BitPCM(float32Array) {
+      const buffer = new ArrayBuffer(float32Array.length * 2);
+      const view = new DataView(buffer);
+      let offset = 0;
+      for (let i = 0; i < float32Array.length; i++, offset += 2) {
+        let s = Math.max(-1, Math.min(1, float32Array[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      return buffer;
+    }
+
+    function downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
+      if (inputSampleRate === outputSampleRate) {
+        return buffer;
+      }
+      const sampleRateRatio = inputSampleRate / outputSampleRate;
+      const newLength = Math.round(buffer.length / sampleRateRatio);
+      const result = new Float32Array(newLength);
+      let offsetResult = 0;
+      let offsetBuffer = 0;
+      while (offsetResult < result.length) {
+        const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+        let accum = 0;
+        let count = 0;
+        for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+          accum += buffer[i];
+          count++;
+        }
+        result[offsetResult] = accum / (count || 1);
+        offsetResult++;
+        offsetBuffer = nextOffsetBuffer;
+      }
+      return result;
+    }
+
+    function arrayBufferToBase64(buffer) {
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return window.btoa(binary);
+    }
+
+    // Dynamic background removal for solid white square background logos
+    function makeLogoTransparent(imgElement) {
+      const img = new Image();
+      img.src = imgElement.src;
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        try {
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imgData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i+1];
+            const b = data[i+2];
+            // If pixel is very close to white (high threshold of 220 to clean up greyish edges too)
+            if (r > 220 && g > 220 && b > 220) {
+              data[i+3] = 0; // set alpha to transparent
+            }
+          }
+          ctx.putImageData(imgData, 0, 0);
+          imgElement.src = canvas.toDataURL();
+        } catch (e) {
+          console.warn("Could not modify logo image transparency dynamically due to cross-origin restrictions:", e);
+        }
+      };
+    }
+
+    // Custom voice select dropdown handlers
+    window.toggleCustomVoiceDropdown = function() {
+      const options = document.getElementById('custom-voice-options');
+      if (options) {
+        options.style.display = options.style.display === 'none' || options.style.display === '' ? 'block' : 'none';
+      }
+    }
+
+    window.selectVoiceOption = function(val, label) {
+      const hiddenInput = document.getElementById('trial-voice');
+      const labelSpan = document.getElementById('selected-voice-label');
+      const optionsContainer = document.getElementById('custom-voice-options');
+      
+      if (hiddenInput) hiddenInput.value = val;
+      if (labelSpan) labelSpan.textContent = label;
+      if (optionsContainer) optionsContainer.style.display = 'none';
+      
+      // Update selected status in CSS
+      const options = document.querySelectorAll('#custom-voice-options .custom-option');
+      options.forEach(opt => {
+        if (opt.getAttribute('onclick').includes(`'${val}'`)) {
+          opt.classList.add('selected');
+        } else {
+          opt.classList.remove('selected');
+        }
+      });
+    }
+
+    // Close voice dropdown on click outside
+    window.addEventListener('click', function(e) {
+      const wrapper = document.querySelector('.custom-select-wrapper');
+      if (wrapper && !wrapper.contains(e.target)) {
+        const options = document.getElementById('custom-voice-options');
+        if (options) options.style.display = 'none';
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      // Theme management synced with standard Tailwind class dark
+      applyTheme();
+      
+      // Process logo background on page load if any images are used
+      document.querySelectorAll('.lp-logo-img').forEach(img => {
+        makeLogoTransparent(img);
+      });
+    });
+  
+</script>
+
+<script>
+    (function() {
+        const branding = window.BrandingContext;
+        if (branding) {
+            // Apply logo URLs
+            document.querySelectorAll('.brand-logo').forEach(img => {
+                img.src = branding.logoUrl;
+                img.alt = branding.appName;
+            });
+            // Apply app name text
+            document.querySelectorAll('.brand-name').forEach(el => {
+                el.textContent = branding.appName;
+            });
+            // Apply copyright
+            document.querySelectorAll('.brand-copyright').forEach(el => {
+                el.textContent = branding.copyrightText;
+            });
+            // Update sim names
+            const simName1 = document.querySelector('.lp-sim-caller-name');
+            if (simName1) simName1.textContent = branding.appName + ' Live Demo';
+            const simName2 = document.getElementById('lp-trial-active-name');
+            if (simName2) simName2.textContent = branding.appName + ' Assistant';
+            
+            // Update favicon
+            let favicon = document.querySelector("link[rel~='icon']");
+            if (!favicon) {
+                favicon = document.createElement('link');
+                favicon.rel = 'icon';
+                document.head.appendChild(favicon);
+            }
+            favicon.href = branding.faviconUrl;
+        }
+    })();
+</script>
+</body>
+</html>
