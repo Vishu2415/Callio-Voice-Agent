@@ -1777,8 +1777,8 @@ app.post('/make-call', async (req, res) => {
     console.log(`[Vobiz REST API] Attempting outbound call to: ${normalizedTo} (Name: ${name}) via CallerId: ${activeVobizCallerId}`);
     
     try {
-      let callbackUrl = publicUrl.trim();
-      if (!callbackUrl.startsWith('http://') && !callbackUrl.startsWith('https://')) {
+      let callbackUrl = publicUrl.trim().replace(/^http:\/\//i, 'https://');
+      if (!callbackUrl.startsWith('https://')) {
         callbackUrl = `https://${callbackUrl}`;
       }
       
