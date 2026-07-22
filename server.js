@@ -984,24 +984,27 @@ app.use((req, res, next) => {
 
 // Authentication Middleware for external SaaS Platform requests
 const authMiddleware = (dataType) => (req, res, next) => {
-  // If no API key is configured on the local server, bypass check and allow all
+  // If no API key is configured on the server, bypass check and allow all
   if (!defaultCallConfig.apiKey) {
     return next();
   }
 
-  // Check if request is local (originating from local dashboard on localhost)
-  const remoteAddress = req.connection.remoteAddress || '';
-  const isNgrok = req.headers['x-forwarded-for'] || req.headers['x-original-forwarded-for'];
-  const isLocal = !isNgrok && (
-                  remoteAddress === '::1' || 
-                  remoteAddress === '127.0.0.1' ||
-                  remoteAddress === '::ffff:127.0.0.1' ||
-                  (req.headers.referer && req.headers.referer.includes('localhost')) ||
-                  (req.headers.origin && req.headers.origin.includes('localhost'))
+  // Check if request originates from the web app dashboard UI
+  const host = (req.headers.host || '').toLowerCase().split(':')[0];
+  const referer = (req.headers.referer || '').toLowerCase();
+  const origin = (req.headers.origin || '').toLowerCase();
+
+  const isDashboard = (
+    (host && referer.includes(host)) ||
+    (host && origin.includes(host)) ||
+    referer.includes('localhost') ||
+    origin.includes('localhost') ||
+    referer.includes('127.0.0.1') ||
+    origin.includes('127.0.0.1')
   );
-  
-  if (isLocal && !req.headers.authorization) {
-    // Allow local dashboard to access without API key if not provided
+
+  if (isDashboard && !req.headers.authorization) {
+    // Allow web app dashboard requests to proceed without requiring bearer API Key
     return next();
   }
 
