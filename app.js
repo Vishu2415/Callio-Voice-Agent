@@ -4609,9 +4609,10 @@ async function fetchClientDashboardData() {
       loggedInUser = { ...loggedInUser, ...data.client };
       localStorage.setItem('user_session', JSON.stringify(loggedInUser));
       applyUserPlanAndLimits(loggedInUser);
-      renderClientNumberStatus(data.client);
-      renderClientAgentConfig(data.client.agent_config);
-      updateDashboardWithClientCalls(data.calls);
+      if (typeof renderClientNumberStatus === 'function') renderClientNumberStatus(data.client);
+      if (typeof renderClientAgentConfig === 'function') renderClientAgentConfig(data.client.agent_config);
+      updateDashboardWithClientCalls(data.calls || []);
+      if (typeof window.populateAIActionPlanner === 'function') window.populateAIActionPlanner();
     }
   } catch (err) {
     console.error('Failed to fetch client dashboard:', err);
