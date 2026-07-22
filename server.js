@@ -3580,7 +3580,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     }
   }
 
-  function initializeGemini(voice, systemInstruction, name = '', callSid = '', model = 'gemini-3.1-flash-live-preview') {
+  function initializeGemini(voice, systemInstruction, name = '', callSid = '', model = 'gemini-2.0-flash-exp') {
     let inactivityTimeout = null;
     agentSpeakingUntil = Date.now();
     
@@ -3636,8 +3636,12 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     const toolRule = `\n\n[CRITICAL TOOL RULE]: If the user says goodbye, bye, or asks to hang up/cut the call, YOU MUST IMMEDIATELY CALL THE 'hangupCall' TOOL to end the connection. Do not wait or ask for confirmation.\n\n[VOICEMAIL RULE]: If you hear an automated voicemail greeting (e.g., 'forwarded to voicemail', 'leave a message', 'record your message', 'after the tone'), YOU MUST IMMEDIATELY CALL THE 'hangupCall' TOOL. DO NOT PITCH THE EVENT. DO NOT LEAVE A VOICEMAIL MESSAGE. Just call hangupCall immediately!`;
     const finalInstruction = `${systemInstruction}${greetingInstruction}${toolRule}\n\n[CRITICAL GRAMMAR RULE]: ${genderRule}`;
     
-    let resolvedModel = model || 'gemini-3.1-flash-live-preview';
-    console.log(`[WebSocket Stream Setup] Voice: ${voice}, Model: ${resolvedModel}, Instruction: ${finalInstruction.substring(0, 45)}...`);
+    // Map unsupported or generic model names to 'gemini-2.0-flash-exp'
+    let resolvedModel = model;
+    if (!resolvedModel || resolvedModel === 'gemini-2.5-flash' || resolvedModel.includes('3.1')) {
+      console.log(`[Gemini Live API] Mapping model '${resolvedModel}' to 'gemini-2.0-flash-exp'`);
+      resolvedModel = 'gemini-2.0-flash-exp';
+    }
 
     const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
     
