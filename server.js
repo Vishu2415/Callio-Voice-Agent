@@ -798,6 +798,11 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
 
       console.log(`[SaaS Billing] Charged Client: ${client.name} (ID: ${clientId}) total: ${totalCharge} min for CallSid: ${callSid}. New balance: ${client.balance} mins`);
       saveClients();
+
+      // Reseller billing: if client belongs to a reseller, charge reseller quota at wholesale rate
+      if (typeof global.chargeResellerForCall === 'function' && durationMin > 0) {
+        global.chargeResellerForCall(clientId, durationMin);
+      }
     }
   } catch (billingErr) {
     console.error(`[SaaS Billing Error] Billing calculation failed:`, billingErr);
@@ -3369,7 +3374,529 @@ app.get('/api/client/billing', (req, res) => {
 });
 
 
+// ============================================================
+//  WHITELABEL RESELLER SYSTEM
+// ============================================================
+
+const RESELLERS_DB_FILE = './resellers_db.json';
+const resellersDb = new Map();
+
+function loadResellers() { loadDatabase(RESELLERS_DB_FILE, resellersDb); }
+function saveResellers() { saveDatabase(RESELLERS_DB_FILE, resellersDb); }
+loadResellers();
+
+// Middleware: validate reseller session token (simple token = resellerId)
+function resellerAuthMiddleware(req, res, next) {
+  const token = req.headers['x-reseller-token'] || req.query.reseller_token;
+  if (!token) return res.status(401).json({ success: false, error: 'Reseller auth required.' });
+  const reseller = resellersDb.get(token);
+  if (!reseller) return res.status(401).json({ success: false, error: 'Invalid reseller token.' });
+  if (reseller.status === 'suspended') return res.status(403).json({ success: false, error: 'Reseller account is suspended.' });
+  req.reseller = reseller;
+  next();
+}
+
+// Helper: check if reseller has permission
+function resellerCan(reseller, permission) {
+  return reseller.permissions && reseller.permissions[permission] === true;
+}
+
+// Helper: get all clients belonging to a reseller
+function getResellerClients(resellerId) {
+  const clients = [];
+  for (const client of clientsDb.values()) {
+    if (client.reseller_id === resellerId) clients.push(client);
+  }
+  return clients;
+}
+
+// ─── SUPER ADMIN — Reseller Management ───────────────────────────────────────
+
+// GET all resellers
+app.get('/api/admin/resellers', express.json(), (req, res) => {
+  const adminPassword = defaultCallConfig.adminPassword || 'admin123';
+  const authHeader = req.headers['x-admin-password'] || req.query.admin_password;
+  if (authHeader !== adminPassword) return res.status(401).json({ success: false, error: 'Admin auth required.' });
+
+  const list = Array.from(resellersDb.values()).map(r => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    status: r.status,
+    domain: r.domain || '',
+    subdomain: r.subdomain || '',
+    created_at: r.created_at,
+    quota: r.quota,
+    permissions: r.permissions,
+    branding: r.branding,
+    client_count: getResellerClients(r.id).length
+  }));
+  res.json({ success: true, resellers: list });
+});
+
+// POST create reseller
+app.post('/api/admin/resellers', express.json(), (req, res) => {
+  const adminPassword = defaultCallConfig.adminPassword || 'admin123';
+  if (req.body.admin_password !== adminPassword) return res.status(401).json({ success: false, error: 'Admin auth required.' });
+
+  const { name, email, password, domain, subdomain } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ success: false, error: 'name, email, password required.' });
+
+  // Check duplicate email
+  for (const r of resellersDb.values()) {
+    if (r.email.toLowerCase() === email.toLowerCase()) {
+      return res.status(400).json({ success: false, error: 'Reseller with this email already exists.' });
+    }
+  }
+
+  const id = 'reseller_' + Date.now();
+  const reseller = {
+    id,
+    name,
+    email,
+    password: hashPassword(password),
+    status: 'active',
+    created_at: new Date().toISOString(),
+    domain: domain || '',
+    subdomain: subdomain || (name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.callio.in'),
+    branding: {
+      appName: name,
+      logoUrl: '',
+      faviconUrl: '',
+      primaryColor: '#FF6B4A',
+      secondaryColor: '#ae3115',
+      supportEmail: email,
+      copyrightText: `© ${new Date().getFullYear()} ${name}. All rights reserved.`
+    },
+    landing_page: {
+      enabled: true,
+      headline: 'AI Calling Agents That Actually Close Deals',
+      subheadline: 'Not basic call bots — AI agents that manage tasks, nurture leads, and drive conversions on every call.',
+      cta_text: 'Get Started Today',
+      features: [],
+      custom_css: ''
+    },
+    permissions: {
+      can_add_clients: true,
+      max_clients: 10,
+      can_set_pricing: true,
+      can_use_crm: true,
+      can_use_recording: true,
+      can_use_api: false,
+      can_edit_landing_page: true,
+      can_use_custom_domain: false,
+      show_callio_branding: true,
+      can_view_call_transcripts: true
+    },
+    quota: {
+      total_minutes: 1000,
+      used_minutes: 0,
+      wholesale_rate_per_minute: 2.0
+    },
+    billing_history: []
+  };
+
+  resellersDb.set(id, reseller);
+  saveResellers();
+  console.log(`[Reseller] Created reseller: ${name} (${id})`);
+  res.json({ success: true, reseller: { ...reseller, password: undefined } });
+});
+
+// PUT update reseller details
+app.put('/api/admin/resellers/:id', express.json(), (req, res) => {
+  const adminPassword = defaultCallConfig.adminPassword || 'admin123';
+  if (req.body.admin_password !== adminPassword) return res.status(401).json({ success: false, error: 'Admin auth required.' });
+
+  const reseller = resellersDb.get(req.params.id);
+  if (!reseller) return res.status(404).json({ success: false, error: 'Reseller not found.' });
+
+  const { name, email, password, domain, subdomain, status } = req.body;
+  if (name) reseller.name = name;
+  if (email) reseller.email = email;
+  if (password) reseller.password = hashPassword(password);
+  if (domain !== undefined) reseller.domain = domain;
+  if (subdomain !== undefined) reseller.subdomain = subdomain;
+  if (status) reseller.status = status;
+
+  resellersDb.set(reseller.id, reseller);
+  saveResellers();
+  res.json({ success: true, reseller: { ...reseller, password: undefined } });
+});
+
+// PUT update reseller permissions
+app.put('/api/admin/resellers/:id/permissions', express.json(), (req, res) => {
+  const adminPassword = defaultCallConfig.adminPassword || 'admin123';
+  if (req.body.admin_password !== adminPassword) return res.status(401).json({ success: false, error: 'Admin auth required.' });
+
+  const reseller = resellersDb.get(req.params.id);
+  if (!reseller) return res.status(404).json({ success: false, error: 'Reseller not found.' });
+
+  reseller.permissions = { ...reseller.permissions, ...req.body.permissions };
+  resellersDb.set(reseller.id, reseller);
+  saveResellers();
+  res.json({ success: true, permissions: reseller.permissions });
+});
+
+// PUT update reseller quota & wholesale rate (Super Admin only)
+app.put('/api/admin/resellers/:id/quota', express.json(), (req, res) => {
+  const adminPassword = defaultCallConfig.adminPassword || 'admin123';
+  if (req.body.admin_password !== adminPassword) return res.status(401).json({ success: false, error: 'Admin auth required.' });
+
+  const reseller = resellersDb.get(req.params.id);
+  if (!reseller) return res.status(404).json({ success: false, error: 'Reseller not found.' });
+
+  if (req.body.total_minutes !== undefined) reseller.quota.total_minutes = Number(req.body.total_minutes);
+  if (req.body.wholesale_rate_per_minute !== undefined) reseller.quota.wholesale_rate_per_minute = Number(req.body.wholesale_rate_per_minute);
+
+  resellersDb.set(reseller.id, reseller);
+  saveResellers();
+  res.json({ success: true, quota: reseller.quota });
+});
+
+// PUT suspend or activate reseller
+app.put('/api/admin/resellers/:id/status', express.json(), (req, res) => {
+  const adminPassword = defaultCallConfig.adminPassword || 'admin123';
+  if (req.body.admin_password !== adminPassword) return res.status(401).json({ success: false, error: 'Admin auth required.' });
+
+  const reseller = resellersDb.get(req.params.id);
+  if (!reseller) return res.status(404).json({ success: false, error: 'Reseller not found.' });
+
+  reseller.status = req.body.status === 'suspended' ? 'suspended' : 'active';
+  resellersDb.set(reseller.id, reseller);
+  saveResellers();
+  res.json({ success: true, status: reseller.status });
+});
+
+// DELETE reseller (only if no clients)
+app.delete('/api/admin/resellers/:id', express.json(), (req, res) => {
+  const adminPassword = defaultCallConfig.adminPassword || 'admin123';
+  const authParam = req.body.admin_password || req.query.admin_password;
+  if (authParam !== adminPassword) return res.status(401).json({ success: false, error: 'Admin auth required.' });
+
+  const reseller = resellersDb.get(req.params.id);
+  if (!reseller) return res.status(404).json({ success: false, error: 'Reseller not found.' });
+
+  const clients = getResellerClients(req.params.id);
+  if (clients.length > 0) return res.status(400).json({ success: false, error: `Cannot delete reseller with ${clients.length} active client(s). Remove or reassign them first.` });
+
+  resellersDb.delete(req.params.id);
+  saveResellers();
+  res.json({ success: true });
+});
+
+// GET reseller's clients (admin oversight)
+app.get('/api/admin/resellers/:id/clients', (req, res) => {
+  const adminPassword = defaultCallConfig.adminPassword || 'admin123';
+  if ((req.query.admin_password || req.headers['x-admin-password']) !== adminPassword) {
+    return res.status(401).json({ success: false, error: 'Admin auth required.' });
+  }
+
+  const reseller = resellersDb.get(req.params.id);
+  if (!reseller) return res.status(404).json({ success: false, error: 'Reseller not found.' });
+
+  const clients = getResellerClients(req.params.id).map(c => ({
+    id: c.id, name: c.name, email: c.email, status: c.status,
+    balance: c.balance, used_minutes: c.used_minutes || 0,
+    plan: c.plan, created_at: c.created_at
+  }));
+  res.json({ success: true, clients });
+});
+
+// ─── RESELLER AUTH ────────────────────────────────────────────────────────────
+
+// POST reseller login
+app.post('/api/reseller/login', express.json(), (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ success: false, error: 'Email and password required.' });
+
+  const hashed = hashPassword(password);
+  for (const reseller of resellersDb.values()) {
+    if (reseller.email.toLowerCase() === email.toLowerCase() && reseller.password === hashed) {
+      if (reseller.status === 'suspended') {
+        return res.status(403).json({ success: false, error: 'Your account has been suspended. Contact support.' });
+      }
+      return res.json({
+        success: true,
+        token: reseller.id,  // simple token = resellerId
+        reseller: {
+          id: reseller.id,
+          name: reseller.name,
+          email: reseller.email,
+          branding: reseller.branding,
+          domain: reseller.domain,
+          subdomain: reseller.subdomain,
+          permissions: reseller.permissions,
+          quota: {
+            total_minutes: reseller.quota.total_minutes,
+            used_minutes: reseller.quota.used_minutes
+            // wholesale_rate NOT sent to reseller
+          }
+        }
+      });
+    }
+  }
+  res.status(401).json({ success: false, error: 'Invalid email or password.' });
+});
+
+// GET reseller profile & stats
+app.get('/api/reseller/me', resellerAuthMiddleware, (req, res) => {
+  const reseller = req.reseller;
+  const clients = getResellerClients(reseller.id);
+  const totalCallsAcrossClients = Array.from(activeCalls.values())
+    .filter(c => clients.some(cl => cl.id === c.clientId)).length;
+
+  res.json({
+    success: true,
+    reseller: {
+      id: reseller.id,
+      name: reseller.name,
+      email: reseller.email,
+      status: reseller.status,
+      domain: reseller.domain,
+      subdomain: reseller.subdomain,
+      branding: reseller.branding,
+      landing_page: reseller.landing_page,
+      permissions: reseller.permissions,
+      quota: {
+        total_minutes: reseller.quota.total_minutes,
+        used_minutes: reseller.quota.used_minutes,
+        remaining_minutes: reseller.quota.total_minutes - reseller.quota.used_minutes
+      }
+    },
+    stats: {
+      total_clients: clients.length,
+      active_clients: clients.filter(c => c.status === 'active').length,
+      total_calls: totalCallsAcrossClients
+    }
+  });
+});
+
+// PUT reseller branding update
+app.put('/api/reseller/branding', express.json(), resellerAuthMiddleware, (req, res) => {
+  const reseller = req.reseller;
+  const { appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, copyrightText } = req.body;
+
+  reseller.branding = {
+    appName: appName || reseller.branding.appName,
+    logoUrl: logoUrl !== undefined ? logoUrl : reseller.branding.logoUrl,
+    faviconUrl: faviconUrl !== undefined ? faviconUrl : reseller.branding.faviconUrl,
+    primaryColor: primaryColor || reseller.branding.primaryColor,
+    secondaryColor: secondaryColor || reseller.branding.secondaryColor,
+    supportEmail: supportEmail || reseller.branding.supportEmail,
+    copyrightText: copyrightText || reseller.branding.copyrightText
+  };
+
+  resellersDb.set(reseller.id, reseller);
+  saveResellers();
+  res.json({ success: true, branding: reseller.branding });
+});
+
+// PUT reseller landing page update
+app.put('/api/reseller/landing-page', express.json(), resellerAuthMiddleware, (req, res) => {
+  const reseller = req.reseller;
+  if (!resellerCan(reseller, 'can_edit_landing_page')) {
+    return res.status(403).json({ success: false, error: 'Landing page editing not permitted for your account.' });
+  }
+
+  reseller.landing_page = { ...reseller.landing_page, ...req.body };
+  resellersDb.set(reseller.id, reseller);
+  saveResellers();
+  res.json({ success: true, landing_page: reseller.landing_page });
+});
+
+// ─── RESELLER CLIENT MANAGEMENT ───────────────────────────────────────────────
+
+// GET reseller's own clients
+app.get('/api/reseller/clients', resellerAuthMiddleware, (req, res) => {
+  const clients = getResellerClients(req.reseller.id).map(c => ({
+    id: c.id, name: c.name, email: c.email, status: c.status,
+    balance: c.balance, used_minutes: c.used_minutes || 0,
+    plan: c.plan, created_at: c.created_at, phone_number: c.phone_number,
+    pricing: c.pricing
+  }));
+  res.json({ success: true, clients });
+});
+
+// POST create client under reseller
+app.post('/api/reseller/clients', express.json(), resellerAuthMiddleware, (req, res) => {
+  const reseller = req.reseller;
+  if (!resellerCan(reseller, 'can_add_clients')) {
+    return res.status(403).json({ success: false, error: 'Adding clients is not permitted for your account.' });
+  }
+
+  const currentClients = getResellerClients(reseller.id);
+  if (currentClients.length >= (reseller.permissions.max_clients || 10)) {
+    return res.status(400).json({ success: false, error: `Client limit reached (max ${reseller.permissions.max_clients || 10}).` });
+  }
+
+  const { name, email, password, phone_number } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ success: false, error: 'name, email, password required.' });
+
+  // Check duplicate
+  for (const c of clientsDb.values()) {
+    if (c.email.toLowerCase() === email.toLowerCase()) {
+      return res.status(400).json({ success: false, error: 'A client with this email already exists.' });
+    }
+  }
+
+  const clientId = 'client_' + Date.now();
+  const defaultRate = 5.0; // default client rate — reseller can change
+  const newClient = {
+    id: clientId,
+    name,
+    email,
+    password: hashPassword(password),
+    phone_number: phone_number || '',
+    status: 'active',
+    reseller_id: reseller.id,
+    created_at: new Date().toISOString(),
+    balance: 0,
+    used_minutes: 0,
+    plan: 'basic',
+    pricing: {
+      rate_per_minute: defaultRate,
+      rate_recording_per_minute: 1.0,
+      rate_per_session: 0.0
+    },
+    billing_history: [],
+    agent_config: {
+      system_prompt: 'You are a helpful AI assistant.',
+      voice: 'Aoede',
+      language: 'English'
+    }
+  };
+
+  clientsDb.set(clientId, newClient);
+  saveClients();
+  console.log(`[Reseller] ${reseller.name} created client: ${name} (${clientId})`);
+  res.json({ success: true, client: { ...newClient, password: undefined } });
+});
+
+// PUT update client (by reseller)
+app.put('/api/reseller/clients/:id', express.json(), resellerAuthMiddleware, (req, res) => {
+  const reseller = req.reseller;
+  const client = clientsDb.get(req.params.id);
+  if (!client || client.reseller_id !== reseller.id) {
+    return res.status(404).json({ success: false, error: 'Client not found or not in your account.' });
+  }
+
+  const { name, email, status, balance, pricing, agent_config } = req.body;
+  if (name) client.name = name;
+  if (email) client.email = email;
+  if (status) client.status = status;
+  if (balance !== undefined) client.balance = Number(balance);
+  if (pricing && resellerCan(reseller, 'can_set_pricing')) {
+    client.pricing = { ...client.pricing, ...pricing };
+  }
+  if (agent_config) client.agent_config = { ...client.agent_config, ...agent_config };
+
+  clientsDb.set(client.id, client);
+  saveClients();
+  res.json({ success: true, client: { ...client, password: undefined } });
+});
+
+// DELETE client (by reseller)
+app.delete('/api/reseller/clients/:id', express.json(), resellerAuthMiddleware, (req, res) => {
+  const reseller = req.reseller;
+  const client = clientsDb.get(req.params.id);
+  if (!client || client.reseller_id !== reseller.id) {
+    return res.status(404).json({ success: false, error: 'Client not found or not in your account.' });
+  }
+
+  clientsDb.delete(req.params.id);
+  saveClients();
+  res.json({ success: true });
+});
+
+// GET reseller stats dashboard
+app.get('/api/reseller/stats', resellerAuthMiddleware, (req, res) => {
+  const reseller = req.reseller;
+  const clients = getResellerClients(reseller.id);
+
+  const totalCalls = Array.from(activeCalls.values())
+    .filter(c => clients.some(cl => cl.id === c.clientId));
+  const completedCalls = totalCalls.filter(c => c.status === 'completed');
+
+  res.json({
+    success: true,
+    stats: {
+      total_clients: clients.length,
+      active_clients: clients.filter(c => c.status === 'active').length,
+      total_calls: totalCalls.length,
+      completed_calls: completedCalls.length,
+      quota_used: reseller.quota.used_minutes,
+      quota_total: reseller.quota.total_minutes,
+      quota_remaining: reseller.quota.total_minutes - reseller.quota.used_minutes
+    }
+  });
+});
+
+// ─── PUBLIC: Reseller Landing Page API ───────────────────────────────────────
+
+// GET reseller branding by domain (for public landing page)
+app.get('/api/public/reseller-branding', (req, res) => {
+  const host = req.query.domain || req.headers.host || '';
+  const hostname = host.split(':')[0].toLowerCase();
+
+  for (const reseller of resellersDb.values()) {
+    if (reseller.status !== 'active') continue;
+    if ((reseller.domain && reseller.domain.toLowerCase() === hostname) ||
+        (reseller.subdomain && reseller.subdomain.toLowerCase() === hostname)) {
+      return res.json({
+        success: true,
+        isReseller: true,
+        resellerId: reseller.id,
+        branding: reseller.branding,
+        landing_page: reseller.landing_page,
+        permissions: { show_callio_branding: reseller.permissions.show_callio_branding }
+      });
+    }
+  }
+  res.json({ success: true, isReseller: false });
+});
+
+// ─── LOGIN EXTENSION: Reseller login added to existing /api/auth/login ───────
+// Already handled in the existing route — resellers use /api/reseller/login separately.
+
+// ─── BILLING: Deduct from reseller quota when their client call ends ──────────
+// This hooks into the existing client billing flow.
+// Called from the call end logic — we monkey-patch it here.
+const _originalSaveClients = saveClients;
+function chargeResellerForCall(clientId, durationMinutes) {
+  const client = clientsDb.get(clientId);
+  if (!client || !client.reseller_id) return;
+
+  const reseller = resellersDb.get(client.reseller_id);
+  if (!reseller) return;
+
+  const wholesaleRate = reseller.quota.wholesale_rate_per_minute || 2.0;
+  const charge = Math.ceil(durationMinutes) * wholesaleRate;
+
+  reseller.quota.used_minutes = (reseller.quota.used_minutes || 0) + Math.ceil(durationMinutes);
+  reseller.billing_history = reseller.billing_history || [];
+  reseller.billing_history.unshift({
+    id: 'rtxn_' + Date.now(),
+    timestamp: new Date().toISOString(),
+    clientId,
+    clientName: client.name,
+    duration_minutes: Math.ceil(durationMinutes),
+    wholesale_rate: wholesaleRate,
+    total_charge: charge,
+    description: `Call by client ${client.name} — ${Math.ceil(durationMinutes)} min @ ₹${wholesaleRate}/min`
+  });
+
+  resellersDb.set(reseller.id, reseller);
+  saveResellers();
+  console.log(`[Reseller Billing] Charged ${reseller.name}: ${Math.ceil(durationMinutes)} min, ₹${charge} wholesale for client ${client.name}`);
+}
+
+// Export for use in billing code
+global.chargeResellerForCall = chargeResellerForCall;
+
+// ─── END RESELLER SYSTEM ──────────────────────────────────────────────────────
+
 const server = createServer(app);
+
 
 // 2. WebSocket Server for Telephony Streams
 const wss = new WebSocketServer({ server });
