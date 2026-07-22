@@ -1204,11 +1204,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
   logInfo('Ready to call. Add your API key and press "Start Call".');
   
-  // Load ngrok URL from local cache if user saves it
-  if (localStorage.getItem('gemini_public_url')) {
+  // Load Server Callback URL (default to live domain if cached value is empty or an old ngrok link)
+  const elPub = document.getElementById('public-url');
+  if (elPub) {
     const cachedUrl = localStorage.getItem('gemini_public_url');
-    const elPub = document.getElementById('public-url');
-    if (elPub) elPub.value = cachedUrl;
+    if (cachedUrl && !cachedUrl.includes('ngrok')) {
+      elPub.value = cachedUrl;
+    } else {
+      elPub.value = window.location.origin;
+    }
   }
   
   if (localStorage.getItem('gemini_record_call') === 'true') {
