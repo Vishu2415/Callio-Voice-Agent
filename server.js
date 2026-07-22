@@ -159,6 +159,19 @@ function resolveBranding(host) {
   return brandingDb.get('default');
 }
 
+function getResellerFromHost(host) {
+  if (!host) return null;
+  const hostname = host.split(':')[0].toLowerCase();
+  for (const reseller of resellersDb.values()) {
+    if (reseller.status === 'suspended') continue;
+    if ((reseller.domain && reseller.domain.toLowerCase() === hostname) ||
+        (reseller.subdomain && reseller.subdomain.toLowerCase() === hostname)) {
+      return reseller;
+    }
+  }
+  return null;
+}
+
 function loadDatabase(file, mapObj) {
   try {
     if (fs.existsSync(file)) {
@@ -2688,23 +2701,67 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(400).json({ success: false, error: 'Email and password are required.' });
   }
 
-  // Admin login check
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const currentReseller = getResellerFromHost(host);
+
+  // 1. Admin login check — Super Admin can ONLY log in on main Callio portal, NOT reseller portals
   const adminEmail = defaultCallConfig.adminEmail || 'admin@callingagent.com';
   const adminPassword = defaultCallConfig.adminPassword || 'admin123';
   const adminName = defaultCallConfig.adminName || 'Admin';
 
   if (email.toLowerCase() === adminEmail.toLowerCase() && password === adminPassword) {
+    if (currentReseller) {
+      return res.status(403).json({ success: false, error: 'Super Admin login is not permitted on reseller portals.' });
+    }
     return res.json({
       success: true,
       user: { id: 'admin', name: adminName, email: adminEmail, role: 'admin' }
     });
   }
 
-  // Client login check
-  const tenantId = req.headers['x-tenant-id'] || req.body.tenantId || '';
   const hashedPassword = hashPassword(password);
+
+  // 2. Reseller Admin login check
+  for (const reseller of resellersDb.values()) {
+    if (reseller.email.toLowerCase() === email.toLowerCase() && reseller.password === hashedPassword) {
+      if (reseller.status === 'suspended') {
+        return res.status(403).json({ success: false, error: 'Your reseller account is suspended.' });
+      }
+      return res.json({
+        success: true,
+        user: {
+          id: reseller.id,
+          name: reseller.name,
+          email: reseller.email,
+          role: 'reseller',
+          status: reseller.status,
+          branding: reseller.branding,
+          permissions: reseller.permissions
+        }
+      });
+    }
+  }
+
+  // 3. Client login check
+  const tenantId = req.headers['x-tenant-id'] || req.body.tenantId || '';
   for (const client of clientsDb.values()) {
     if (client.email.toLowerCase() === email.toLowerCase() && client.password === hashedPassword) {
+      // Domain isolation check
+      if (currentReseller) {
+        if (client.reseller_id !== currentReseller.id) {
+          return res.status(403).json({ success: false, error: 'User account does not belong to this portal.' });
+        }
+      } else {
+        // Direct Callio portal — direct clients only
+        if (client.reseller_id) {
+          return res.status(403).json({ success: false, error: 'Reseller clients must log in on their reseller portal.' });
+        }
+      }
+
+      if (client.status === 'suspended') {
+        return res.status(403).json({ success: false, error: 'Your account is suspended.' });
+      }
+
       if (tenantId && client.tenantId && client.tenantId !== tenantId) {
         return res.status(400).json({ success: false, error: 'User account does not belong to this branding portal.' });
       }
@@ -2730,6 +2787,7 @@ app.post('/api/auth/login', (req, res) => {
 
   res.status(401).json({ success: false, error: 'Invalid email or password.' });
 });
+
 
 // 2A. Update Profile Endpoint (for user/admin profile settings)
 app.post('/api/auth/update-profile', (req, res) => {
