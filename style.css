@@ -48,9 +48,11 @@ html[data-theme="light"] body {
 }
 
 html[data-theme="light"] .glass-navbar {
-  background: rgba(255, 255, 255, 0.8) !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03) !important;
 }
 
 /* Inputs, Selects, and Textareas */
