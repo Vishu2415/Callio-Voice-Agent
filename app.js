@@ -5620,7 +5620,8 @@ window.switchAdminSubtab = function(tabName) {
     'logs': 'admin-panel-section-logs',
     'plans': 'admin-panel-section-plans',
     'trial-leads': 'admin-panel-section-trial-leads',
-    'branding': 'admin-panel-section-branding'
+    'branding': 'admin-panel-section-branding',
+    'resellers': 'admin-panel-section-resellers'
   };
   const buttons = {
     'users': 'admin-subtab-users',
@@ -5628,7 +5629,8 @@ window.switchAdminSubtab = function(tabName) {
     'logs': 'admin-subtab-logs',
     'plans': 'admin-subtab-plans',
     'trial-leads': 'admin-subtab-trial-leads',
-    'branding': 'admin-subtab-branding'
+    'branding': 'admin-subtab-branding',
+    'resellers': 'admin-subtab-resellers'
   };
   
   Object.keys(sections).forEach(key => {
@@ -5648,6 +5650,9 @@ window.switchAdminSubtab = function(tabName) {
       if (key === 'branding') {
         window.loadBrandingToForm();
       }
+      if (key === 'resellers') {
+        window.fetchAdminResellers();
+      }
     } else {
       if (sectionEl) sectionEl.style.display = 'none';
       if (btnEl) {
@@ -5657,7 +5662,146 @@ window.switchAdminSubtab = function(tabName) {
   });
 };
 
+// --- Super Admin Reseller Management Functions ---
+window.fetchAdminResellers = async function() {
+  const tbody = document.getElementById('admin-resellers-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">Loading resellers...</td></tr>';
+
+  try {
+    const adminPass = localStorage.getItem('adminPassword') || 'admin123';
+    const res = await fetch(`/api/admin/resellers?admin_password=${encodeURIComponent(adminPass)}`);
+    const data = await res.json();
+
+    if (!data.success) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 20px;">${data.error || 'Failed to load resellers.'}</td></tr>`;
+      return;
+    }
+
+    const resellers = data.resellers || [];
+    if (resellers.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">No whitelabel resellers created yet. Click "Add New Reseller" to get started.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = resellers.map(r => `
+      <tr>
+        <td style="font-weight: 600;">${r.name}</td>
+        <td style="font-size: 0.85rem; color: var(--text-muted);">${r.email}</td>
+        <td style="font-size: 0.85rem; font-family: monospace;">${r.domain || r.subdomain || '—'}</td>
+        <td style="font-size: 0.85rem;">
+          <strong>${r.quota?.used_minutes || 0}</strong> / ${r.quota?.total_minutes || 0} min
+        </td>
+        <td style="font-size: 0.85rem; color: var(--color-cyan); font-weight: 600;">
+          ₹${r.quota?.wholesale_rate_per_minute || 2.0}/min
+        </td>
+        <td style="font-size: 0.85rem;">${r.client_count || 0} clients</td>
+        <td>
+          <span class="badge ${r.status === 'active' ? 'badge-green' : 'badge-red'}" style="padding: 2px 8px; border-radius: 100px; font-size: 0.75rem; font-weight: 600;">${r.status}</span>
+        </td>
+        <td style="text-align: right;">
+          <button onclick="window.editResellerQuota('${r.id}', ${r.quota?.total_minutes||1000}, ${r.quota?.wholesale_rate_per_minute||2.0})" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; margin-right: 4px;">Quota &amp; Rate</button>
+          <button onclick="window.toggleResellerStatus('${r.id}', '${r.status}')" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; margin-right: 4px;">${r.status === 'active' ? 'Suspend' : 'Activate'}</button>
+          <button onclick="window.deleteReseller('${r.id}', '${r.name}')" class="btn btn-danger" style="padding: 3px 8px; font-size: 0.75rem; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3);">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Fetch resellers error:', err);
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 20px;">Connection error loading resellers.</td></tr>';
+  }
+};
+
+window.openCreateResellerModal = async function() {
+  const name = prompt("Reseller Agency / Company Name:");
+  if (!name) return;
+  const email = prompt("Reseller Admin Email:");
+  if (!email) return;
+  const password = prompt("Reseller Admin Password:");
+  if (!password) return;
+  const domain = prompt("Custom Domain (optional, e.g. app.brand.com):", "") || "";
+
+  const adminPass = localStorage.getItem('adminPassword') || 'admin123';
+  try {
+    const res = await fetch('/api/admin/resellers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_password: adminPass, name, email, password, domain })
+    });
+    const d = await res.json();
+    if (d.success) {
+      alert(`Reseller "${name}" created successfully! Login URL: /reseller`);
+      window.fetchAdminResellers();
+    } else {
+      alert("Error: " + d.error);
+    }
+  } catch (e) { alert("Failed to create reseller."); }
+};
+
+window.editResellerQuota = async function(id, currentTotal, currentRate) {
+  const newTotal = prompt("Set total minute quota for this reseller:", currentTotal);
+  if (newTotal === null) return;
+  const newRate = prompt("Set wholesale rate (₹/min) charged to this reseller:", currentRate);
+  if (newRate === null) return;
+
+  const adminPass = localStorage.getItem('adminPassword') || 'admin123';
+  try {
+    const res = await fetch(`/api/admin/resellers/${id}/quota`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        admin_password: adminPass,
+        total_minutes: parseFloat(newTotal),
+        wholesale_rate_per_minute: parseFloat(newRate)
+      })
+    });
+    const d = await res.json();
+    if (d.success) {
+      window.fetchAdminResellers();
+    } else {
+      alert("Error: " + d.error);
+    }
+  } catch (e) { alert("Failed to update quota."); }
+};
+
+window.toggleResellerStatus = async function(id, currentStatus) {
+  const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+  const adminPass = localStorage.getItem('adminPassword') || 'admin123';
+  try {
+    const res = await fetch(`/api/admin/resellers/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_password: adminPass, status: newStatus })
+    });
+    const d = await res.json();
+    if (d.success) {
+      window.fetchAdminResellers();
+    } else {
+      alert("Error: " + d.error);
+    }
+  } catch (e) { alert("Failed to change status."); }
+};
+
+window.deleteReseller = async function(id, name) {
+  if (!confirm(`Are you sure you want to delete reseller "${name}"?`)) return;
+  const adminPass = localStorage.getItem('adminPassword') || 'admin123';
+  try {
+    const res = await fetch(`/api/admin/resellers/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_password: adminPass })
+    });
+    const d = await res.json();
+    if (d.success) {
+      window.fetchAdminResellers();
+    } else {
+      alert("Error: " + d.error);
+    }
+  } catch (e) { alert("Failed to delete reseller."); }
+};
+
 // Sleek Global Audio Player for Lead Recordings
+
 let currentPlayingBtn = null;
 let globalAudio = null;
 

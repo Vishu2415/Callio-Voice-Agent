@@ -1125,6 +1125,10 @@ app.get('/app', (req, res) => {
   res.sendFile(path.join(__dirname, 'app.html'));
 });
 
+app.get('/reseller', (req, res) => {
+  res.sendFile(path.join(__dirname, 'reseller.html'));
+});
+
 // Serving the static front-end files for fallback UI
 app.use(express.static('./'));
 

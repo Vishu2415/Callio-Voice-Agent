@@ -1308,6 +1308,7 @@
             <button class="admin-console-tab-btn" id="admin-subtab-plans" onclick="window.switchAdminSubtab('plans')">💳 Manage Pricing Plans</button>
             <button class="admin-console-tab-btn" id="admin-subtab-trial-leads" onclick="window.switchAdminSubtab('trial-leads')">📋 Trial Leads</button>
             <button class="admin-console-tab-btn" id="admin-subtab-branding" onclick="window.switchAdminSubtab('branding')">🎨 Branding Settings</button>
+            <button class="admin-console-tab-btn" id="admin-subtab-resellers" onclick="window.switchAdminSubtab('resellers')">🏷️ Whitelabel Resellers</button>
           </div>
 
           <!-- SECTION 1: Users & Clients -->
@@ -1582,6 +1583,33 @@
                 💾 Save Branding &amp; White Labeling Settings
               </button>
             </form>
+          </div>
+
+          <!-- SECTION 7: Whitelabel Resellers -->
+          <div id="admin-panel-section-resellers" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+              <h3 class="section-title" style="margin: 0;">Whitelabel Partners &amp; Resellers</h3>
+              <button onclick="window.openCreateResellerModal()" class="admin-action-btn admin-action-btn-recharge" style="font-size: 0.85rem !important; padding: 8px 16px !important;">➕ Add New Reseller</button>
+            </div>
+            <div class="table-responsive">
+              <table class="premium-table">
+                <thead>
+                  <tr>
+                    <th>Reseller Name</th>
+                    <th>Email</th>
+                    <th>Subdomain / Domain</th>
+                    <th>Quota (Used / Total)</th>
+                    <th>Wholesale Rate</th>
+                    <th>Clients</th>
+                    <th>Status</th>
+                    <th style="text-align: right; width: 280px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-resellers-table-body">
+                  <tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">Loading resellers...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
         </div>

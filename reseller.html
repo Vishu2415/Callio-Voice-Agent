@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reseller Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #FF6B4A;
+      --primary-dark: #ae3115;
+      --bg: #0d0f14;
+      --surface: #161a23;
+      --surface2: #1e2330;
+      --border: rgba(255,255,255,0.08);
+      --text: #f0f2f7;
+      --text-muted: #8890a6;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; }
+    .sidebar { width: 240px; background: var(--surface); border-right: 1px solid var(--border); height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; overflow-y: auto; }
+    .main { margin-left: 240px; min-height: 100vh; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 8px; cursor: pointer; transition: all 0.15s; color: var(--text-muted); font-size: 0.875rem; font-weight: 500; margin: 2px 8px; }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+    .nav-item.active { background: rgba(255,107,74,0.15); color: var(--primary); }
+    .nav-item .material-icons-round { font-size: 18px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 100px; font-size: 0.72rem; font-weight: 600; }
+    .badge-green { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .badge-red { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .badge-orange { background: rgba(255,107,74,0.15); color: #FF6B4A; }
+    .btn-primary { background: var(--primary); color: white; border: none; padding: 8px 18px; border-radius: 8px; font-weight: 600; font-size: 0.875rem; cursor: pointer; transition: all 0.15s; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-ghost { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--border); padding: 8px 18px; border-radius: 8px; font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: all 0.15s; }
+    .btn-ghost:hover { background: rgba(255,255,255,0.10); }
+    input, select, textarea { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 9px 12px; font-size: 0.875rem; font-family: 'Inter', sans-serif; outline: none; width: 100%; transition: border-color 0.15s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    label { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; display: block; margin-bottom: 5px; }
+    .tab { padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 0.875rem; font-weight: 500; color: var(--text-muted); transition: all 0.15s; }
+    .tab.active { background: rgba(255,107,74,0.15); color: var(--primary); }
+    .quota-bar { height: 8px; background: var(--surface2); border-radius: 100px; overflow: hidden; }
+    .quota-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #ff9a7a); border-radius: 100px; transition: width 0.5s ease; }
+    .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--surface2); border-radius: 20px; transition: 0.3s; border: 1px solid var(--border); }
+    .toggle-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background: var(--text-muted); border-radius: 50%; transition: 0.3s; }
+    input:checked + .toggle-slider { background: var(--primary); }
+    input:checked + .toggle-slider:before { transform: translateX(16px); background: white; }
+    .color-preview { width: 28px; height: 28px; border-radius: 6px; border: 2px solid var(--border); cursor: pointer; }
+    .section-page { display: none; }
+    .section-page.active { display: block; }
+    .table-row:hover { background: rgba(255,255,255,0.03); }
+    #loginScreen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    #loginScreen.hidden { display: none; }
+    #appScreen { display: none; }
+    #appScreen.visible { display: flex; }
+    .branding-preview { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    select option { background: #1e2330; }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ──────────────────────────────────────────────── -->
+<div id="loginScreen">
+  <div style="width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 36px;">
+    <div style="text-align:center; margin-bottom: 28px;">
+      <div id="loginLogo" style="font-size: 2rem; margin-bottom: 8px;">🤝</div>
+      <h1 id="loginTitle" style="font-size: 1.4rem; font-weight: 700; margin: 0 0 4px 0;">Reseller Portal</h1>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">Sign in to manage your account</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <div>
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="you@brand.com">
+      </div>
+      <div>
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••">
+      </div>
+      <div id="loginError" style="color: #ef4444; font-size: 0.82rem; text-align: center; display: none;"></div>
+      <button class="btn-primary" style="width: 100%; padding: 11px;" onclick="doLogin()">Sign In</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── APP SCREEN ──────────────────────────────────────────────────── -->
+<div id="appScreen" style="min-height: 100vh;">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div style="padding: 20px 16px 12px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+        <div id="sidebarLogo" style="width: 32px; height: 32px; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem;">R</div>
+        <div>
+          <div id="sidebarAppName" style="font-weight: 700; font-size: 0.9rem; line-height: 1.2;">Reseller Panel</div>
+          <div id="sidebarEmail" style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.2;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex: 1; padding: 4px 0;">
+      <div class="nav-item active" onclick="showPage('dashboard')">
+        <span class="material-icons-round">dashboard</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="showPage('clients')">
+        <span class="material-icons-round">people</span> Clients
+      </div>
+      <div class="nav-item" onclick="showPage('branding')">
+        <span class="material-icons-round">palette</span> Branding
+      </div>
+      <div class="nav-item" onclick="showPage('landing')">
+        <span class="material-icons-round">web</span> Landing Page
+      </div>
+      <div class="nav-item" onclick="showPage('billing')">
+        <span class="material-icons-round">receipt_long</span> Billing
+      </div>
+    </div>
+
+    <div style="padding: 12px 8px 20px;">
+      <div class="nav-item" onclick="doLogout()" style="color: #ef4444;">
+        <span class="material-icons-round">logout</span> Sign Out
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main" style="padding: 28px; max-width: 1100px;">
+
+    <!-- HEADER -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px;">
+      <div>
+        <h2 id="pageTitle" style="font-size: 1.4rem; font-weight: 700; margin: 0;">Dashboard</h2>
+        <p id="pageSubtitle" style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0 0;">Your reseller overview</p>
+      </div>
+    </div>
+
+    <!-- ── DASHBOARD PAGE ── -->
+    <div id="page-dashboard" class="section-page active">
+      <!-- Stats Row -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <div class="stat-card">
+          <div style="color: var(--text-muted); font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Total Clients</div>
+          <div id="statTotalClients" style="font-size: 2rem; font-weight: 800;">—</div>
+          <div id="statActiveClients" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;"></div>
+        </div>
+        <div class="stat-card">
+          <div style="color: var(--text-muted); font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Minutes Used</div>
+          <div id="statMinUsed" style="font-size: 2rem; font-weight: 800;">—</div>
+          <div id="statMinRemaining" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;"></div>
+        </div>
+        <div class="stat-card">
+          <div style="color: var(--text-muted); font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Total Calls</div>
+          <div id="statTotalCalls" style="font-size: 2rem; font-weight: 800;">—</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Across all clients</div>
+        </div>
+      </div>
+
+      <!-- Quota Bar -->
+      <div class="card" style="padding: 20px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-weight: 600;">Minute Quota</span>
+          <span id="quotaLabel" style="font-size: 0.82rem; color: var(--text-muted);"></span>
+        </div>
+        <div class="quota-bar">
+          <div class="quota-fill" id="quotaFill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Domain Info -->
+      <div class="card" style="padding: 20px;">
+        <div style="font-weight: 600; margin-bottom: 14px;">Your Portal Info</div>
+        <div style="display: grid; gap: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--surface2); border-radius: 8px;">
+            <span style="color: var(--text-muted); font-size: 0.85rem;">Subdomain</span>
+            <span id="infoSubdomain" style="font-size: 0.85rem; font-weight: 500; font-family: monospace;"></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--surface2); border-radius: 8px;">
+            <span style="color: var(--text-muted); font-size: 0.85rem;">Custom Domain</span>
+            <span id="infoDomain" style="font-size: 0.85rem; font-weight: 500; font-family: monospace;"></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--surface2); border-radius: 8px;">
+            <span style="color: var(--text-muted); font-size: 0.85rem;">Landing Page</span>
+            <a id="infoLanding" href="#" target="_blank" style="font-size: 0.85rem; color: var(--primary); text-decoration: none;">View →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CLIENTS PAGE ── -->
+    <div id="page-clients" class="section-page">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+        <div id="clientLimitInfo" style="font-size: 0.82rem; color: var(--text-muted);"></div>
+        <button class="btn-primary" onclick="showAddClientModal()" id="addClientBtn">+ Add Client</button>
+      </div>
+      <div class="card" style="overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <th style="text-align: left; padding: 12px 16px; font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">CLIENT</th>
+              <th style="text-align: left; padding: 12px 16px; font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">STATUS</th>
+              <th style="text-align: left; padding: 12px 16px; font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">BALANCE</th>
+              <th style="text-align: left; padding: 12px 16px; font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">RATE/MIN</th>
+              <th style="text-align: left; padding: 12px 16px; font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody id="clientsTableBody">
+            <tr><td colspan="5" style="padding: 40px; text-align: center; color: var(--text-muted);">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── BRANDING PAGE ── -->
+    <div id="page-branding" class="section-page">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start;">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="card" style="padding: 20px;">
+            <div style="font-weight: 600; margin-bottom: 16px;">Identity</div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div><label>App / Brand Name</label><input id="b_appName" oninput="updateBrandPreview()"></div>
+              <div><label>Logo URL</label><input id="b_logoUrl" placeholder="https://..." oninput="updateBrandPreview()"></div>
+              <div><label>Favicon URL</label><input id="b_faviconUrl" placeholder="https://..."></div>
+              <div><label>Support Email</label><input id="b_supportEmail" type="email"></div>
+              <div><label>Copyright Text</label><input id="b_copyright"></div>
+            </div>
+          </div>
+          <div class="card" style="padding: 20px;">
+            <div style="font-weight: 600; margin-bottom: 16px;">Colors</div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <input type="color" id="b_primaryColor" value="#FF6B4A" style="width: 44px; height: 36px; padding: 2px; cursor: pointer;" oninput="updateBrandPreview()">
+                <div><label style="margin: 0;">Primary Color</label><span id="b_primaryColorHex" style="font-size: 0.78rem; color: var(--text-muted);">#FF6B4A</span></div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <input type="color" id="b_secondaryColor" value="#ae3115" style="width: 44px; height: 36px; padding: 2px; cursor: pointer;">
+                <div><label style="margin: 0;">Secondary Color</label><span id="b_secondaryColorHex" style="font-size: 0.78rem; color: var(--text-muted);">#ae3115</span></div>
+              </div>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="saveBranding()" style="padding: 11px;">Save Branding</button>
+          <div id="brandingMsg" style="font-size: 0.82rem; text-align: center; display: none;"></div>
+        </div>
+
+        <!-- Live Preview -->
+        <div>
+          <div style="font-weight: 600; margin-bottom: 12px; color: var(--text-muted); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.5px;">Live Preview</div>
+          <div class="branding-preview">
+            <div id="previewNavbar" style="background: rgba(0,0,0,0.4); backdrop-filter: blur(12px); border-radius: 12px; padding: 12px 18px; display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+              <div id="previewLogoBox" style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem; color: white;">R</div>
+              <span id="previewAppName" style="font-weight: 700; font-size: 0.95rem;">My Brand</span>
+            </div>
+            <div style="padding: 10px; text-align: center;">
+              <div id="previewHeadline" style="font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;">AI Calling Agents</div>
+              <div id="previewBtn" style="display: inline-block; padding: 8px 20px; border-radius: 100px; color: white; font-weight: 600; font-size: 0.85rem; cursor: pointer;">Get Started</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LANDING PAGE ── -->
+    <div id="page-landing" class="section-page">
+      <div class="card" style="padding: 24px; max-width: 700px;">
+        <div style="font-weight: 600; margin-bottom: 18px;">Landing Page Content</div>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="margin: 0;">Landing Page Enabled</label>
+            <label class="toggle">
+              <input type="checkbox" id="lp_enabled" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div><label>Hero Headline</label><input id="lp_headline" placeholder="AI Calling Agents That Close Deals"></div>
+          <div><label>Subheadline</label><textarea id="lp_subheadline" rows="3" placeholder="Describe your service..."></textarea></div>
+          <div><label>CTA Button Text</label><input id="lp_cta" placeholder="Get Started Today"></div>
+          <div><label>Custom CSS (advanced)</label><textarea id="lp_css" rows="4" style="font-family: monospace; font-size: 0.8rem;" placeholder="/* Add custom styles */"></textarea></div>
+          <button class="btn-primary" onclick="saveLandingPage()" style="padding: 11px;">Save Landing Page</button>
+          <div id="landingMsg" style="font-size: 0.82rem; text-align: center; display: none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BILLING PAGE ── -->
+    <div id="page-billing" class="section-page">
+      <div class="card" style="padding: 20px; margin-bottom: 20px;">
+        <div style="font-weight: 600; margin-bottom: 6px;">Quota Overview</div>
+        <div id="billingQuotaInfo" style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 14px;"></div>
+        <div class="quota-bar" style="height: 10px;">
+          <div class="quota-fill" id="billingQuotaFill" style="width: 0%;"></div>
+        </div>
+      </div>
+      <div class="card" style="overflow: hidden;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600;">Billing History</div>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <th style="text-align: left; padding: 10px 16px; font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">DATE</th>
+              <th style="text-align: left; padding: 10px 16px; font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">CLIENT</th>
+              <th style="text-align: left; padding: 10px 16px; font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">DURATION</th>
+              <th style="text-align: left; padding: 10px 16px; font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">DESCRIPTION</th>
+            </tr>
+          </thead>
+          <tbody id="billingHistoryBody">
+            <tr><td colspan="4" style="padding: 40px; text-align: center; color: var(--text-muted);">No billing history yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /appScreen -->
+
+<!-- ── ADD CLIENT MODAL ── -->
+<div id="addClientModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:500; align-items:center; justify-content:center;">
+  <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 28px; width: 420px; max-width: 95vw;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <span style="font-weight: 700; font-size: 1.05rem;">Add New Client</span>
+      <span onclick="closeModal('addClientModal')" style="cursor:pointer; color: var(--text-muted); font-size: 1.3rem;">✕</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div><label>Name</label><input id="ac_name" placeholder="Client Name"></div>
+      <div><label>Email</label><input id="ac_email" type="email" placeholder="client@email.com"></div>
+      <div><label>Password</label><input id="ac_password" type="password" placeholder="Min 6 characters"></div>
+      <div><label>Phone Number</label><input id="ac_phone" placeholder="+91XXXXXXXXXX"></div>
+      <div><label>Rate per Minute (₹)</label><input id="ac_rate" type="number" value="5" step="0.5"></div>
+      <div id="addClientError" style="color: #ef4444; font-size: 0.82rem; display: none;"></div>
+      <button class="btn-primary" onclick="addClient()" style="padding: 10px; margin-top: 4px;">Create Client</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EDIT CLIENT MODAL ── -->
+<div id="editClientModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:500; align-items:center; justify-content:center;">
+  <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 28px; width: 420px; max-width: 95vw;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <span style="font-weight: 700; font-size: 1.05rem;">Edit Client</span>
+      <span onclick="closeModal('editClientModal')" style="cursor:pointer; color: var(--text-muted); font-size: 1.3rem;">✕</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <input type="hidden" id="ec_id">
+      <div><label>Name</label><input id="ec_name"></div>
+      <div><label>Email</label><input id="ec_email" type="email"></div>
+      <div><label>Status</label>
+        <select id="ec_status">
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
+        </select>
+      </div>
+      <div><label>Balance (minutes)</label><input id="ec_balance" type="number" step="1"></div>
+      <div><label>Rate per Minute (₹)</label><input id="ec_rate" type="number" step="0.5"></div>
+      <div id="editClientError" style="color: #ef4444; font-size: 0.82rem; display: none;"></div>
+      <button class="btn-primary" onclick="saveEditClient()" style="padding: 10px;">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let SESSION = null; // { token, reseller }
+
+  // ── AUTH ─────────────────────────────────────────────────────────
+  async function doLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errEl = document.getElementById('loginError');
+    errEl.style.display = 'none';
+    if (!email || !password) { errEl.textContent = 'Enter email and password.'; errEl.style.display = 'block'; return; }
+    try {
+      const r = await fetch('/api/reseller/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const d = await r.json();
+      if (!d.success) { errEl.textContent = d.error; errEl.style.display = 'block'; return; }
+      SESSION = { token: d.token, reseller: d.reseller };
+      localStorage.setItem('reseller_session', JSON.stringify(SESSION));
+      initApp();
+    } catch(e) {
+      errEl.textContent = 'Connection error. Try again.';
+      errEl.style.display = 'block';
+    }
+  }
+
+  function doLogout() {
+    localStorage.removeItem('reseller_session');
+    SESSION = null;
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('appScreen').classList.remove('visible');
+    document.getElementById('appScreen').style.display = 'none';
+  }
+
+  function authHeaders() {
+    return { 'Content-Type': 'application/json', 'x-reseller-token': SESSION.token };
+  }
+
+  // ── INIT ─────────────────────────────────────────────────────────
+  function initApp() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('appScreen').style.display = 'flex';
+    document.getElementById('appScreen').classList.add('visible');
+    applyBranding(SESSION.reseller.branding);
+    loadDashboard();
+    loadBrandingForm();
+    loadLandingForm();
+  }
+
+  function applyBranding(b) {
+    if (!b) return;
+    if (b.primaryColor) {
+      document.documentElement.style.setProperty('--primary', b.primaryColor);
+    }
+    if (b.secondaryColor) {
+      document.documentElement.style.setProperty('--primary-dark', b.secondaryColor);
+    }
+    document.getElementById('sidebarAppName').textContent = b.appName || 'Reseller Panel';
+    document.getElementById('sidebarEmail').textContent = SESSION.reseller.email || '';
+    document.title = (b.appName || 'Reseller') + ' — Dashboard';
+    if (b.logoUrl) {
+      document.getElementById('sidebarLogo').innerHTML = `<img src="${b.logoUrl}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 6px;">`;
+    } else {
+      document.getElementById('sidebarLogo').textContent = (b.appName || 'R').charAt(0).toUpperCase();
+    }
+  }
+
+  // ── DASHBOARD ────────────────────────────────────────────────────
+  async function loadDashboard() {
+    try {
+      const r = await fetch('/api/reseller/stats', { headers: authHeaders() });
+      const d = await r.json();
+      if (!d.success) return;
+      const s = d.stats;
+      document.getElementById('statTotalClients').textContent = s.total_clients;
+      document.getElementById('statActiveClients').textContent = `${s.active_clients} active`;
+      document.getElementById('statMinUsed').textContent = s.quota_used;
+      document.getElementById('statMinRemaining').textContent = `${s.quota_remaining} remaining`;
+      document.getElementById('statTotalCalls').textContent = s.total_calls;
+      const pct = Math.min(100, Math.round((s.quota_used / s.quota_total) * 100)) || 0;
+      document.getElementById('quotaFill').style.width = pct + '%';
+      document.getElementById('quotaLabel').textContent = `${s.quota_used} / ${s.quota_total} minutes (${pct}%)`;
+      document.getElementById('billingQuotaFill').style.width = pct + '%';
+      document.getElementById('billingQuotaInfo').textContent = `${s.quota_used} minutes used of ${s.quota_total} total — ${s.quota_remaining} remaining`;
+    } catch(e) { console.error('Dashboard load error:', e); }
+
+    const res = SESSION.reseller;
+    document.getElementById('infoSubdomain').textContent = res.subdomain || 'Not set';
+    document.getElementById('infoDomain').textContent = res.domain || 'Not set';
+    const lpUrl = res.domain ? `https://${res.domain}` : (res.subdomain ? `https://${res.subdomain}` : '#');
+    document.getElementById('infoLanding').href = lpUrl;
+    document.getElementById('infoLanding').textContent = 'View Landing Page →';
+  }
+
+  // ── CLIENTS ──────────────────────────────────────────────────────
+  async function loadClients() {
+    const tbody = document.getElementById('clientsTableBody');
+    tbody.innerHTML = '<tr><td colspan="5" style="padding: 40px; text-align: center; color: var(--text-muted);">Loading...</td></tr>';
+    try {
+      const r = await fetch('/api/reseller/clients', { headers: authHeaders() });
+      const d = await r.json();
+      if (!d.success) { tbody.innerHTML = `<tr><td colspan="5" style="padding: 30px; text-align: center; color: #ef4444;">${d.error}</td></tr>`; return; }
+      const clients = d.clients;
+      const maxClients = SESSION.reseller.permissions?.max_clients || 10;
+      document.getElementById('clientLimitInfo').textContent = `${clients.length} / ${maxClients} clients`;
+      if (clients.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 40px; text-align: center; color: var(--text-muted);">No clients yet. Add your first client!</td></tr>';
+        return;
+      }
+      tbody.innerHTML = clients.map(c => `
+        <tr class="table-row" style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 12px 16px;">
+            <div style="font-weight: 500; font-size: 0.88rem;">${c.name}</div>
+            <div style="color: var(--text-muted); font-size: 0.77rem;">${c.email}</div>
+          </td>
+          <td style="padding: 12px 16px;"><span class="badge ${c.status === 'active' ? 'badge-green' : 'badge-red'}">${c.status}</span></td>
+          <td style="padding: 12px 16px; font-size: 0.88rem;">${c.balance} min</td>
+          <td style="padding: 12px 16px; font-size: 0.88rem;">₹${c.pricing?.rate_per_minute || 5}/min</td>
+          <td style="padding: 12px 16px;">
+            <button onclick="openEditClient('${c.id}','${c.name}','${c.email}','${c.status}',${c.balance},${c.pricing?.rate_per_minute||5})" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text); padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; margin-right: 6px;">Edit</button>
+            <button onclick="deleteClient('${c.id}','${c.name}')" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; cursor: pointer;">Remove</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="5" style="padding: 30px; text-align: center; color: #ef4444;">Failed to load clients.</td></tr>';
+    }
+  }
+
+  function showAddClientModal() {
+    ['ac_name','ac_email','ac_password','ac_phone'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('ac_rate').value = '5';
+    document.getElementById('addClientError').style.display = 'none';
+    document.getElementById('addClientModal').style.display = 'flex';
+  }
+
+  async function addClient() {
+    const errEl = document.getElementById('addClientError');
+    errEl.style.display = 'none';
+    const body = {
+      name: document.getElementById('ac_name').value.trim(),
+      email: document.getElementById('ac_email').value.trim(),
+      password: document.getElementById('ac_password').value,
+      phone_number: document.getElementById('ac_phone').value.trim()
+    };
+    const rate = parseFloat(document.getElementById('ac_rate').value) || 5;
+    if (!body.name || !body.email || !body.password) { errEl.textContent = 'Name, email and password are required.'; errEl.style.display = 'block'; return; }
+    try {
+      const r = await fetch('/api/reseller/clients', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+      const d = await r.json();
+      if (!d.success) { errEl.textContent = d.error; errEl.style.display = 'block'; return; }
+      // Set rate if different from default
+      if (rate !== 5) {
+        await fetch(`/api/reseller/clients/${d.client.id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ pricing: { rate_per_minute: rate } }) });
+      }
+      closeModal('addClientModal');
+      loadClients();
+    } catch(e) { errEl.textContent = 'Failed to create client.'; errEl.style.display = 'block'; }
+  }
+
+  function openEditClient(id, name, email, status, balance, rate) {
+    document.getElementById('ec_id').value = id;
+    document.getElementById('ec_name').value = name;
+    document.getElementById('ec_email').value = email;
+    document.getElementById('ec_status').value = status;
+    document.getElementById('ec_balance').value = balance;
+    document.getElementById('ec_rate').value = rate;
+    document.getElementById('editClientError').style.display = 'none';
+    document.getElementById('editClientModal').style.display = 'flex';
+  }
+
+  async function saveEditClient() {
+    const id = document.getElementById('ec_id').value;
+    const errEl = document.getElementById('editClientError');
+    errEl.style.display = 'none';
+    const body = {
+      name: document.getElementById('ec_name').value.trim(),
+      email: document.getElementById('ec_email').value.trim(),
+      status: document.getElementById('ec_status').value,
+      balance: parseFloat(document.getElementById('ec_balance').value),
+      pricing: { rate_per_minute: parseFloat(document.getElementById('ec_rate').value) || 5 }
+    };
+    try {
+      const r = await fetch(`/api/reseller/clients/${id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) });
+      const d = await r.json();
+      if (!d.success) { errEl.textContent = d.error; errEl.style.display = 'block'; return; }
+      closeModal('editClientModal');
+      loadClients();
+    } catch(e) { errEl.textContent = 'Failed to save.'; errEl.style.display = 'block'; }
+  }
+
+  async function deleteClient(id, name) {
+    if (!confirm(`Remove client "${name}"? This cannot be undone.`)) return;
+    await fetch(`/api/reseller/clients/${id}`, { method: 'DELETE', headers: authHeaders() });
+    loadClients();
+  }
+
+  // ── BRANDING ─────────────────────────────────────────────────────
+  function loadBrandingForm() {
+    const b = SESSION.reseller.branding || {};
+    document.getElementById('b_appName').value = b.appName || '';
+    document.getElementById('b_logoUrl').value = b.logoUrl || '';
+    document.getElementById('b_faviconUrl').value = b.faviconUrl || '';
+    document.getElementById('b_supportEmail').value = b.supportEmail || '';
+    document.getElementById('b_copyright').value = b.copyrightText || '';
+    document.getElementById('b_primaryColor').value = b.primaryColor || '#FF6B4A';
+    document.getElementById('b_secondaryColor').value = b.secondaryColor || '#ae3115';
+    document.getElementById('b_primaryColorHex').textContent = b.primaryColor || '#FF6B4A';
+    document.getElementById('b_secondaryColorHex').textContent = b.secondaryColor || '#ae3115';
+    updateBrandPreview();
+  }
+
+  function updateBrandPreview() {
+    const name = document.getElementById('b_appName').value || 'My Brand';
+    const logoUrl = document.getElementById('b_logoUrl').value;
+    const color = document.getElementById('b_primaryColor').value;
+    document.getElementById('b_primaryColorHex').textContent = color;
+    document.getElementById('previewAppName').textContent = name;
+    document.getElementById('previewBtn').style.background = color;
+    document.getElementById('previewLogoBox').style.background = `linear-gradient(135deg, ${color}, ${document.getElementById('b_secondaryColor').value})`;
+    if (logoUrl) {
+      document.getElementById('previewLogoBox').innerHTML = `<img src="${logoUrl}" style="width:24px; height:24px; object-fit: contain;">`;
+    } else {
+      document.getElementById('previewLogoBox').textContent = name.charAt(0).toUpperCase();
+    }
+  }
+
+  async function saveBranding() {
+    const msgEl = document.getElementById('brandingMsg');
+    const body = {
+      appName: document.getElementById('b_appName').value.trim(),
+      logoUrl: document.getElementById('b_logoUrl').value.trim(),
+      faviconUrl: document.getElementById('b_faviconUrl').value.trim(),
+      supportEmail: document.getElementById('b_supportEmail').value.trim(),
+      copyrightText: document.getElementById('b_copyright').value.trim(),
+      primaryColor: document.getElementById('b_primaryColor').value,
+      secondaryColor: document.getElementById('b_secondaryColor').value
+    };
+    const r = await fetch('/api/reseller/branding', { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.success) {
+      SESSION.reseller.branding = d.branding;
+      localStorage.setItem('reseller_session', JSON.stringify(SESSION));
+      applyBranding(d.branding);
+      msgEl.textContent = '✓ Branding saved!';
+      msgEl.style.color = '#22c55e';
+    } else {
+      msgEl.textContent = '✗ ' + d.error;
+      msgEl.style.color = '#ef4444';
+    }
+    msgEl.style.display = 'block';
+    setTimeout(() => { msgEl.style.display = 'none'; }, 3000);
+  }
+
+  // ── LANDING PAGE ─────────────────────────────────────────────────
+  function loadLandingForm() {
+    const lp = SESSION.reseller.landing_page || {};
+    document.getElementById('lp_enabled').checked = lp.enabled !== false;
+    document.getElementById('lp_headline').value = lp.headline || '';
+    document.getElementById('lp_subheadline').value = lp.subheadline || '';
+    document.getElementById('lp_cta').value = lp.cta_text || '';
+    document.getElementById('lp_css').value = lp.custom_css || '';
+  }
+
+  async function saveLandingPage() {
+    const msgEl = document.getElementById('landingMsg');
+    const body = {
+      enabled: document.getElementById('lp_enabled').checked,
+      headline: document.getElementById('lp_headline').value.trim(),
+      subheadline: document.getElementById('lp_subheadline').value.trim(),
+      cta_text: document.getElementById('lp_cta').value.trim(),
+      custom_css: document.getElementById('lp_css').value
+    };
+    const r = await fetch('/api/reseller/landing-page', { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.success) {
+      SESSION.reseller.landing_page = d.landing_page;
+      localStorage.setItem('reseller_session', JSON.stringify(SESSION));
+      msgEl.textContent = '✓ Landing page saved!';
+      msgEl.style.color = '#22c55e';
+    } else {
+      msgEl.textContent = '✗ ' + d.error;
+      msgEl.style.color = '#ef4444';
+    }
+    msgEl.style.display = 'block';
+    setTimeout(() => { msgEl.style.display = 'none'; }, 3000);
+  }
+
+  // ── BILLING ──────────────────────────────────────────────────────
+  async function loadBilling() {
+    try {
+      const r = await fetch('/api/reseller/me', { headers: authHeaders() });
+      const d = await r.json();
+      if (!d.success) return;
+      // billing history would come from reseller data
+      const res = d.reseller;
+      document.getElementById('billingHistoryBody').innerHTML = '<tr><td colspan="4" style="padding: 30px; text-align: center; color: var(--text-muted);">No billing history yet. Billing records appear as your clients make calls.</td></tr>';
+    } catch(e) {}
+  }
+
+  // ── NAV ──────────────────────────────────────────────────────────
+  const pageTitles = { dashboard: ['Dashboard','Your reseller overview'], clients: ['Clients','Manage your client accounts'], branding: ['Branding','Customize your brand identity'], landing: ['Landing Page','Edit your public landing page'], billing: ['Billing','Your quota and billing history'] };
+
+  function showPage(name) {
+    document.querySelectorAll('.section-page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    event.currentTarget.classList.add('active');
+    const [title, sub] = pageTitles[name] || [name, ''];
+    document.getElementById('pageTitle').textContent = title;
+    document.getElementById('pageSubtitle').textContent = sub;
+    if (name === 'clients') loadClients();
+    if (name === 'billing') loadBilling();
+    if (name === 'dashboard') loadDashboard();
+  }
+
+  function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+  document.getElementById('b_primaryColor').addEventListener('input', updateBrandPreview);
+  document.getElementById('b_secondaryColor').addEventListener('input', function() {
+    document.getElementById('b_secondaryColorHex').textContent = this.value;
+    updateBrandPreview();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal('addClientModal'); closeModal('editClientModal'); } });
+  document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+  // Auto-login from localStorage
+  window.addEventListener('load', () => {
+    const saved = localStorage.getItem('reseller_session');
+    if (saved) {
+      try {
+        SESSION = JSON.parse(saved);
+        if (SESSION?.token) { initApp(); return; }
+      } catch(e) {}
+    }
+    document.getElementById('loginScreen').style.display = 'flex';
+  });
+</script>
+</body>
+</html>
