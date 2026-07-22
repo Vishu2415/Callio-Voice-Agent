@@ -220,9 +220,23 @@
           <div class="card" style="padding: 20px;">
             <div style="font-weight: 600; margin-bottom: 16px;">Identity</div>
             <div style="display: flex; flex-direction: column; gap: 12px;">
-              <div><label>App / Brand Name</label><input id="b_appName" oninput="updateBrandPreview()"></div>
-              <div><label>Logo URL</label><input id="b_logoUrl" placeholder="https://..." oninput="updateBrandPreview()"></div>
-              <div><label>Favicon URL</label><input id="b_faviconUrl" placeholder="https://..."></div>
+              <div>
+                <label>Logo URL</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input id="b_logoUrl" placeholder="https://... or upload image" style="flex: 1;" oninput="updateBrandPreview()">
+                  <button type="button" class="btn btn-secondary" onclick="document.getElementById('reseller-logo-file').click()" style="padding: 6px 12px; height: 36px; white-space: nowrap; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">📁 Upload</button>
+                  <input type="file" id="reseller-logo-file" accept="image/*" style="display: none;" onchange="window.handleBrandingFileUpload(this, 'b_logoUrl')">
+                </div>
+              </div>
+              <div>
+                <label>Favicon URL</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input id="b_faviconUrl" placeholder="https://... or upload image" style="flex: 1;">
+                  <button type="button" class="btn btn-secondary" onclick="document.getElementById('reseller-favicon-file').click()" style="padding: 6px 12px; height: 36px; white-space: nowrap; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">📁 Upload</button>
+                  <input type="file" id="reseller-favicon-file" accept="image/*,.ico" style="display: none;" onchange="window.handleBrandingFileUpload(this, 'b_faviconUrl')">
+                </div>
+              </div>
+
               <div><label>Support Email</label><input id="b_supportEmail" type="email"></div>
               <div><label>Copyright Text</label><input id="b_copyright"></div>
             </div>
@@ -680,7 +694,44 @@
     updateBrandPreview();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal('addClientModal'); closeModal('editClientModal'); } });
+  window.handleBrandingFileUpload = function(inputEl, targetInputId) {
+    const file = inputEl.files && inputEl.files[0];
+    if (!file) return;
+    const targetInput = document.getElementById(targetInputId);
+    if (targetInput) {
+      targetInput.value = 'Uploading...';
+      targetInput.disabled = true;
+    }
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      const fullDataUrl = e.target.result;
+      const base64Data = fullDataUrl.split(',')[1];
+      let uploadedUrl = null;
+      try {
+        const res = await fetch('/api/upload-branding-asset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name, fileData: base64Data })
+        });
+        const data = await res.json();
+        if (data && data.success && data.url) uploadedUrl = data.url;
+      } catch (err) {
+        console.warn('Server upload error, using Data URL fallback:', err);
+      }
+      const finalUrl = uploadedUrl || fullDataUrl;
+      if (targetInput) {
+        targetInput.value = finalUrl;
+        targetInput.disabled = false;
+        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+        targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (typeof updateBrandPreview === 'function') updateBrandPreview();
+    };
+    reader.readAsDataURL(file);
+  };
+
   document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
 
   // Auto-login from localStorage
   window.addEventListener('load', () => {

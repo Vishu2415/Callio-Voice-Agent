@@ -6673,17 +6673,20 @@ window.applyBranding = function(branding) {
 };
 
 window.handleBrandingFileUpload = function(inputEl, targetInputId) {
-  const file = inputEl.files[0];
+  const file = inputEl.files && inputEl.files[0];
   if (!file) return;
+
+  const targetInput = document.getElementById(targetInputId);
+  if (targetInput) {
+    targetInput.value = 'Uploading...';
+    targetInput.disabled = true;
+  }
 
   const reader = new FileReader();
   reader.onload = async function(e) {
-    const base64Data = e.target.result.split(',')[1];
-    
-    // Show uploading status
-    const targetInput = document.getElementById(targetInputId);
-    targetInput.value = 'Uploading...';
-    targetInput.disabled = true;
+    const fullDataUrl = e.target.result;
+    const base64Data = fullDataUrl.split(',')[1];
+    let uploadedUrl = null;
 
     try {
       const res = await fetch('/api/upload-branding-asset', {
@@ -6695,24 +6698,29 @@ window.handleBrandingFileUpload = function(inputEl, targetInputId) {
         })
       });
       const data = await res.json();
-      if (data.success) {
-        targetInput.value = data.url;
-        // Trigger live change event to notify picker or preview
-        targetInput.dispatchEvent(new Event('change'));
-      } else {
-        alert('Upload failed: ' + data.error);
-        targetInput.value = '';
+      if (data && data.success && data.url) {
+        uploadedUrl = data.url;
       }
     } catch (err) {
-      console.error('Error uploading file:', err);
-      alert('Network error during file upload.');
-      targetInput.value = '';
-    } finally {
+      console.warn('Server upload error, using Data URL fallback:', err);
+    }
+
+    // Use uploaded URL or fallback to Data URL
+    const finalUrl = uploadedUrl || fullDataUrl;
+    if (targetInput) {
+      targetInput.value = finalUrl;
       targetInput.disabled = false;
+      targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+      targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    if (typeof window.updateBrandPreview === 'function') {
+      window.updateBrandPreview();
     }
   };
   reader.readAsDataURL(file);
 };
+
 
 window.saveBrandingSettings = async function(event) {
   event.preventDefault();

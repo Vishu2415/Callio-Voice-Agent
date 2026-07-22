@@ -986,8 +986,9 @@ function getIncomingCallConfig(query = {}, fromNum = '') {
 
 
 const app = express();
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
+app.use(express.json({ limit: '25mb' }));
+
 
 // CORS Middleware to allow requests from the SaaS platform
 app.use((req, res, next) => {
