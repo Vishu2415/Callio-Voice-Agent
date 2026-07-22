@@ -568,6 +568,57 @@
         .brand-logo:hover {
             opacity: 0.82;
         }
+
+        /* =============================================
+           NAVBAR — LIGHT MODE OVERRIDES
+           Dark mode uses hardcoded dark glass via Tailwind inline classes.
+           Light mode overrides applied here via html:not(.dark) selectors.
+        ============================================= */
+        html:not(.dark) header > div {
+            background: rgba(255, 255, 255, 0.82) !important;
+            border-color: rgba(0, 0, 0, 0.08) !important;
+            box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.08) !important;
+        }
+        /* Nav links inner capsule */
+        html:not(.dark) header nav {
+            background: rgba(0, 0, 0, 0.04) !important;
+            border-color: rgba(0, 0, 0, 0.08) !important;
+        }
+        /* Nav link text */
+        html:not(.dark) header nav a,
+        html:not(.dark) header nav button {
+            color: #374151 !important; /* gray-700 */
+        }
+        html:not(.dark) header nav a:hover,
+        html:not(.dark) header nav button:hover {
+            color: #111827 !important; /* gray-900 */
+            background: rgba(0, 0, 0, 0.06) !important;
+        }
+        /* Sign In link */
+        html:not(.dark) header .sign-in-link {
+            color: #374151 !important;
+        }
+        html:not(.dark) header .sign-in-link:hover {
+            color: #111827 !important;
+            background: rgba(0, 0, 0, 0.05) !important;
+        }
+        /* Theme toggle button */
+        html:not(.dark) header #themeToggleBtn {
+            color: #374151 !important;
+            background: rgba(0, 0, 0, 0.04) !important;
+            border-color: rgba(0, 0, 0, 0.10) !important;
+        }
+        html:not(.dark) header #themeToggleBtn:hover {
+            color: #111827 !important;
+            background: rgba(0, 0, 0, 0.08) !important;
+        }
+        /* SVG chevron icons */
+        html:not(.dark) header nav svg {
+            color: #9ca3af !important; /* gray-400 */
+        }
+        html:not(.dark) header nav button:hover svg {
+            color: #6b7280 !important; /* gray-500 */
+        }
     </style>
 </head>
 <body class="text-on-surface">
@@ -603,7 +654,7 @@
 
         <!-- Right: Actions -->
         <div class="flex items-center gap-2.5 sm:gap-3">
-            <a href="/app" class="hidden sm:inline-flex items-center text-xs sm:text-sm font-semibold text-gray-300 hover:text-white px-4 py-2 rounded-full hover:bg-white/10 transition-all duration-200">Sign In</a>
+            <a href="/app" class="sign-in-link hidden sm:inline-flex items-center text-xs sm:text-sm font-semibold text-gray-300 hover:text-white px-4 py-2 rounded-full hover:bg-white/10 transition-all duration-200">Sign In</a>
             <button id="themeToggleBtn" onclick="toggleTheme()" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all" title="Toggle Theme">
                 <span class="material-symbols-outlined text-[18px]" id="themeToggleIcon">light_mode</span>
             </button>
