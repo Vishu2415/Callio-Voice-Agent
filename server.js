@@ -270,37 +270,58 @@ function saveCrmLogs() { saveDatabase(CRM_LOGS_DB_FILE, crmLogsDb); }
 
 async function syncVobizNumberWebhook(phoneNumber, clientId = null) {
   if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.trim() === '') return;
-  const cleanNumber = phoneNumber.trim().replace(/[\s\-\(\)]/g, '');
+  const rawNumber = phoneNumber.trim();
+  const digitsOnly = rawNumber.replace(/\D/g, '');
+  const cleanNumber = rawNumber.replace(/[\s\-\(\)]/g, '');
+  const e164Number = digitsOnly.startsWith('91') ? '+' + digitsOnly : '+' + digitsOnly;
+  
   const masterAuthId = defaultCallConfig.vobizAuthId || process.env.VOBIZ_MASTER_AUTH_ID || 'MA_5VY3LRDW';
   const masterAuthToken = defaultCallConfig.vobizAuthToken || process.env.VOBIZ_MASTER_AUTH_TOKEN || 'eoJKIYccZirxLWHbVZmHKHa5LF0rt6Z0rLax0GVrbNZjmEZKeYuCSFml1btABTnr';
   const publicUrl = (defaultCallConfig.publicUrl || 'https://callio.in').trim().replace(/\/$/, '');
 
   if (!masterAuthId || !masterAuthToken) {
-    console.warn(`[Vobiz Webhook Sync] Cannot sync ${cleanNumber}: Master Vobiz Auth ID/Token missing.`);
+    console.warn(`[Vobiz Webhook Sync] Cannot sync ${digitsOnly}: Master Vobiz Auth ID/Token missing.`);
     return;
   }
 
-  try {
-    const webhookUrl = `${publicUrl}/incoming-call-vobiz${clientId ? `?client_id=${clientId}` : ''}`;
-    console.log(`[Vobiz Webhook Sync] Updating voice_url for ${cleanNumber} -> ${webhookUrl}`);
-    const webhookApiUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Number/${cleanNumber}/`;
-    const res = await fetch(webhookApiUrl, {
-      method: 'PUT',
-      headers: {
-        'X-Auth-ID': masterAuthId.trim(),
-        'X-Auth-Token': masterAuthToken.trim(),
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ voice_url: webhookUrl, voice_method: 'POST' })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) {
-      console.log(`[Vobiz Webhook Sync] Successfully set voice_url for ${cleanNumber}`);
-    } else {
-      console.warn(`[Vobiz Webhook Sync] Vobiz API returned HTTP ${res.status} for ${cleanNumber}:`, data);
+  const webhookUrl = `${publicUrl}/incoming-call-vobiz${clientId ? `?client_id=${clientId}` : ''}`;
+  console.log(`[Vobiz Webhook Sync] Updating voice_url for ${digitsOnly} -> ${webhookUrl}`);
+
+  // Try formats: digits only (e.g. 917971442441) and E.164 (e.g. +917971442441)
+  const numberFormats = Array.from(new Set([digitsOnly, e164Number, cleanNumber]));
+  for (const numFormat of numberFormats) {
+    try {
+      // 1. Unassign from subaccount to ensure incoming calls route via master voice_url
+      const unassignUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Number/${encodeURIComponent(numFormat)}/Unassign/`;
+      await fetch(unassignUrl, {
+        method: 'POST',
+        headers: {
+          'X-Auth-ID': masterAuthId.trim(),
+          'X-Auth-Token': masterAuthToken.trim(),
+          'Content-Type': 'application/json'
+        }
+      }).catch(() => {});
+
+      // 2. Set voice_url on Master Account
+      const webhookApiUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Number/${encodeURIComponent(numFormat)}/`;
+      const res = await fetch(webhookApiUrl, {
+        method: 'PUT',
+        headers: {
+          'X-Auth-ID': masterAuthId.trim(),
+          'X-Auth-Token': masterAuthToken.trim(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ voice_url: webhookUrl, voice_method: 'POST' })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        console.log(`[Vobiz Webhook Sync] Successfully set voice_url for ${numFormat}`);
+      } else {
+        console.warn(`[Vobiz Webhook Sync] Vobiz API HTTP ${res.status} for ${numFormat}:`, data);
+      }
+    } catch (err) {
+      console.error(`[Vobiz Webhook Sync Error] Failed for ${numFormat}:`, err.message);
     }
-  } catch (err) {
-    console.error(`[Vobiz Webhook Sync Error] Failed for ${cleanNumber}:`, err.message);
   }
 }
 
