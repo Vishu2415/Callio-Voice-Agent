@@ -2820,11 +2820,16 @@ app.post('/api/auth/login', (req, res) => {
         if (!client.reseller_id) {
           // Auto-migrate client created on this reseller portal before fix
           client.reseller_id = currentReseller.id;
+          client.tenantId = tenantId || currentReseller.id;
           clientsDb.set(client.id, client);
           saveClients();
           console.log(`[Auto Migration] Linked unassigned client ${client.email} to reseller ${currentReseller.name}`);
         } else if (client.reseller_id !== currentReseller.id) {
           return res.status(403).json({ success: false, error: 'User account does not belong to this portal.' });
+        } else if (tenantId && client.tenantId !== tenantId) {
+          client.tenantId = tenantId;
+          clientsDb.set(client.id, client);
+          saveClients();
         }
       } else {
         // Direct Callio portal — direct clients only
@@ -2833,14 +2838,10 @@ app.post('/api/auth/login', (req, res) => {
         }
       }
 
-
       if (client.status === 'suspended') {
         return res.status(403).json({ success: false, error: 'Your account is suspended.' });
       }
 
-      if (tenantId && client.tenantId && client.tenantId !== tenantId) {
-        return res.status(400).json({ success: false, error: 'User account does not belong to this branding portal.' });
-      }
       return res.json({
         success: true,
         user: {
