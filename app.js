@@ -5369,7 +5369,9 @@ async function fetchAdminClients() {
 
       const deleteActionBtn = `<button onclick="window.deleteClient('${client.id}', '${escapeHtml(client.name)}')" class="admin-action-btn admin-action-btn-delete" title="Delete Client">🗑️</button>`;
 
-      const customCredsBadge = client.vobiz_sub_auth_id ? `<br><span style="font-size: 0.65rem; color: var(--color-cyan); background: rgba(6, 182, 212, 0.1); padding: 1px 4px; border-radius: 4px; font-weight: 600; display: inline-block; margin-top: 2px;">🔑 Custom Vobiz</span>` : '';
+      const isWL = window.isWhitelabelDomain();
+      const customCredsBadge = (!isWL && client.vobiz_sub_auth_id) ? `<br><span style="font-size: 0.65rem; color: var(--color-cyan); background: rgba(6, 182, 212, 0.1); padding: 1px 4px; border-radius: 4px; font-weight: 600; display: inline-block; margin-top: 2px;">🔑 Custom Vobiz</span>` : '';
+      const assignBtnText = isWL ? '📱 Assign Number' : '📞 Telephony &amp; Credentials';
 
       tr.innerHTML = `
         <td>
@@ -5394,7 +5396,7 @@ async function fetchAdminClients() {
           <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
             <button onclick="window.openRechargeModal('${client.id}', '${escapeHtml(client.name)}')" class="admin-action-btn admin-action-btn-recharge">Recharge</button>
             <button onclick="window.openPricingModal('${client.id}', '${escapeHtml(client.name)}', ${rates.rate_per_minute}, ${rates.rate_recording_per_minute}, ${rates.rate_per_session}, '${client.plan || 'basic'}')" class="admin-action-btn admin-action-btn-pricing">Pricing &amp; Plan</button>
-            <button onclick="window.openAssignNumberModal('${client.id}', '${escapeHtml(client.name)}', '${escapeHtml(client.phone_number || '')}', '${escapeHtml(client.vobiz_sub_auth_id || '')}', '${escapeHtml(client.vobiz_sub_auth_token || '')}')" class="admin-action-btn" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c084fc;">📞 Telephony &amp; Credentials</button>
+            <button onclick="window.openAssignNumberModal('${client.id}', '${escapeHtml(client.name)}', '${escapeHtml(client.phone_number || '')}', '${escapeHtml(client.vobiz_sub_auth_id || '')}', '${escapeHtml(client.vobiz_sub_auth_token || '')}')" class="admin-action-btn" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c084fc;">${assignBtnText}</button>
             <button onclick="impersonateUser('${client.id}')" class="admin-action-btn admin-action-btn-impersonate">Impersonate</button>
             ${statusActionBtn}
             ${deleteActionBtn}
@@ -5444,8 +5446,58 @@ window.submitRecharge = async function(event) {
   }
 };
 
+// --- Whitelabel UI Helper & Restrictions ---
+window.isWhitelabelDomain = function() {
+  const branding = window.BrandingContext || {};
+  const host = window.location.hostname.toLowerCase();
+  if (host !== 'callio.in' && host !== 'localhost' && host !== '127.0.0.1' && !host.endsWith('.callio.in')) {
+    return true;
+  }
+  if (branding.id && branding.id !== 'default') {
+    return true;
+  }
+  return false;
+};
+
+window.applyWhitelabelUiRestrictions = function() {
+  const isWL = window.isWhitelabelDomain();
+  const branding = window.BrandingContext || {};
+
+  // 1. Admin Panel Header Title
+  const adminTitle = document.querySelector('.admin-modern-title');
+  if (adminTitle) {
+    const name = branding.appName || 'Admin';
+    adminTitle.textContent = isWL ? `${name} Admin Panel` : 'Super Admin Panel';
+  }
+
+  // 2. System Monitor Bar
+  const sysMonitor = document.getElementById('admin-system-monitor-bar');
+  if (sysMonitor) {
+    sysMonitor.style.display = isWL ? 'none' : 'flex';
+  }
+
+  // 3. Reseller Management Tab
+  const resellerTab = document.getElementById('admin-subtab-resellers');
+  if (resellerTab) {
+    resellerTab.style.display = isWL ? 'none' : 'inline-block';
+  }
+
+  // 4. Modal Vobiz Credentials Container
+  const vobizCredsSection = document.getElementById('assign-number-vobiz-creds-container');
+  if (vobizCredsSection) {
+    vobizCredsSection.style.display = isWL ? 'none' : 'block';
+  }
+
+  // 5. Modal Header Title
+  const modalTitle = document.getElementById('assign-number-modal-title');
+  if (modalTitle) {
+    modalTitle.textContent = isWL ? 'Assign Telephony Number' : 'Client Telephony & Credentials';
+  }
+};
+
 // --- Assign Number & Telephony Credentials Modal ---
 window.openAssignNumberModal = function(clientId, clientName, currentNumber, subAuthId, subAuthToken) {
+  window.applyWhitelabelUiRestrictions();
   document.getElementById('assign-number-client-id').value = clientId;
   document.getElementById('assign-number-client-name').value = clientName;
   document.getElementById('assign-number-new-input').value = currentNumber || '';
@@ -5454,6 +5506,7 @@ window.openAssignNumberModal = function(clientId, clientName, currentNumber, sub
   document.getElementById('assign-number-auth-token').value = subAuthToken || '';
   document.getElementById('admin-assign-number-modal').style.display = 'flex';
 };
+
 
 window.closeAssignNumberModal = function() {
   document.getElementById('admin-assign-number-modal').style.display = 'none';
@@ -6681,7 +6734,13 @@ window.applyBranding = function(branding) {
   document.querySelectorAll('.brand-copyright').forEach(el => {
     el.textContent = branding.copyrightText;
   });
+
+  // 7. Apply Whitelabel UI restrictions & title customization
+  if (typeof window.applyWhitelabelUiRestrictions === 'function') {
+    window.applyWhitelabelUiRestrictions();
+  }
 };
+
 
 window.handleBrandingFileUpload = function(inputEl, targetInputId) {
   const file = inputEl.files && inputEl.files[0];
