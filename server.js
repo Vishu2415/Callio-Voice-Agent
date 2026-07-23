@@ -4978,9 +4978,13 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           console.log('Gemini setup complete. Call channel active.');
           isGeminiReady = true;
 
-          // Trigger initial greeting with a 1.5-second delay, unless user speaks first
+          // Trigger initial greeting with a 3.5-second delay for incoming calls (2s for outbound), unless user speaks first
           ws.userHasSpoken = false;
           ws.isInterrupted = false;
+          
+          const callStateObj = activeCalls.get(callSid);
+          const isIncomingCall = callStateObj && callStateObj.direction === 'incoming';
+          const greetingDelayMs = isIncomingCall ? 3500 : 2000;
           
           ws.greetingTimeout = setTimeout(() => {
             if (geminiWs && geminiWs.readyState === WebSocket.OPEN && !ws.userHasSpoken) {
@@ -5007,14 +5011,14 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 }
               };
               
-              console.log(`[WebSocket Stream Setup] Injecting initial greeting turn after 1.5s silence: "${greetPrompt}"`);
+              console.log(`[WebSocket Stream Setup] Injecting initial greeting turn after ${greetingDelayMs}ms silence: "${greetPrompt}"`);
               try {
                 geminiWs.send(JSON.stringify(initGreeting));
               } catch (e) {
                 console.error('Failed to send initial greeting:', e.message);
               }
             }
-          }, 2000); // 2s delay so audio path fully stabilizes before agent speaks
+          }, greetingDelayMs); // 2s delay so audio path fully stabilizes before agent speaks
           
           resetInactivityTimer();
           return;
@@ -5389,6 +5393,13 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               }
               const rms = Math.sqrt(sum / numSamples);
               if (rms > 1000) {
+                // If caller speaks first, cancel the automated greeting timeout immediately
+                if (ws.greetingTimeout) {
+                  clearTimeout(ws.greetingTimeout);
+                  ws.greetingTimeout = null;
+                  ws.userHasSpoken = true;
+                  console.log(`[Call ${activeCallSid}] Caller spoke first (RMS: ${Math.round(rms)}). Cancelled initial greeting timeout.`);
+                }
                 // User is actively making sound, reset inactivity timer
                 resetInactivityTimer();
               }
