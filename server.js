@@ -1161,7 +1161,7 @@ app.use(express.json({ limit: '25mb' }));
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, api-key, ngrok-skip-browser-warning');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -1189,18 +1189,23 @@ const authMiddleware = (dataType) => (req, res, next) => {
     origin.includes('127.0.0.1')
   );
 
-  if (isDashboard && !req.headers.authorization) {
-    // Allow web app dashboard requests to proceed without requiring bearer API Key
+  const rawAuthHeader = req.headers.authorization || '';
+  const key = (rawAuthHeader ? rawAuthHeader.replace(/^Bearer\s+/i, '') : '') ||
+              req.headers['x-api-key'] ||
+              req.headers['api-key'] ||
+              req.query?.api_key ||
+              req.body?.apiKey || '';
+
+  if (isDashboard && !key) {
+    // Allow local web app dashboard requests to proceed without requiring API Key
     return next();
   }
 
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!key) {
     return res.status(401).json({ success: false, error: 'Unauthorized: Missing API Key' });
   }
 
-  const key = authHeader.split(' ')[1].trim();
-  if (key !== defaultCallConfig.apiKey.trim()) {
+  if (defaultCallConfig.apiKey && key.trim() !== defaultCallConfig.apiKey.trim()) {
     return res.status(401).json({ success: false, error: 'Unauthorized: Invalid API Key' });
   }
 
@@ -2291,7 +2296,8 @@ app.get('/api/agents', authMiddleware('agents'), (req, res) => {
   const { clientId } = req.query;
   let list = Array.from(agentsDb.values());
   if (clientId && clientId !== 'admin') {
-    list = list.filter(a => a.clientId === clientId);
+    const clientAgents = list.filter(a => a.clientId === clientId);
+    list = clientAgents.length > 0 ? clientAgents : list.filter(a => !a.clientId || a.clientId === 'admin');
   } else if (clientId === 'admin') {
     list = list.filter(a => a.clientId === 'admin' || !a.clientId);
   }
