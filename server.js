@@ -1742,8 +1742,24 @@ app.all('/incoming-call-vobiz', (req, res) => {
     req.body.call_uuid || req.query.call_uuid || 
     req.body.request_uuid || req.query.request_uuid || ''
   ).trim();
-  const toNum = (req.body.To || req.query.To || req.body.to || req.query.to || '').trim();
-  const fromNum = (req.body.From || req.query.From || req.body.from || req.query.from || '').trim();
+  const toNum = (
+    req.body.To || req.query.To || 
+    req.body.to || req.query.to || 
+    req.body.Destination || req.query.Destination || 
+    req.body.destination || req.query.destination ||
+    req.body.ToNumber || req.query.ToNumber ||
+    req.body.to_number || req.query.to_number ||
+    req.body.ALegNumber || req.query.ALegNumber || ''
+  ).trim();
+
+  const fromNum = (
+    req.body.From || req.query.From || 
+    req.body.from || req.query.from || 
+    req.body.CLegNumber || req.query.CLegNumber || 
+    req.body.FromNumber || req.query.FromNumber ||
+    req.body.from_number || req.query.from_number ||
+    req.body.caller_number || req.query.caller_number || ''
+  ).trim();
   
   let clientId = req.query.client_id || req.body.client_id || '';
   if (!clientId && toNum) {
@@ -1801,15 +1817,11 @@ app.all('/incoming-call-vobiz', (req, res) => {
   }
   
   if (callSid) {
-    // --- DEDUP FIX: Check if there is already a 'calling' state entry for this destination number.
-    // When /make-call registers a call with 'request_uuid' and Vobiz later calls back with 'CallUUID',
-    // these may differ. Find the pre-existing entry and merge instead of creating a duplicate.
     let resolvedSid = callSid;
     if (toNum) {
       for (const [sid, state] of activeCalls.entries()) {
         if (cleanAndComparePhone(state.to, toNum) && state.status === 'calling' && sid !== callSid) {
           console.log(`[Vobiz Webhook] Dedup: Found existing 'calling' entry for ${toNum} (sid: ${sid}). Merging into callSid ${callSid}.`);
-          // Copy the old state into the new callSid
           const oldState = { ...state, callSid: callSid };
           activeCalls.delete(sid);
           activeCalls.set(callSid, oldState);
@@ -1821,6 +1833,8 @@ app.all('/incoming-call-vobiz', (req, res) => {
       }
     }
     callSettingsMap.set(resolvedSid, callConfig);
+    if (toNum) callSettingsMap.set(toNum, callConfig);
+    if (fromNum) callSettingsMap.set(fromNum, callConfig);
     console.log(`[Vobiz Webhook] Config cached under CallSid: ${resolvedSid}`);
     getOrCreateCallState(resolvedSid, {
       provider: 'vobiz',
@@ -1833,10 +1847,11 @@ app.all('/incoming-call-vobiz', (req, res) => {
     });
   }
   
+  const streamUrlQuery = `provider=vobiz${clientId ? `&amp;client_id=${clientId}` : ''}${callSid ? `&amp;call_sid=${callSid}` : ''}`;
   res.type('text/xml');
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Stream bidirectional="true" keepCallAlive="true">wss://${req.headers.host}/media-stream?provider=vobiz${clientId ? `&amp;client_id=${clientId}` : ''}</Stream>
+  <Stream bidirectional="true" keepCallAlive="true">wss://${req.headers.host}/media-stream?${streamUrlQuery}</Stream>
 </Response>`);
 });
 // 3. Outbound Call Trigger Endpoint
@@ -5164,29 +5179,29 @@ Follow these rules strictly to sound completely human, lively, and emotional:
 
           if (ws.provider === 'vobiz') {
             streamSid = msg.start.streamId;
-            const callSid = msg.start.callId;
+            const callSid = msg.start.callId || urlObj.searchParams.get('call_sid') || 'vobiz_' + Date.now();
             activeCallSid = callSid;
-            console.log(`Vobiz call started. StreamSid: ${streamSid}, CallSid: ${callSid}`);
+            console.log(`Vobiz call started. StreamSid: ${streamSid}, CallSid: ${callSid}, ClientId: ${clientId || 'None'}`);
             
-            // Retrieve config by CallSid or fallback to client specific/default
-            let callConfig = callSettingsMap.get(callSid);
+            // Retrieve config by CallSid, To, or ClientId
+            let callConfig = callSettingsMap.get(callSid) || (clientId && clientsDb.has(clientId) ? null : null);
+            if (!callConfig && clientId && clientsDb.has(clientId)) {
+              const client = clientsDb.get(clientId);
+              console.log(`[Vobiz WS Stream] Selected client agent for ${client.name} (ID: ${client.id})`);
+              callConfig = {
+                voice: client.agent_config?.voice || defaultCallConfig.voice || 'Aoede',
+                systemInstruction: client.agent_config?.system_prompt || defaultCallConfig.systemInstruction,
+                model: defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
+                name: client.name || '',
+                recordCall: defaultCallConfig.gemini_record_call === 'true' || defaultCallConfig.recordCall || false,
+                clientId: clientId,
+                vobizAuthId: client.vobiz_sub_auth_id,
+                vobizAuthToken: client.vobiz_sub_auth_token
+              };
+              callSettingsMap.set(callSid, callConfig);
+            }
             if (!callConfig) {
-              if (clientId && clientsDb.has(clientId)) {
-                const client = clientsDb.get(clientId);
-                callConfig = {
-                  voice: client.agent_config?.voice || defaultCallConfig.voice || 'Aoede',
-                  systemInstruction: client.agent_config?.system_prompt || defaultCallConfig.systemInstruction,
-                  model: defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
-                  name: client.name || '',
-                  recordCall: defaultCallConfig.gemini_record_call === 'true' || defaultCallConfig.recordCall || false,
-                  clientId: clientId,
-                  vobizAuthId: client.vobiz_sub_auth_id,
-                  vobizAuthToken: client.vobiz_sub_auth_token
-                };
-                callSettingsMap.set(callSid, callConfig);
-              } else {
-                callConfig = getIncomingCallConfig();
-              }
+              callConfig = getIncomingCallConfig(urlObj.searchParams, '');
             }
             const callState = getOrCreateCallState(callSid, {
               provider: 'vobiz',
@@ -5276,12 +5291,20 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           let pcm16Base64 = '';
           
           if (ws.provider === 'vobiz') {
+            const mediaFmt = (msg.media?.contentType || msg.media?.format || msg.media?.encoding || '').toLowerCase();
             if (!ws.loggedFirstMedia) {
               ws.loggedFirstMedia = true;
-              console.log(`[Vobiz Media] First media packet received. ContentType: ${msg.media?.contentType}, Payload length: ${base64Media.length}`);
+              console.log(`[Vobiz Media] First media packet received. Format: "${mediaFmt}", Payload length: ${base64Media.length}`);
             }
-            // Vobiz sends mu-law 8kHz audio (same as Twilio) — transcode to 16kHz PCM for Gemini
-            pcm16Buffer = twilioToGemini(mediaBuffer);
+            if (mediaFmt.includes('pcm') || mediaFmt.includes('l16') || mediaFmt.includes('raw')) {
+              if (mediaFmt.includes('8000') || mediaFmt.includes('8k') || mediaBuffer.length <= 160) {
+                pcm16Buffer = pcm8ToPcm16(mediaBuffer);
+              } else {
+                pcm16Buffer = mediaBuffer;
+              }
+            } else {
+              pcm16Buffer = twilioToGemini(mediaBuffer);
+            }
             pcm16Base64 = pcm16Buffer.toString('base64');
           } else if (ws.provider === 'exotel') {
             // Transcode: 8kHz PCM -> 16kHz PCM
