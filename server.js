@@ -2312,11 +2312,11 @@ app.get('/recording-proxy/:callSid', async (req, res) => {
 
 // --- AGENTS API ---
 app.get('/api/agents', authMiddleware('agents'), (req, res) => {
-  const { clientId } = req.query;
+  const clientId = req.query.clientId || req.query.client_id || '';
   let list = Array.from(agentsDb.values());
   if (clientId && clientId !== 'admin') {
-    const clientAgents = list.filter(a => a.clientId === clientId);
-    list = clientAgents.length > 0 ? clientAgents : list.filter(a => !a.clientId || a.clientId === 'admin');
+    // Strict Multi-Tenant Isolation: Only return agents created by this specific client
+    list = list.filter(a => a.clientId === clientId);
   } else if (clientId === 'admin') {
     list = list.filter(a => a.clientId === 'admin' || !a.clientId);
   }
