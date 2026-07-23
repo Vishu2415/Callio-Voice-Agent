@@ -1209,21 +1209,22 @@ const authMiddleware = (dataType) => (req, res, next) => {
   const masterKey = (defaultCallConfig.apiKey || '').trim();
   let matchedClient = null;
 
-  if (masterKey && cleanKey === masterKey) {
-    // Authenticated via Master Server API Key
-  } else {
-    // Check multi-tenant isolated client API keys
-    for (const [cId, client] of clientsDb.entries()) {
-      if ((client.api_key && client.api_key.trim() === cleanKey) ||
-          (client.vobiz_sub_auth_token && client.vobiz_sub_auth_token.trim() === cleanKey) ||
-          cId === cleanKey) {
-        matchedClient = client;
-        req.query.clientId = cId; // Bind client ID for isolated data queries
-        break;
-      }
+  // ALWAYS check clientsDb first to identify if key belongs to a specific client/reseller
+  for (const [cId, client] of clientsDb.entries()) {
+    if ((client.api_key && client.api_key.trim() === cleanKey) ||
+        (client.vobiz_sub_auth_token && client.vobiz_sub_auth_token.trim() === cleanKey) ||
+        cId === cleanKey) {
+      matchedClient = client;
+      req.query.clientId = cId; // Bind client ID for strict isolated queries
+      break;
     }
+  }
 
-    if (!matchedClient && masterKey) {
+  // If not matched to a specific client, check if it's the master admin API Key
+  if (!matchedClient) {
+    if (masterKey && cleanKey === masterKey) {
+      // Authenticated as Master Admin
+    } else if (masterKey) {
       return res.status(401).json({ success: false, error: 'Unauthorized: Invalid API Key' });
     }
   }
