@@ -1841,7 +1841,8 @@ app.all('/incoming-call-vobiz', (req, res) => {
     console.log(`[Vobiz Webhook] Config cached under CallSid: ${resolvedSid}`);
     getOrCreateCallState(resolvedSid, {
       provider: 'vobiz',
-      to: toNum,
+      to: fromNum || toNum,
+      from: fromNum,
       direction: 'incoming',
       name: callConfig.name || '',
       recordCall: callConfig.recordCall || false,
@@ -1855,7 +1856,6 @@ app.all('/incoming-call-vobiz', (req, res) => {
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Stream bidirectional="true">wss://${req.headers.host}/media-stream?${streamUrlQuery}</Stream>
-  <Wait length="3600"/>
 </Response>`);
 });
 // 3. Outbound Call Trigger Endpoint
