@@ -5186,13 +5186,14 @@ Follow these rules strictly to sound completely human, lively, and emotional:
       
       switch (msg.event) {
         case 'start':
-          // Auto-detect provider based on keys in the start event
-          const isVobiz = ('streamId' in msg.start) || ('callId' in msg.start) || (provider === 'vobiz');
-          const isExotel = !isVobiz && (('stream_sid' in msg.start) || ('call_sid' in msg.start) || (provider === 'exotel'));
-          ws.provider = isVobiz ? 'vobiz' : (isExotel ? 'exotel' : 'twilio');
-          
           const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+          const paramProvider = (urlObj.searchParams.get('provider') || '').toLowerCase();
           const clientId = urlObj.searchParams.get('client_id');
+
+          // Auto-detect provider based on keys in the start event or query param
+          const isVobiz = (msg.start && ('streamId' in msg.start || 'callId' in msg.start)) || (paramProvider === 'vobiz');
+          const isExotel = !isVobiz && (msg.start && ('stream_sid' in msg.start || 'call_sid' in msg.start)) || (paramProvider === 'exotel');
+          ws.provider = isVobiz ? 'vobiz' : (isExotel ? 'exotel' : (paramProvider || 'twilio'));
 
           if (ws.provider === 'vobiz') {
             streamSid = msg.start.streamId;
