@@ -5032,12 +5032,10 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 const base64Mulaw = mulawBuffer.toString('base64');
                 
                 const vobizMessage = {
-                  event: 'playAudio',
+                  event: 'media',
                   streamId: streamSid,
                   streamSid: streamSid,
                   media: {
-                    contentType: 'audio/x-mulaw',
-                    sampleRate: 8000,
                     payload: base64Mulaw
                   }
                 };
@@ -5098,8 +5096,9 @@ Follow these rules strictly to sound completely human, lively, and emotional:
             }
           } else if (ws.provider === 'vobiz') {
             const clearMsg = {
-              event: 'clearAudio',
-              streamId: streamSid
+              event: 'clear',
+              streamId: streamSid,
+              streamSid: streamSid
             };
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify(clearMsg));
