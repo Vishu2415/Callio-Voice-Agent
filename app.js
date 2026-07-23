@@ -5369,6 +5369,8 @@ async function fetchAdminClients() {
 
       const deleteActionBtn = `<button onclick="window.deleteClient('${client.id}', '${escapeHtml(client.name)}')" class="admin-action-btn admin-action-btn-delete" title="Delete Client">🗑️</button>`;
 
+      const customCredsBadge = client.vobiz_sub_auth_id ? `<br><span style="font-size: 0.65rem; color: var(--color-cyan); background: rgba(6, 182, 212, 0.1); padding: 1px 4px; border-radius: 4px; font-weight: 600; display: inline-block; margin-top: 2px;">🔑 Custom Vobiz</span>` : '';
+
       tr.innerHTML = `
         <td>
           <div class="client-info-cell">
@@ -5381,7 +5383,7 @@ async function fetchAdminClients() {
         </td>
         <td>${roleBadge}</td>
         <td>${planBadge}</td>
-        <td class="phone">${escapeHtml(client.phone_number || 'None')}</td>
+        <td class="phone">${escapeHtml(client.phone_number || 'None')}${customCredsBadge}</td>
         <td style="font-family: monospace; font-weight: bold; color: var(--color-cyan);">₹${balanceText}</td>
         <td>${ratesTextHtml}</td>
         <td>
@@ -5392,7 +5394,7 @@ async function fetchAdminClients() {
           <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
             <button onclick="window.openRechargeModal('${client.id}', '${escapeHtml(client.name)}')" class="admin-action-btn admin-action-btn-recharge">Recharge</button>
             <button onclick="window.openPricingModal('${client.id}', '${escapeHtml(client.name)}', ${rates.rate_per_minute}, ${rates.rate_recording_per_minute}, ${rates.rate_per_session}, '${client.plan || 'basic'}')" class="admin-action-btn admin-action-btn-pricing">Pricing &amp; Plan</button>
-            <button onclick="window.openAssignNumberModal('${client.id}', '${escapeHtml(client.name)}', '${escapeHtml(client.phone_number || '')}')" class="admin-action-btn" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c084fc;">Assign Number</button>
+            <button onclick="window.openAssignNumberModal('${client.id}', '${escapeHtml(client.name)}', '${escapeHtml(client.phone_number || '')}', '${escapeHtml(client.vobiz_sub_auth_id || '')}', '${escapeHtml(client.vobiz_sub_auth_token || '')}')" class="admin-action-btn" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c084fc;">📞 Telephony &amp; Credentials</button>
             <button onclick="impersonateUser('${client.id}')" class="admin-action-btn admin-action-btn-impersonate">Impersonate</button>
             ${statusActionBtn}
             ${deleteActionBtn}
@@ -5442,13 +5444,14 @@ window.submitRecharge = async function(event) {
   }
 };
 
-// --- Assign Number Modal & Form Handling ---
-window.openAssignNumberModal = function(clientId, clientName, currentNumber) {
+// --- Assign Number & Telephony Credentials Modal ---
+window.openAssignNumberModal = function(clientId, clientName, currentNumber, subAuthId, subAuthToken) {
   document.getElementById('assign-number-client-id').value = clientId;
   document.getElementById('assign-number-client-name').value = clientName;
-  document.getElementById('assign-number-current').value = currentNumber || 'None';
   document.getElementById('assign-number-new-input').value = currentNumber || '';
   document.getElementById('assign-number-quick-select').value = '';
+  document.getElementById('assign-number-auth-id').value = subAuthId || '';
+  document.getElementById('assign-number-auth-token').value = subAuthToken || '';
   document.getElementById('admin-assign-number-modal').style.display = 'flex';
 };
 
@@ -5460,25 +5463,33 @@ window.submitAssignNumberUpdate = async function(event) {
   event.preventDefault();
   const clientId = document.getElementById('assign-number-client-id').value;
   const phoneNumber = document.getElementById('assign-number-new-input').value.trim();
+  const vobizSubAuthId = document.getElementById('assign-number-auth-id').value.trim();
+  const vobizSubAuthToken = document.getElementById('assign-number-auth-token').value.trim();
 
   try {
     const res = await fetch('/api/admin/update-client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId, phone_number: phoneNumber })
+      body: JSON.stringify({
+        clientId,
+        phone_number: phoneNumber,
+        vobiz_sub_auth_id: vobizSubAuthId,
+        vobiz_sub_auth_token: vobizSubAuthToken
+      })
     });
     const data = await res.json();
     if (data.success) {
-      alert('Telephony number assigned successfully!');
+      alert('Telephony number and credentials updated successfully!');
       window.closeAssignNumberModal();
       fetchAdminClients(); // Refresh client table in Admin Panel
     } else {
-      alert(`Assignment failed: ${data.error}`);
+      alert(`Update failed: ${data.error}`);
     }
   } catch (err) {
     alert(`Error: ${err.message}`);
   }
 };
+
 
 // --- Pricing Plan Modal & Form Handling ---
 window.openPricingModal = function(clientId, clientName, rateMin, rateRec, rateSess, plan) {

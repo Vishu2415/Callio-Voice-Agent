@@ -3338,7 +3338,7 @@ app.post('/api/admin/update-pricing', (req, res) => {
 
 // 11A1. Admin - Advanced Client Update (Plan, Status, Details)
 app.post('/api/admin/update-client', (req, res) => {
-  const { clientId, plan, status, name, email, phone_number } = req.body;
+  const { clientId, plan, status, name, email, phone_number, vobiz_sub_auth_id, vobiz_sub_auth_token } = req.body;
   if (!clientId) {
     return res.status(400).json({ success: false, error: 'clientId is required.' });
   }
@@ -3369,9 +3369,12 @@ app.post('/api/admin/update-client', (req, res) => {
     client.email = email;
   }
   if (phone_number !== undefined) client.phone_number = phone_number;
+  if (vobiz_sub_auth_id !== undefined) client.vobiz_sub_auth_id = vobiz_sub_auth_id;
+  if (vobiz_sub_auth_token !== undefined) client.vobiz_sub_auth_token = vobiz_sub_auth_token;
 
   clientsDb.set(clientId, client);
   saveClients();
+
 
   console.log(`[Admin Update Client] Client ${client.name} (ID: ${clientId}) updated: plan=${client.plan}, status=${client.status}`);
   res.json({ success: true, client });

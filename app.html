@@ -2497,29 +2497,26 @@
   </div>
 
   <!-- Admin Assign Number Modal -->
+  <!-- Admin Assign Number & Telephony Credentials Modal -->
   <div id="admin-assign-number-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
-    <div class="premium-glass-modal" style="max-width: 400px !important;">
+    <div class="premium-glass-modal" style="max-width: 480px !important;">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;">
-        <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main); font-weight: 600;">Assign Telephony Number</h3>
+        <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main); font-weight: 600;">Client Telephony &amp; Credentials</h3>
         <button onclick="window.closeAssignNumberModal()" class="premium-modal-close-btn">&times;</button>
       </div>
       <form id="assign-number-form" onsubmit="window.submitAssignNumberUpdate(event)">
         <input type="hidden" id="assign-number-client-id">
         <div style="margin-bottom: 12px;">
           <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">Client Name</label>
-          <input type="text" id="assign-number-client-name" readonly class="premium-modal-input">
+          <input type="text" id="assign-number-client-name" readonly class="premium-modal-input" style="opacity: 0.8;">
         </div>
         <div style="margin-bottom: 12px;">
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">Current Assigned Number</label>
-          <input type="text" id="assign-number-current" readonly class="premium-modal-input" placeholder="None" style="opacity: 0.7;">
-        </div>
-        <div style="margin-bottom: 15px;">
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">Assign New Number (Manual Enter)</label>
+          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">Assign Virtual Number (Caller ID)</label>
           <input type="text" id="assign-number-new-input" required class="premium-modal-input" placeholder="e.g. +917971442441">
         </div>
-        <div style="margin-bottom: 20px;">
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">Or Quick Select Number</label>
-          <select id="assign-number-quick-select" class="premium-modal-input premium-modal-select" onchange="document.getElementById('assign-number-new-input').value = this.value">
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px;">Or Quick Select Number</label>
+          <select id="assign-number-quick-select" class="premium-modal-input premium-modal-select" onchange="if(this.value) document.getElementById('assign-number-new-input').value = this.value">
             <option value="" style="background: var(--bg-surface); color: var(--text-main);">-- Type manually or select below --</option>
             <option value="+917971442441" style="background: var(--bg-surface); color: var(--text-main);">+917971442441 (Admin Master Number)</option>
             <option value="+918047492101" style="background: var(--bg-surface); color: var(--text-main);">+918047492101</option>
@@ -2528,10 +2525,26 @@
             <option value="+918047492104" style="background: var(--bg-surface); color: var(--text-main);">+918047492104</option>
           </select>
         </div>
-        <button type="submit" class="premium-modal-submit-btn">Assign Telephony Number</button>
+
+        <div style="border-top: 1px dashed var(--border-color); padding-top: 12px; margin-top: 15px; margin-bottom: 12px;">
+          <div style="font-size: 0.82rem; font-weight: 600; color: var(--color-cyan); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            🔑 Custom Vobiz Account Credentials <span style="font-size: 0.7rem; font-weight: normal; color: var(--text-muted);">(Optional)</span>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Vobiz Auth ID (API Username)</label>
+            <input type="text" id="assign-number-auth-id" class="premium-modal-input" placeholder="e.g. MA_5VY3LRDW (Blank = Default Global)">
+          </div>
+          <div style="margin-bottom: 15px;">
+            <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Vobiz Auth Token (API Password)</label>
+            <input type="password" id="assign-number-auth-token" class="premium-modal-input" placeholder="e.g. your_vobiz_token (Blank = Default Global)">
+          </div>
+        </div>
+
+        <button type="submit" class="premium-modal-submit-btn">Save Telephony &amp; Credentials</button>
       </form>
     </div>
   </div>
+
 
   <!-- Admin Create/Edit Plan Modal -->
   <div id="admin-plan-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
