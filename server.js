@@ -291,18 +291,6 @@ async function syncVobizNumberWebhook(phoneNumber, clientId = null) {
   const numberFormats = Array.from(new Set([digitsOnly, e164Number, cleanNumber]));
   for (const numFormat of numberFormats) {
     try {
-      // 1. Unassign from subaccount to ensure incoming calls route via master voice_url
-      const unassignUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Number/${encodeURIComponent(numFormat)}/Unassign/`;
-      await fetch(unassignUrl, {
-        method: 'POST',
-        headers: {
-          'X-Auth-ID': masterAuthId.trim(),
-          'X-Auth-Token': masterAuthToken.trim(),
-          'Content-Type': 'application/json'
-        }
-      }).catch(() => {});
-
-      // 2. Set voice_url on Master Account
       const webhookApiUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Number/${encodeURIComponent(numFormat)}/`;
       const res = await fetch(webhookApiUrl, {
         method: 'PUT',
@@ -1795,10 +1783,10 @@ app.all('/incoming-call-vobiz', (req, res) => {
     });
   }
   
-  res.type('application/xml');
+  res.type('text/xml');
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Stream bidirectional="true" contentType="audio/x-mulaw;rate=8000" keepCallAlive="true">wss://${req.headers.host}/media-stream?provider=vobiz${clientId ? `&amp;client_id=${clientId}` : ''}</Stream>
+  <Stream bidirectional="true" keepCallAlive="true">wss://${req.headers.host}/media-stream?provider=vobiz${clientId ? `&amp;client_id=${clientId}` : ''}</Stream>
 </Response>`);
 });
 // 3. Outbound Call Trigger Endpoint
