@@ -5205,10 +5205,11 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           ws.provider = isVobiz ? 'vobiz' : (isExotel ? 'exotel' : (paramProvider || 'twilio'));
 
           if (ws.provider === 'vobiz') {
-            streamSid = msg.start.streamId;
-            const callSid = msg.start.callId || urlObj.searchParams.get('call_sid') || urlObj.searchParams.get('amp;call_sid') || 'vobiz_' + Date.now();
+            streamSid = msg.start.streamId || msg.start.stream_id || msg.start.callId || 'vobiz_stream';
+            const callSid = msg.start.callId || msg.start.call_id || urlObj.searchParams.get('call_sid') || urlObj.searchParams.get('amp;call_sid') || 'vobiz_' + Date.now();
             activeCallSid = callSid;
-            console.log(`Vobiz call started. StreamSid: ${streamSid}, CallSid: ${callSid}, ClientId: ${clientId || 'None'}`);
+            ws.vobizMediaFormat = (msg.start.mediaFormat || msg.start.media_format || msg.start.contentType || '').toLowerCase();
+            console.log(`[Vobiz Start] StreamSid: ${streamSid}, CallSid: ${callSid}, ClientId: ${clientId || 'None'}, MediaFormat: "${ws.vobizMediaFormat}", Full start: ${JSON.stringify(msg.start)}`);
             
             // Retrieve config by CallSid, To, or ClientId
             let callConfig = callSettingsMap.get(callSid) || (clientId && clientsDb.has(clientId) ? null : null);
@@ -5318,19 +5319,22 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           let pcm16Base64 = '';
           
           if (ws.provider === 'vobiz') {
-            const mediaFmt = (msg.media?.contentType || msg.media?.format || msg.media?.encoding || '').toLowerCase();
+            // Vobiz sends PCM16 at 8kHz (audio/x-l16;rate=8000) — always upsample to 16kHz
+            // Even if format is empty, Vobiz default is PCM16 8kHz per their docs
+            const mediaFmt = (msg.media?.contentType || msg.media?.format || msg.media?.encoding || ws.vobizMediaFormat || '').toLowerCase();
+            const isMulaw = mediaFmt.includes('mulaw') || mediaFmt.includes('pcma') || mediaFmt.includes('ulaw');
+            if (isMulaw) {
+              pcm16Buffer = twilioToGemini(mediaBuffer); // mu-law 8kHz -> PCM 16kHz
+            } else {
+              pcm16Buffer = pcm8ToPcm16(mediaBuffer); // PCM16 8kHz -> PCM16 16kHz (Vobiz default)
+            }
             if (!ws.loggedFirstMedia) {
               ws.loggedFirstMedia = true;
-              console.log(`[Vobiz Media] First media packet received. Format: "${mediaFmt}", Payload length: ${base64Media.length}`);
+              console.log(`[Vobiz Media] First media. Format: "${mediaFmt}", isMulaw: ${isMulaw}, bufLen: ${mediaBuffer.length}, transcoding: ${isMulaw ? 'mulaw->pcm16' : 'pcm8->pcm16'}`);
             }
-            if (mediaFmt.includes('pcm') || mediaFmt.includes('l16') || mediaFmt.includes('raw')) {
-              if (mediaFmt.includes('8000') || mediaFmt.includes('8k') || mediaBuffer.length <= 160) {
-                pcm16Buffer = pcm8ToPcm16(mediaBuffer);
-              } else {
-                pcm16Buffer = mediaBuffer;
-              }
-            } else {
-              pcm16Buffer = twilioToGemini(mediaBuffer);
+            ws._mediaCount = (ws._mediaCount || 0) + 1;
+            if (ws._mediaCount % 100 === 0) {
+              console.log(`[Vobiz Media] Packet #${ws._mediaCount}, bufLen: ${mediaBuffer.length}, isGeminiReady: ${isGeminiReady}`);
             }
             pcm16Base64 = pcm16Buffer.toString('base64');
           } else if (ws.provider === 'exotel') {
