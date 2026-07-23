@@ -1936,9 +1936,10 @@
     (function() {
         const branding = window.BrandingContext;
         if (branding) {
+            document.title = branding.appName + ' - AI Calling Agents That Actually Close Deals';
             // Apply logo URLs
             document.querySelectorAll('.brand-logo').forEach(img => {
-                img.src = branding.logoUrl;
+                if (branding.logoUrl) img.src = branding.logoUrl;
                 img.alt = branding.appName;
             });
             // Apply app name text
@@ -1949,22 +1950,27 @@
             document.querySelectorAll('.brand-copyright').forEach(el => {
                 el.textContent = branding.copyrightText;
             });
-            // Update sim names
+            // Update sim names & status
             const simName1 = document.querySelector('.lp-sim-caller-name');
             if (simName1) simName1.textContent = branding.appName + ' Live Demo';
             const simName2 = document.getElementById('lp-trial-active-name');
             if (simName2) simName2.textContent = branding.appName + ' Assistant';
+            const simStatus = document.querySelector('.lp-sim-caller-status');
+            if (simStatus) simStatus.textContent = 'Choose voice & speak live with ' + branding.appName + ' AI';
             
             // Update favicon
-            let favicon = document.querySelector("link[rel~='icon']");
-            if (!favicon) {
-                favicon = document.createElement('link');
-                favicon.rel = 'icon';
-                document.head.appendChild(favicon);
+            if (branding.faviconUrl) {
+                let favicon = document.querySelector("link[rel~='icon']");
+                if (!favicon) {
+                    favicon = document.createElement('link');
+                    favicon.rel = 'icon';
+                    document.head.appendChild(favicon);
+                }
+                favicon.href = branding.faviconUrl;
             }
-            favicon.href = branding.faviconUrl;
         }
     })();
 </script>
+
 </body>
 </html>

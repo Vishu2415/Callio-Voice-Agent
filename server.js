@@ -138,39 +138,78 @@ function saveBranding() {
   saveDatabase(BRANDING_DB_FILE, brandingDb);
 }
 
-function resolveBranding(host) {
-  if (!host) return brandingDb.get('default');
-  const hostname = host.split(':')[0].toLowerCase();
-  
-  for (const branding of brandingDb.values()) {
-    if (branding.customDomain && branding.customDomain.toLowerCase() === hostname) {
-      return branding;
-    }
-    if (branding.subdomain && branding.subdomain.toLowerCase() === hostname) {
-      return branding;
-    }
-    if (hostname.endsWith('.' + branding.subdomain) || hostname === branding.subdomain) {
-      return branding;
-    }
-    if (branding.id !== 'default' && (hostname.startsWith(branding.id + '.') || hostname === branding.id)) {
-      return branding;
-    }
-  }
-  return brandingDb.get('default');
-}
-
 function getResellerFromHost(host) {
   if (!host) return null;
-  const hostname = host.split(':')[0].toLowerCase();
+  // Clean host: strip protocol, path, port
+  let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+  const domainWithoutWww = cleanHost.startsWith('www.') ? cleanHost.substring(4) : cleanHost;
+
   for (const reseller of resellersDb.values()) {
     if (reseller.status === 'suspended') continue;
-    if ((reseller.domain && reseller.domain.toLowerCase() === hostname) ||
-        (reseller.subdomain && reseller.subdomain.toLowerCase() === hostname)) {
-      return reseller;
+
+    if (reseller.domain) {
+      let rDomain = reseller.domain.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+      if (rDomain.startsWith('www.')) rDomain = rDomain.substring(4);
+      if (rDomain === domainWithoutWww || rDomain === cleanHost) {
+        return reseller;
+      }
+    }
+
+    if (reseller.subdomain) {
+      let rSub = reseller.subdomain.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+      if (rSub.startsWith('www.')) rSub = rSub.substring(4);
+      if (rSub === domainWithoutWww || cleanHost === rSub || cleanHost.startsWith(rSub + '.')) {
+        return reseller;
+      }
     }
   }
   return null;
 }
+
+function resolveBranding(host) {
+  if (!host) return brandingDb.get('default');
+  let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+
+  // 1. Check if host matches a Reseller
+  const reseller = getResellerFromHost(host);
+  if (reseller) {
+    const b = reseller.branding || {};
+    const appName = b.appName || reseller.name || 'AI Voice Agent';
+    return {
+      id: reseller.id,
+      customDomain: reseller.domain || '',
+      subdomain: reseller.subdomain || '',
+      appName: appName,
+      logoUrl: b.logoUrl || 'logo_new.png',
+      faviconUrl: b.faviconUrl || 'favicon.ico',
+      primaryColor: b.primaryColor || '#FF6B4A',
+      secondaryColor: b.secondaryColor || '#ae3115',
+      supportEmail: b.supportEmail || reseller.email || '',
+      supportPhone: b.supportPhone || '',
+      copyrightText: b.copyrightText || `© ${new Date().getFullYear()} ${appName}. All rights reserved.`
+    };
+  }
+
+  // 2. Check brandingDb for custom tenant records
+  for (const branding of brandingDb.values()) {
+    if (branding.customDomain && branding.customDomain.toLowerCase() === cleanHost) {
+      return branding;
+    }
+    if (branding.subdomain && branding.subdomain.toLowerCase() === cleanHost) {
+      return branding;
+    }
+    if (cleanHost.endsWith('.' + branding.subdomain) || cleanHost === branding.subdomain) {
+      return branding;
+    }
+    if (branding.id !== 'default' && (cleanHost.startsWith(branding.id + '.') || cleanHost === branding.id)) {
+      return branding;
+    }
+  }
+
+  // 3. Fallback to default Callio branding
+  return brandingDb.get('default');
+}
+
 
 function loadDatabase(file, mapObj) {
   try {
