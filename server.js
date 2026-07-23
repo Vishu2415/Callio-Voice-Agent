@@ -288,6 +288,11 @@ function loadClients() {
       client.billing_history = [];
       dirty = true;
     }
+    // Auto-fix status: if client has assigned phone_number, status MUST be active
+    if (client.phone_number && client.phone_number.trim() !== '' && client.status === 'pending_number') {
+      client.status = 'active';
+      dirty = true;
+    }
   }
   if (dirty) {
     saveClients();
@@ -3368,12 +3373,19 @@ app.post('/api/admin/update-client', (req, res) => {
     }
     client.email = email;
   }
-  if (phone_number !== undefined) client.phone_number = phone_number;
+  if (phone_number !== undefined) {
+    client.phone_number = phone_number;
+    if (phone_number && phone_number.trim() !== '' && (client.status === 'pending_number' || !client.status)) {
+      client.status = 'active';
+      client.requested_number = null;
+    }
+  }
   if (vobiz_sub_auth_id !== undefined) client.vobiz_sub_auth_id = vobiz_sub_auth_id;
   if (vobiz_sub_auth_token !== undefined) client.vobiz_sub_auth_token = vobiz_sub_auth_token;
 
   clientsDb.set(clientId, client);
   saveClients();
+
 
 
   console.log(`[Admin Update Client] Client ${client.name} (ID: ${clientId}) updated: plan=${client.plan}, status=${client.status}`);
