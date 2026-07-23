@@ -311,6 +311,56 @@ async function syncVobizNumberWebhook(phoneNumber, clientId = null) {
       console.error(`[Vobiz Webhook Sync Error] Failed for ${numFormat}:`, err.message);
     }
   }
+async function syncVobizApplications() {
+  const masterAuthId = defaultCallConfig.vobizAuthId || process.env.VOBIZ_MASTER_AUTH_ID || 'MA_5VY3LRDW';
+  const masterAuthToken = defaultCallConfig.vobizAuthToken || process.env.VOBIZ_MASTER_AUTH_TOKEN || 'eoJKIYccZirxLWHbVZmHKHa5LF0rt6Z0rLax0GVrbNZjmEZKeYuCSFml1btABTnr';
+  const publicUrl = (defaultCallConfig.publicUrl || 'https://callio.in').trim().replace(/\/$/, '');
+
+  if (!masterAuthId || !masterAuthToken) return;
+
+  const authHeader = 'Basic ' + Buffer.from(`${masterAuthId.trim()}:${masterAuthToken.trim()}`).toString('base64');
+  const targetUrl = `${publicUrl}/incoming-call-vobiz`;
+
+  try {
+    const listUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Application/`;
+    const res = await fetch(listUrl, {
+      headers: {
+        'Authorization': authHeader,
+        'X-Auth-ID': masterAuthId.trim(),
+        'X-Auth-Token': masterAuthToken.trim()
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const apps = data.objects || data.applications || [];
+      for (const app of apps) {
+        const appId = app.app_id || app.id;
+        if (appId) {
+          console.log(`[Vobiz Application Sync] Updating App ${app.app_name || appId} URLs to ${targetUrl}`);
+          const updateUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Application/${appId}/`;
+          await fetch(updateUrl, {
+            method: 'PUT',
+            headers: {
+              'Authorization': authHeader,
+              'X-Auth-ID': masterAuthId.trim(),
+              'X-Auth-Token': masterAuthToken.trim(),
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              answer_url: targetUrl,
+              answer_method: 'POST',
+              hangup_url: targetUrl,
+              hangup_method: 'POST',
+              fallback_answer_url: targetUrl,
+              fallback_method: 'POST'
+            })
+          }).catch(() => {});
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[Vobiz Application Sync Error]`, err.message);
+  }
 }
 
 function loadClients() { 
@@ -5643,4 +5693,7 @@ console.log('[Callback Scheduler] Auto-dialer scheduler started (60s interval).'
 // Run server on specified port
 server.listen(PORT, () => {
   console.log(`🚀 Telephony Calling Agent Backend running on port ${PORT}`);
+  setTimeout(() => {
+    syncVobizApplications();
+  }, 3000);
 });
