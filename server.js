@@ -1858,11 +1858,13 @@ app.all('/incoming-call-vobiz', (req, res) => {
     });
   }
   
-  const streamUrlQuery = `provider=vobiz${clientId ? `&client_id=${clientId}` : ''}${callSid ? `&call_sid=${callSid}` : ''}`;
+  const wsHost = req.headers.host || 'callio.in';
+  const wsUrl = `wss://${wsHost}/media-stream?provider=vobiz${clientId ? `&amp;client_id=${clientId}` : ''}${callSid ? `&amp;call_sid=${callSid}` : ''}`;
+  console.log(`[Vobiz XML] Returning Stream XML. URL: ${wsUrl}`);
   res.type('text/xml');
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Stream bidirectional="true">wss://${req.headers.host}/media-stream?${streamUrlQuery}</Stream>
+  <Stream bidirectional="true" keepCallAlive="true">${wsUrl}</Stream>
 </Response>`);
 });
 // 3. Outbound Call Trigger Endpoint
