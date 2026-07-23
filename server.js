@@ -1850,11 +1850,12 @@ app.all('/incoming-call-vobiz', (req, res) => {
     });
   }
   
-  const streamUrlQuery = `provider=vobiz${clientId ? `&amp;client_id=${clientId}` : ''}${callSid ? `&amp;call_sid=${callSid}` : ''}`;
+  const streamUrlQuery = `provider=vobiz${clientId ? `&client_id=${clientId}` : ''}${callSid ? `&call_sid=${callSid}` : ''}`;
   res.type('text/xml');
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Stream bidirectional="true" keepCallAlive="true">wss://${req.headers.host}/media-stream?${streamUrlQuery}</Stream>
+  <Stream bidirectional="true">wss://${req.headers.host}/media-stream?${streamUrlQuery}</Stream>
+  <Wait length="3600"/>
 </Response>`);
 });
 // 3. Outbound Call Trigger Endpoint
@@ -5186,8 +5187,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
       switch (msg.event) {
         case 'start':
           const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-          const paramProvider = (urlObj.searchParams.get('provider') || '').toLowerCase();
-          const clientId = urlObj.searchParams.get('client_id');
+          const paramProvider = (urlObj.searchParams.get('provider') || urlObj.searchParams.get('amp;provider') || '').toLowerCase();
+          const clientId = urlObj.searchParams.get('client_id') || urlObj.searchParams.get('amp;client_id');
 
           // Auto-detect provider based on keys in the start event or query param
           const isVobiz = (msg.start && ('streamId' in msg.start || 'callId' in msg.start)) || (paramProvider === 'vobiz');
@@ -5196,7 +5197,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
 
           if (ws.provider === 'vobiz') {
             streamSid = msg.start.streamId;
-            const callSid = msg.start.callId || urlObj.searchParams.get('call_sid') || 'vobiz_' + Date.now();
+            const callSid = msg.start.callId || urlObj.searchParams.get('call_sid') || urlObj.searchParams.get('amp;call_sid') || 'vobiz_' + Date.now();
             activeCallSid = callSid;
             console.log(`Vobiz call started. StreamSid: ${streamSid}, CallSid: ${callSid}, ClientId: ${clientId || 'None'}`);
             
