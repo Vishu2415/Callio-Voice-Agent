@@ -1205,8 +1205,27 @@ const authMiddleware = (dataType) => (req, res, next) => {
     return res.status(401).json({ success: false, error: 'Unauthorized: Missing API Key' });
   }
 
-  if (defaultCallConfig.apiKey && key.trim() !== defaultCallConfig.apiKey.trim()) {
-    return res.status(401).json({ success: false, error: 'Unauthorized: Invalid API Key' });
+  const cleanKey = key.trim();
+  const masterKey = (defaultCallConfig.apiKey || '').trim();
+  let matchedClient = null;
+
+  if (masterKey && cleanKey === masterKey) {
+    // Authenticated via Master Server API Key
+  } else {
+    // Check multi-tenant isolated client API keys
+    for (const [cId, client] of clientsDb.entries()) {
+      if ((client.api_key && client.api_key.trim() === cleanKey) ||
+          (client.vobiz_sub_auth_token && client.vobiz_sub_auth_token.trim() === cleanKey) ||
+          cId === cleanKey) {
+        matchedClient = client;
+        req.query.clientId = cId; // Bind client ID for isolated data queries
+        break;
+      }
+    }
+
+    if (!matchedClient && masterKey) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Invalid API Key' });
+    }
   }
 
   // Check data sharing permissions
