@@ -268,6 +268,42 @@ function saveCrmRules() { saveDatabase(CRM_RULES_DB_FILE, crmRulesDb); }
 function loadCrmLogs() { loadDatabase(CRM_LOGS_DB_FILE, crmLogsDb); }
 function saveCrmLogs() { saveDatabase(CRM_LOGS_DB_FILE, crmLogsDb); }
 
+async function syncVobizNumberWebhook(phoneNumber, clientId = null) {
+  if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.trim() === '') return;
+  const cleanNumber = phoneNumber.trim().replace(/[\s\-\(\)]/g, '');
+  const masterAuthId = defaultCallConfig.vobizAuthId || process.env.VOBIZ_MASTER_AUTH_ID || 'MA_5VY3LRDW';
+  const masterAuthToken = defaultCallConfig.vobizAuthToken || process.env.VOBIZ_MASTER_AUTH_TOKEN || 'eoJKIYccZirxLWHbVZmHKHa5LF0rt6Z0rLax0GVrbNZjmEZKeYuCSFml1btABTnr';
+  const publicUrl = (defaultCallConfig.publicUrl || 'https://callio.in').trim().replace(/\/$/, '');
+
+  if (!masterAuthId || !masterAuthToken) {
+    console.warn(`[Vobiz Webhook Sync] Cannot sync ${cleanNumber}: Master Vobiz Auth ID/Token missing.`);
+    return;
+  }
+
+  try {
+    const webhookUrl = `${publicUrl}/incoming-call-vobiz${clientId ? `?client_id=${clientId}` : ''}`;
+    console.log(`[Vobiz Webhook Sync] Updating voice_url for ${cleanNumber} -> ${webhookUrl}`);
+    const webhookApiUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Number/${cleanNumber}/`;
+    const res = await fetch(webhookApiUrl, {
+      method: 'PUT',
+      headers: {
+        'X-Auth-ID': masterAuthId.trim(),
+        'X-Auth-Token': masterAuthToken.trim(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ voice_url: webhookUrl, voice_method: 'POST' })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      console.log(`[Vobiz Webhook Sync] Successfully set voice_url for ${cleanNumber}`);
+    } else {
+      console.warn(`[Vobiz Webhook Sync] Vobiz API returned HTTP ${res.status} for ${cleanNumber}:`, data);
+    }
+  } catch (err) {
+    console.error(`[Vobiz Webhook Sync Error] Failed for ${cleanNumber}:`, err.message);
+  }
+}
+
 function loadClients() { 
   loadDatabase(CLIENTS_DB_FILE, clientsDb); 
   let dirty = false;
@@ -297,6 +333,15 @@ function loadClients() {
   if (dirty) {
     saveClients();
   }
+
+  // Sync Vobiz webhooks for all assigned phone numbers in background
+  setTimeout(async () => {
+    for (const [cId, client] of clientsDb.entries()) {
+      if (client.phone_number && client.phone_number.trim() !== '') {
+        await syncVobizNumberWebhook(client.phone_number, cId);
+      }
+    }
+  }, 3000);
 }
 function saveClients() { saveDatabase(CLIENTS_DB_FILE, clientsDb); }
 
@@ -3385,6 +3430,9 @@ app.post('/api/admin/update-client', (req, res) => {
       client.status = 'active';
       client.requested_number = null;
     }
+    if (phone_number && phone_number.trim() !== '') {
+      syncVobizNumberWebhook(phone_number, clientId);
+    }
   }
   if (vobiz_sub_auth_id !== undefined) client.vobiz_sub_auth_id = vobiz_sub_auth_id;
   if (vobiz_sub_auth_token !== undefined) client.vobiz_sub_auth_token = vobiz_sub_auth_token;
@@ -3415,6 +3463,18 @@ app.post('/api/admin/delete-client', (req, res) => {
 
   console.log(`[Admin Delete Client] Client ${client.name} (ID: ${clientId}) deleted.`);
   res.json({ success: true, message: 'Client deleted successfully.' });
+});
+
+// 11A3. Admin - Sync Vobiz Telephony Webhooks
+app.post('/api/admin/sync-telephony-webhooks', async (req, res) => {
+  let count = 0;
+  for (const [cId, client] of clientsDb.entries()) {
+    if (client.phone_number && client.phone_number.trim() !== '') {
+      await syncVobizNumberWebhook(client.phone_number, cId);
+      count++;
+    }
+  }
+  res.json({ success: true, syncedCount: count, message: `Successfully synced Vobiz webhooks for ${count} virtual numbers.` });
 });
 
 // 11A3. Plans Database API routes
