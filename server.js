@@ -5205,10 +5205,12 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           ws.provider = isVobiz ? 'vobiz' : (isExotel ? 'exotel' : (paramProvider || 'twilio'));
 
           if (ws.provider === 'vobiz') {
-            streamSid = msg.start.streamId || msg.start.stream_id || msg.start.callId || 'vobiz_stream';
-            const callSid = msg.start.callId || msg.start.call_id || urlObj.searchParams.get('call_sid') || urlObj.searchParams.get('amp;call_sid') || 'vobiz_' + Date.now();
+            streamSid = msg.start?.streamId || msg.start?.stream_id || msg.start?.callId || 'vobiz_stream';
+            const callSid = msg.start?.callId || msg.start?.call_id || urlObj.searchParams.get('call_sid') || urlObj.searchParams.get('amp;call_sid') || 'vobiz_' + Date.now();
             activeCallSid = callSid;
-            ws.vobizMediaFormat = (msg.start.mediaFormat || msg.start.media_format || msg.start.contentType || '').toLowerCase();
+            // Vobiz sends mediaFormat as object {type,sampleRate} OR as a string — handle both safely
+            const rawFmt = msg.start?.mediaFormat || msg.start?.media_format || msg.start?.contentType || '';
+            ws.vobizMediaFormat = (typeof rawFmt === 'string' ? rawFmt : (rawFmt?.type || rawFmt?.encoding || rawFmt?.contentType || '')).toLowerCase();
             console.log(`[Vobiz Start] StreamSid: ${streamSid}, CallSid: ${callSid}, ClientId: ${clientId || 'None'}, MediaFormat: "${ws.vobizMediaFormat}", Full start: ${JSON.stringify(msg.start)}`);
             
             // Retrieve config by CallSid, To, or ClientId
