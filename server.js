@@ -1815,9 +1815,13 @@ app.post('/make-call', async (req, res) => {
   if (provider === 'vobiz') {
     normalizedTo = normalizedTo.replace(/[\s\-\(\)\+]/g, '');
     
-    let activeVobizAuthId = vobizAuthId || defaultCallConfig.vobizAuthId;
-    let activeVobizAuthToken = vobizAuthToken || defaultCallConfig.vobizAuthToken;
-    let activeVobizCallerId = vobizCallerId || defaultCallConfig.vobizCallerId || '+917971442441';
+    const masterAuthId = defaultCallConfig.vobizAuthId || process.env.VOBIZ_MASTER_AUTH_ID || 'MA_5VY3LRDW';
+    const masterAuthToken = defaultCallConfig.vobizAuthToken || process.env.VOBIZ_MASTER_AUTH_TOKEN || 'eoJKIYccZirxLWHbVZmHKHa5LF0rt6Z0rLax0GVrbNZjmEZKeYuCSFml1btABTnr';
+    const masterCallerId = defaultCallConfig.vobizCallerId || process.env.VOBIZ_CALLER_ID || '+917971442441';
+
+    let activeVobizAuthId = masterAuthId;
+    let activeVobizAuthToken = masterAuthToken;
+    let activeVobizCallerId = masterCallerId;
     let activeVoice = voice;
     let activeInstruction = systemInstruction;
     let activeClientId = req.body.client_id || req.body.clientId || null;
@@ -1836,28 +1840,28 @@ app.post('/make-call', async (req, res) => {
         // Client has their own real sub-account — use their credentials + their number
         activeVobizAuthId = subAuthId;
         activeVobizAuthToken = subAuthToken;
-        activeVobizCallerId = client.phone_number || activeVobizCallerId;
+        activeVobizCallerId = (client.phone_number && client.phone_number.trim() !== '') ? client.phone_number : masterCallerId;
       } else {
-        // No valid sub-account — use admin credentials but client's assigned number as caller ID
-        // (admin must have this number configured in their Vobiz account)
-        activeVobizCallerId = client.phone_number || defaultCallConfig.vobizCallerId || activeVobizCallerId;
+        // No valid sub-account — use Master Admin credentials + client's assigned number if available
+        activeVobizAuthId = masterAuthId;
+        activeVobizAuthToken = masterAuthToken;
+        activeVobizCallerId = (client.phone_number && client.phone_number.trim() !== '') ? client.phone_number : masterCallerId;
       }
       // IMPORTANT: Only use client.agent_config as a last fallback.
-      // The frontend sends the user-selected agent's voice/instruction — NEVER override it.
-      // Only apply defaults if the frontend sent nothing at all (null/undefined/empty).
       if (!activeVoice) {
         activeVoice = client.agent_config?.voice;
       }
       if (!activeInstruction) {
         activeInstruction = client.agent_config?.system_prompt;
       }
-      console.log(`[Vobiz REST API] ${hasValidSubCredentials ? 'Using sub-account' : 'Using admin account (fallback)'}: AuthID=${activeVobizAuthId}, CallerId=${activeVobizCallerId} for client: ${activeClientId}`);
+      console.log(`[Vobiz REST API] ${hasValidSubCredentials ? 'Using sub-account' : 'Using admin master account'}: AuthID=${activeVobizAuthId}, CallerId=${activeVobizCallerId} for client: ${activeClientId}`);
     }
     
     if (!activeVobizAuthId || !activeVobizAuthToken || !activeVobizCallerId || activeVobizCallerId.trim() === '') {
       const missingField = !activeVobizAuthId ? 'Auth ID' : !activeVobizAuthToken ? 'Auth Token' : 'Virtual Number (Caller ID)';
       return res.status(400).json({ success: false, error: `Callio setup incomplete: ${missingField} is not configured. Please set it in Admin Settings → Callings tab.` });
     }
+
     
     console.log(`[Vobiz REST API] Attempting outbound call to: ${normalizedTo} (Name: ${name}) via CallerId: ${activeVobizCallerId}`);
     
@@ -2637,7 +2641,8 @@ app.post('/api/broadcast', async (req, res) => {
       
       vobizAuthId: req.body.vobizAuthId,
       vobizAuthToken: req.body.vobizAuthToken,
-      vobizCallerId: req.body.vobizCallerId
+      vobizCallerId: req.body.vobizCallerId,
+      clientId: req.body.clientId || req.body.client_id || agent.clientId || agent.client_id || null
     };
     
     try {

@@ -2802,7 +2802,7 @@ document.getElementById('btn-dial-phone')?.addEventListener('click', async () =>
   const number = document.getElementById('telephony-number').value.trim();
   const agentId = document.getElementById('quick-agent-select').value;
   const provider = document.getElementById('telephony-provider').value;
-  const publicUrl = document.getElementById('public-url').value;
+  const publicUrl = (document.getElementById('public-url') && document.getElementById('public-url').value.trim()) || window.location.origin;
   
   if (!number) {
     alert("Please enter a destination phone number.");
