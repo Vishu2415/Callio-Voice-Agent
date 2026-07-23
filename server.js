@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -311,6 +312,8 @@ async function syncVobizNumberWebhook(phoneNumber, clientId = null) {
       console.error(`[Vobiz Webhook Sync Error] Failed for ${numFormat}:`, err.message);
     }
   }
+}
+
 async function syncVobizApplications() {
   const masterAuthId = defaultCallConfig.vobizAuthId || process.env.VOBIZ_MASTER_AUTH_ID || 'MA_5VY3LRDW';
   const masterAuthToken = defaultCallConfig.vobizAuthToken || process.env.VOBIZ_MASTER_AUTH_TOKEN || 'eoJKIYccZirxLWHbVZmHKHa5LF0rt6Z0rLax0GVrbNZjmEZKeYuCSFml1btABTnr';
@@ -2786,7 +2789,6 @@ app.post('/api/broadcast', async (req, res) => {
 // ==========================================
 
 // Password Hashing Helper
-import crypto from 'crypto';
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
