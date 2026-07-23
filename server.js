@@ -13,13 +13,11 @@ const __dirname = path.dirname(__filename);
 // Load environment configurations
 dotenv.config();
 
-if (!process.env.GEMINI_API_KEY) {
-  console.error("❌ CRITICAL ERROR: GEMINI_API_KEY is not defined in the environment.");
-  console.error("Please create a '.env' file containing: GEMINI_API_KEY=your_key_here");
-  process.exit(1);
+let GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  console.warn("⚠️ WARNING: GEMINI_API_KEY is not defined in environment. Using default fallback key.");
+  GEMINI_API_KEY = 'AQ.Ab8RN6I0ZOs9CRGzUNX3fQYn1e-FaGcdf_B3gjWRVDtpSF_4Zg';
 }
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const PORT = process.env.PORT || 5050;
 const CONFIG_FILE = './config.json';
 const CALLS_DB_FILE = './calls_db.json';
@@ -291,10 +289,12 @@ async function syncVobizNumberWebhook(phoneNumber, clientId = null) {
   const numberFormats = Array.from(new Set([digitsOnly, e164Number, cleanNumber]));
   for (const numFormat of numberFormats) {
     try {
+      const authHeader = 'Basic ' + Buffer.from(`${masterAuthId.trim()}:${masterAuthToken.trim()}`).toString('base64');
       const webhookApiUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Number/${encodeURIComponent(numFormat)}/`;
       const res = await fetch(webhookApiUrl, {
         method: 'PUT',
         headers: {
+          'Authorization': authHeader,
           'X-Auth-ID': masterAuthId.trim(),
           'X-Auth-Token': masterAuthToken.trim(),
           'Content-Type': 'application/json'
