@@ -1037,28 +1037,32 @@ try {
   console.error('[Config Startup Error] Failed to load config.json:', err.message);
 }
 
-function getIncomingCallConfig(query = {}, fromNum = '') {
+function getIncomingCallConfig(query = {}, fromNum = '', clientId = '') {
   const recordCall = defaultCallConfig.gemini_record_call === 'true' || defaultCallConfig.recordCall || false;
 
+  let clientObj = null;
+  if (clientId && clientsDb.has(clientId)) {
+    clientObj = clientsDb.get(clientId);
+  }
+
+  // 1. Determine tagRules and incomingAgentId (client-specific first, fallback to global)
+  const tagRules = clientObj?.agent_config?.tagRules || clientObj?.tagRules || defaultCallConfig.tagRules || [];
+  const incomingAgentId = clientObj?.agent_config?.incomingAgentId || clientObj?.incomingAgentId || defaultCallConfig.incomingAgentId;
+
   // ─── TAG-BASED ROUTING ──────────────────────────────────────────────────────
-  // If we have the caller's number, look them up in contacts and match their tag
-  // to an agent. This takes priority over the default incoming agent.
   if (fromNum) {
     const callerContact = findContactByPhone(fromNum);
     if (callerContact && callerContact.tag) {
       const contactTag = callerContact.tag.toLowerCase().trim();
       console.log(`[Incoming Routing] Caller ${fromNum} has tag: "${contactTag}" — searching for matching agent…`);
 
-      // 1. Check explicit tagRules from config (UI-managed)
       let taggedAgent = null;
-      const tagRules = defaultCallConfig.tagRules || [];
       const matchedRule = tagRules.find(r => r.tag && r.tag.toLowerCase() === contactTag);
       if (matchedRule && matchedRule.agentId) {
         taggedAgent = agentsDb.get(matchedRule.agentId) || null;
         if (taggedAgent) console.log(`[Incoming Routing] Matched via tagRules config: agentId ${matchedRule.agentId}`);
       }
 
-      // 2. Fallback: match by agent name (case-insensitive)
       if (!taggedAgent) {
         for (const agent of agentsDb.values()) {
           if (agent.name && agent.name.toLowerCase().trim() === contactTag) {
@@ -1078,30 +1082,25 @@ function getIncomingCallConfig(query = {}, fromNum = '') {
           systemInstruction = `[MOOD DIRECTIVE: You must act and speak in a ${taggedAgent.mood.toUpperCase()} mood at all times.]\n\n` + systemInstruction;
         }
         return {
-          voice: taggedAgent.voice || defaultCallConfig.voice || 'Aoede',
-          systemInstruction: systemInstruction || defaultCallConfig.systemInstruction,
+          voice: taggedAgent.voice || clientObj?.agent_config?.voice || defaultCallConfig.voice || 'Aoede',
+          systemInstruction: systemInstruction || clientObj?.agent_config?.system_prompt || defaultCallConfig.systemInstruction,
           model: taggedAgent.model || defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
           name: callerContact.name || '',
           recordCall: recordCall,
-          vobizAuthId: defaultCallConfig.vobizAuthId,
-          vobizAuthToken: defaultCallConfig.vobizAuthToken,
+          clientId: clientId || null,
+          vobizAuthId: clientObj?.vobiz_sub_auth_id || defaultCallConfig.vobizAuthId,
+          vobizAuthToken: clientObj?.vobiz_sub_auth_token || defaultCallConfig.vobizAuthToken,
           vobizCallerId: defaultCallConfig.vobizCallerId
         };
-      } else {
-        console.log(`[Incoming Routing] Tag "${contactTag}" found no matching agent — falling back to default incoming agent.`);
       }
-    } else if (callerContact) {
-      console.log(`[Incoming Routing] Caller ${fromNum} found ("${callerContact.name}") but has no tag — using default incoming agent.`);
-    } else {
-      console.log(`[Incoming Routing] Caller ${fromNum} not found in contacts — using default incoming agent.`);
     }
   }
-  // ────────────────────────────────────────────────────────────────────────────
 
-  if (defaultCallConfig.incomingAgentId) {
-    const agent = agentsDb.get(defaultCallConfig.incomingAgentId);
+  // ─── DEFAULT INCOMING AGENT ROUTING ─────────────────────────────────────────
+  if (incomingAgentId) {
+    const agent = agentsDb.get(incomingAgentId);
     if (agent) {
-      console.log(`[Incoming Routing] Dynamically routing call to agent: ${agent.name} (ID: ${agent.id})`);
+      console.log(`[Incoming Routing] Dynamically routing call to agent: ${agent.name} (ID: ${agent.id}) for Client: ${clientObj ? clientObj.name : 'Default Global'}`);
       let systemInstruction = agent.systemInstruction || '';
       if (agent.name) {
         systemInstruction = `[IDENTITY DIRECTIVE: Your name is "${agent.name}". You must introduce yourself as "${agent.name}" and identify as "${agent.name}" if asked for your name. In Hindi/Hinglish, you can say "Mera naam ${agent.name} hai".]\n\n` + systemInstruction;
@@ -1110,19 +1109,36 @@ function getIncomingCallConfig(query = {}, fromNum = '') {
         systemInstruction = `[MOOD DIRECTIVE: You must act and speak in a ${agent.mood.toUpperCase()} mood at all times.]\n\n` + systemInstruction;
       }
       return {
-        voice: agent.voice || defaultCallConfig.voice || 'Aoede',
-        systemInstruction: systemInstruction || defaultCallConfig.systemInstruction,
+        voice: agent.voice || clientObj?.agent_config?.voice || defaultCallConfig.voice || 'Aoede',
+        systemInstruction: systemInstruction || clientObj?.agent_config?.system_prompt || defaultCallConfig.systemInstruction,
         model: agent.model || defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
         name: '',
         recordCall: recordCall,
-        vobizAuthId: defaultCallConfig.vobizAuthId,
-        vobizAuthToken: defaultCallConfig.vobizAuthToken,
+        clientId: clientId || null,
+        vobizAuthId: clientObj?.vobiz_sub_auth_id || defaultCallConfig.vobizAuthId,
+        vobizAuthToken: clientObj?.vobiz_sub_auth_token || defaultCallConfig.vobizAuthToken,
         vobizCallerId: defaultCallConfig.vobizCallerId
       };
     } else {
-      console.warn(`[Incoming Routing] Warning: Default Incoming Agent ID ${defaultCallConfig.incomingAgentId} not found in agentsDb. Falling back to default settings.`);
+      console.warn(`[Incoming Routing] Warning: Incoming Agent ID ${incomingAgentId} not found in agentsDb.`);
     }
   }
+
+  // ─── CLIENT FALLBACK PROMPT ──────────────────────────────────────────────────
+  if (clientObj) {
+    console.log(`[Incoming Routing] Routing call to client's saved system_prompt: ${clientObj.name}`);
+    return {
+      voice: clientObj.agent_config?.voice || defaultCallConfig.voice || 'Aoede',
+      systemInstruction: clientObj.agent_config?.system_prompt || defaultCallConfig.systemInstruction,
+      model: defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
+      name: clientObj.name || '',
+      recordCall: recordCall,
+      clientId: clientId,
+      vobizAuthId: clientObj.vobiz_sub_auth_id || defaultCallConfig.vobizAuthId,
+      vobizAuthToken: clientObj.vobiz_sub_auth_token || defaultCallConfig.vobizAuthToken
+    };
+  }
+
   return {
     voice: query.voice || defaultCallConfig.voice || 'Aoede',
     systemInstruction: query.systemInstruction || defaultCallConfig.systemInstruction,
@@ -1316,8 +1332,17 @@ app.get('/reseller', (req, res) => {
 app.use(express.static('./'));
 
 // ─── Routing Config API ───────────────────────────────────────────────────────
-// GET: return current incomingAgentId + tagRules from defaultCallConfig
+// GET: return current incomingAgentId + tagRules from client or defaultCallConfig
 app.get('/api/routing-config', (req, res) => {
+  const clientId = req.query.client_id || req.headers['x-client-id'] || '';
+  if (clientId && clientsDb.has(clientId)) {
+    const client = clientsDb.get(clientId);
+    return res.json({
+      success: true,
+      incomingAgentId: client.agent_config?.incomingAgentId || client.incomingAgentId || '',
+      tagRules: client.agent_config?.tagRules || client.tagRules || []
+    });
+  }
   res.json({
     success: true,
     incomingAgentId: defaultCallConfig.incomingAgentId || '',
@@ -1325,9 +1350,28 @@ app.get('/api/routing-config', (req, res) => {
   });
 });
 
-// POST: update incomingAgentId and/or tagRules, persist to config.json
+// POST: update incomingAgentId and/or tagRules, persist to client and config.json
 app.post('/api/routing-config', express.json(), (req, res) => {
   const { incomingAgentId, tagRules } = req.body;
+  const clientId = req.query.client_id || req.body.client_id || req.headers['x-client-id'] || '';
+
+  if (clientId && clientsDb.has(clientId)) {
+    const client = clientsDb.get(clientId);
+    if (!client.agent_config) client.agent_config = {};
+    if (incomingAgentId !== undefined) {
+      client.agent_config.incomingAgentId = incomingAgentId;
+      client.incomingAgentId = incomingAgentId;
+    }
+    if (tagRules !== undefined) {
+      client.agent_config.tagRules = tagRules;
+      client.tagRules = tagRules;
+    }
+    clientsDb.set(clientId, client);
+    saveClients();
+    console.log(`[Routing Config] Saved for Client ${client.name} (${clientId}) — incomingAgentId: ${incomingAgentId}`);
+  }
+
+  // Also save to global defaultCallConfig for global fallbacks
   if (incomingAgentId !== undefined) defaultCallConfig.incomingAgentId = incomingAgentId;
   if (tagRules !== undefined) defaultCallConfig.tagRules = tagRules;
   try {
@@ -1798,23 +1842,8 @@ app.all('/incoming-call-vobiz', (req, res) => {
   let callConfig = callSettingsMap.get(callSid) || callSettingsMap.get(toNum) || callSettingsMap.get(fromNum);
   
   if (!callConfig) {
-    if (clientId && clientsDb.has(clientId)) {
-      const client = clientsDb.get(clientId);
-      console.log(`[Vobiz Webhook] Dynamically routing call to client: ${client.name} (ID: ${client.id})`);
-      callConfig = {
-        voice: client.agent_config?.voice || defaultCallConfig.voice || 'Aoede',
-        systemInstruction: client.agent_config?.system_prompt || defaultCallConfig.systemInstruction,
-        model: defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
-        name: client.name || '',
-        recordCall: defaultCallConfig.gemini_record_call === 'true' || defaultCallConfig.recordCall || false,
-        clientId: clientId,
-        vobizAuthId: client.vobiz_sub_auth_id,
-        vobizAuthToken: client.vobiz_sub_auth_token
-      };
-    } else {
-      console.log(`[Vobiz Webhook] Configuration not found in backend memory map. Falling back to dynamic routing.`);
-      callConfig = getIncomingCallConfig(req.query, fromNum);
-    }
+    console.log(`[Vobiz Webhook] Resolving incoming call config for Client: ${clientId || 'None'}, From: ${fromNum}`);
+    callConfig = getIncomingCallConfig(req.query, fromNum, clientId);
   } else {
     console.log(`[Vobiz Webhook] Configuration successfully loaded from memory map.`);
     callConfig = { ...callConfig };
