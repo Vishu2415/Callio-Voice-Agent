@@ -1215,18 +1215,34 @@ const authMiddleware = (dataType) => (req, res, next) => {
   const masterKey = (defaultCallConfig.apiKey || '').trim();
   let matchedClient = null;
 
-  // ALWAYS check clientsDb first to identify if key belongs to a specific client/reseller
+  // 1. Check clientsDb first for client key matching
   for (const [cId, client] of clientsDb.entries()) {
     if ((client.api_key && client.api_key.trim() === cleanKey) ||
         (client.vobiz_sub_auth_token && client.vobiz_sub_auth_token.trim() === cleanKey) ||
         cId === cleanKey) {
       matchedClient = client;
-      req.query.clientId = cId; // Bind client ID for strict isolated queries
+      req.query.clientId = cId;
+      req.clientId = cId;
       break;
     }
   }
 
-  // If not matched to a specific client, check if it's the master admin API Key
+  // 2. Check resellersDb for reseller key matching
+  if (!matchedClient) {
+    for (const [rId, reseller] of resellersDb.entries()) {
+      if ((reseller.api_key && reseller.api_key.trim() === cleanKey) ||
+          (reseller.vobiz_sub_auth_token && reseller.vobiz_sub_auth_token.trim() === cleanKey) ||
+          (reseller.auth_token && reseller.auth_token.trim() === cleanKey) ||
+          rId === cleanKey) {
+        matchedClient = reseller;
+        req.query.clientId = rId;
+        req.clientId = rId;
+        break;
+      }
+    }
+  }
+
+  // 3. If not matched to a client or reseller, verify master admin key
   if (!matchedClient) {
     if (masterKey && cleanKey === masterKey) {
       // Authenticated as Master Admin
@@ -2334,11 +2350,11 @@ app.get('/recording-proxy/:callSid', async (req, res) => {
 
 // --- AGENTS API ---
 app.get('/api/agents', authMiddleware('agents'), (req, res) => {
-  const clientId = req.query.clientId || req.query.client_id || '';
+  const clientId = req.query.clientId || req.query.client_id || req.clientId || '';
   let list = Array.from(agentsDb.values());
   if (clientId && clientId !== 'admin') {
-    // Strict Multi-Tenant Isolation: Only return agents created by this specific client
-    list = list.filter(a => a.clientId === clientId);
+    // Strict Multi-Tenant Isolation: Only return agents created by or assigned to this specific client/reseller
+    list = list.filter(a => a.clientId === clientId || a.resellerId === clientId);
   } else if (clientId === 'admin') {
     list = list.filter(a => a.clientId === 'admin' || !a.clientId);
   }
@@ -2352,14 +2368,16 @@ app.post('/api/agents', authMiddleware('agents'), (req, res) => {
     return res.status(400).json({ success: false, error: 'Name and Voice are required.' });
   }
 
+  const effectiveClientId = clientId || req.query.clientId || req.query.client_id || req.clientId || null;
+
   const isNew = !id;
-  if (clientId && clientsDb.has(clientId)) {
-    const client = clientsDb.get(clientId);
+  if (effectiveClientId && clientsDb.has(effectiveClientId)) {
+    const client = clientsDb.get(effectiveClientId);
     if (client && client.role !== 'admin') {
       const plan = client.plan || 'basic';
       const planDetails = plansDb.get(plan.toLowerCase()) || { max_agents: 2 };
       const allowedAgents = planDetails.max_agents >= 99999 ? Infinity : planDetails.max_agents;
-      const clientAgents = Array.from(agentsDb.values()).filter(a => a.clientId === clientId);
+      const clientAgents = Array.from(agentsDb.values()).filter(a => a.clientId === effectiveClientId || a.resellerId === effectiveClientId);
       
       if (isNew && clientAgents.length >= allowedAgents) {
         return res.status(400).json({
@@ -2378,7 +2396,7 @@ app.post('/api/agents', authMiddleware('agents'), (req, res) => {
     systemInstruction: systemInstruction || '',
     mood: mood || 'Professional',
     model: model || 'gemini-2.5-flash', // Fallback to flash if not provided
-    clientId: clientId || null,
+    clientId: effectiveClientId,
     createdAt: id ? agentsDb.get(id)?.createdAt : Date.now()
   };
   
