@@ -5033,6 +5033,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 
                 const vobizMessage = {
                   event: 'playAudio',
+                  streamId: streamSid,
+                  streamSid: streamSid,
                   media: {
                     contentType: 'audio/x-mulaw',
                     sampleRate: 8000,
@@ -5149,18 +5151,31 @@ Follow these rules strictly to sound completely human, lively, and emotional:
       // Only handle as binary if: (1) ws library flags it as binary, AND (2) we already
       // received the 'start' event (ws.provider is set), AND (3) Gemini is ready.
       if (isBinary && ws.provider === 'vobiz' && isGeminiReady) {
-        // Binary message = raw PCM audio from caller's phone (L16 16kHz)
         const audioBuffer = Buffer.isBuffer(message) ? message : Buffer.from(message);
-        const pcm16Base64 = audioBuffer.toString('base64');
+        let pcm16Buf;
+        if (audioBuffer.length <= 160) {
+          // 8kHz mu-law (160 bytes = 20ms) -> 16kHz PCM
+          pcm16Buf = twilioToGemini(audioBuffer);
+        } else if (audioBuffer.length <= 320) {
+          // 8kHz 16-bit PCM (320 bytes = 20ms) -> 16kHz PCM
+          pcm16Buf = pcm8ToPcm16(audioBuffer);
+        } else {
+          // 16kHz 16-bit PCM (640 bytes = 20ms)
+          pcm16Buf = audioBuffer;
+        }
+        const pcm16Base64 = pcm16Buf.toString('base64');
         sendAudioToGemini(pcm16Base64);
         
         // RMS check for inactivity reset
-        if (audioBuffer.length >= 2) {
-          const pcm16 = new Int16Array(audioBuffer.buffer, audioBuffer.byteOffset, Math.floor(audioBuffer.length / 2));
+        if (pcm16Buf.length >= 2) {
           let sum = 0;
-          for (let i = 0; i < pcm16.length; i++) sum += pcm16[i] * pcm16[i];
-          const rms = Math.sqrt(sum / Math.max(pcm16.length, 1));
-          if (rms > 300) resetInactivityTimer();
+          const numSamples = Math.floor(pcm16Buf.length / 2);
+          for (let i = 0; i < pcm16Buf.length; i += 2) {
+            const sample = pcm16Buf.readInt16LE(i);
+            sum += sample * sample;
+          }
+          const rms = Math.sqrt(sum / Math.max(numSamples, 1));
+          if (rms > 200) resetInactivityTimer();
         }
         return; // binary handled, skip JSON parse
       }
