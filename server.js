@@ -1776,9 +1776,9 @@ app.all('/incoming-call-vobiz', (req, res) => {
   
   console.log(`[Vobiz Webhook] Received call. CallSid: ${callSid || 'Unknown'} (To: ${toNum}, From: ${fromNum}, Client: ${clientId || 'None'})`);
   
-  const event = req.body.Event || req.query.Event || '';
-  if (event === 'Hangup') {
-    const callStatus = req.body.CallStatus || req.query.CallStatus || '';
+  const event = req.body.Event || req.query.Event || req.body.event || req.query.event || '';
+  if (event === 'Hangup' || event === 'hangup') {
+    const callStatus = req.body.CallStatus || req.query.CallStatus || req.body.callStatus || req.query.callStatus || '';
     let finalStatus = 'completed';
     if (callStatus === 'busy' || callStatus === 'no-answer' || callStatus === 'failed' || callStatus === 'canceled') {
       finalStatus = 'failed';
@@ -1787,6 +1787,13 @@ app.all('/incoming-call-vobiz', (req, res) => {
     handleCallEnd(callSid, finalStatus);
     return res.type('application/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
   }
+
+  // Dedup guard: if we already sent the Stream XML for this CallSid, return empty response
+  if (callSid && callSettingsMap.has('__xml_sent_' + callSid)) {
+    console.log(`[Vobiz Webhook] Duplicate webhook for CallSid: ${callSid}, ignoring.`);
+    return res.type('application/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+  }
+  if (callSid) callSettingsMap.set('__xml_sent_' + callSid, true);
 
   let callConfig = callSettingsMap.get(callSid) || callSettingsMap.get(toNum) || callSettingsMap.get(fromNum);
   
@@ -5033,10 +5040,11 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 const base64Mulaw = mulawBuffer.toString('base64');
                 
                 const vobizMessage = {
-                  event: 'media',
+                  event: 'playAudio',
                   streamId: streamSid,
-                  streamSid: streamSid,
                   media: {
+                    contentType: 'audio/x-mulaw',
+                    sampleRate: 8000,
                     payload: base64Mulaw
                   }
                 };
@@ -5097,9 +5105,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
             }
           } else if (ws.provider === 'vobiz') {
             const clearMsg = {
-              event: 'clear',
-              streamId: streamSid,
-              streamSid: streamSid
+              event: 'clearAudio',
+              streamId: streamSid
             };
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify(clearMsg));
