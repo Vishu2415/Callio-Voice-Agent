@@ -168,6 +168,7 @@ function getResellerFromHost(host) {
 function resolveBranding(host) {
   if (!host) return brandingDb.get('default');
   let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+  if (cleanHost.startsWith('www.')) cleanHost = cleanHost.substring(4);
 
   // 1. Check if host matches a Reseller
   const reseller = getResellerFromHost(host);
@@ -189,24 +190,29 @@ function resolveBranding(host) {
     };
   }
 
-  // 2. Check brandingDb for custom tenant records
+  // 2. Check brandingDb for custom domain record
+  if (brandingDb.has(cleanHost)) {
+    return brandingDb.get(cleanHost);
+  }
+
   for (const branding of brandingDb.values()) {
-    if (branding.customDomain && branding.customDomain.toLowerCase() === cleanHost) {
+    if (branding.customDomain && branding.customDomain.toLowerCase().replace(/^www\./, '') === cleanHost) {
       return branding;
     }
     if (branding.subdomain && branding.subdomain.toLowerCase() === cleanHost) {
       return branding;
     }
-    if (cleanHost.endsWith('.' + branding.subdomain) || cleanHost === branding.subdomain) {
-      return branding;
-    }
-    if (branding.id !== 'default' && (cleanHost.startsWith(branding.id + '.') || cleanHost === branding.id)) {
-      return branding;
-    }
   }
 
   // 3. Fallback to default Callio branding
-  return brandingDb.get('default');
+  return brandingDb.get('default') || {
+    appName: 'Callio',
+    logoUrl: 'logo_new.png',
+    faviconUrl: 'favicon.ico',
+    primaryColor: '#FF6B4A',
+    secondaryColor: '#ae3115',
+    copyrightText: '© 2026 Callio. All rights reserved.'
+  };
 }
 
 
@@ -1282,27 +1288,38 @@ app.get('/api/public/branding', (req, res) => {
 app.post('/api/admin/branding', (req, res) => {
   const { id, customDomain, subdomain, appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText } = req.body;
   const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+  if (cleanHost.startsWith('www.')) cleanHost = cleanHost.substring(4);
+
   const currentReseller = getResellerFromHost(host);
 
   if (currentReseller) {
     // If request is made from a reseller portal (e.g. growvo.in), ONLY update this reseller's branding
     currentReseller.branding = {
-      appName: appName || currentReseller.branding.appName,
-      logoUrl: logoUrl !== undefined ? logoUrl : currentReseller.branding.logoUrl,
-      faviconUrl: faviconUrl !== undefined ? faviconUrl : currentReseller.branding.faviconUrl,
-      primaryColor: primaryColor || currentReseller.branding.primaryColor,
-      secondaryColor: secondaryColor || currentReseller.branding.secondaryColor,
-      supportEmail: supportEmail !== undefined ? supportEmail : currentReseller.branding.supportEmail,
-      copyrightText: copyrightText !== undefined ? copyrightText : currentReseller.branding.copyrightText
+      appName: appName || currentReseller.branding?.appName || 'Growvo',
+      logoUrl: logoUrl !== undefined ? logoUrl : currentReseller.branding?.logoUrl,
+      faviconUrl: faviconUrl !== undefined ? faviconUrl : currentReseller.branding?.faviconUrl,
+      primaryColor: primaryColor || currentReseller.branding?.primaryColor || '#FF6B4A',
+      secondaryColor: secondaryColor || currentReseller.branding?.secondaryColor || '#ae3115',
+      supportEmail: supportEmail !== undefined ? supportEmail : currentReseller.branding?.supportEmail,
+      copyrightText: copyrightText !== undefined ? copyrightText : currentReseller.branding?.copyrightText
     };
     resellersDb.set(currentReseller.id, currentReseller);
     saveResellers();
+
+    if (currentReseller.domain) {
+      const rDomain = currentReseller.domain.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase().replace(/^www\./, '');
+      brandingDb.set(rDomain, { id: currentReseller.id, ...currentReseller.branding });
+      saveBranding();
+    }
+
     return res.json({ success: true, branding: currentReseller.branding });
   }
 
-  // Super Admin updating default Callio portal branding
+  const targetDomain = (customDomain || cleanHost).replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase().replace(/^www\./, '');
+
   const brandingData = {
-    id: 'default',
+    id: targetDomain,
     customDomain: customDomain || '',
     subdomain: subdomain || '',
     appName: appName || 'Callio',
@@ -1315,7 +1332,11 @@ app.post('/api/admin/branding', (req, res) => {
     copyrightText: copyrightText || '© 2026 Callio. All rights reserved.'
   };
 
-  brandingDb.set('default', brandingData);
+  if (targetDomain.includes('callio') || targetDomain.includes('localhost') || targetDomain === 'default') {
+    brandingDb.set('default', brandingData);
+  } else {
+    brandingDb.set(targetDomain, brandingData);
+  }
   saveBranding();
 
   res.json({ success: true, branding: brandingData });
