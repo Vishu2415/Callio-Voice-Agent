@@ -7223,7 +7223,7 @@ window.initiateUserRecharge = function() {
       });
       const data = await res.json();
       if (data.success) {
-        if (loggedInUser) {
+        if (loggedInUser && (loggedInUser.role !== 'admin' || targetClientId === loggedInUser.id)) {
           loggedInUser.balance = data.balance;
           localStorage.setItem('user_session', JSON.stringify(loggedInUser));
         }
@@ -7232,9 +7232,11 @@ window.initiateUserRecharge = function() {
         const headerWalletBalance = document.getElementById('header-wallet-balance');
         const remMins = data.balance !== undefined ? (data.balance >= 99999 ? '∞' : Math.max(0, data.balance).toFixed(1)) : '0.0';
         if (balanceEl) balanceEl.textContent = `${remMins} Mins`;
-        if (headerWalletBalance) headerWalletBalance.textContent = `${remMins}`;
-
-        fetchBillingData();
+        if (loggedInUser && loggedInUser.role === 'admin' && window.onAdminBillingClientChange) {
+          window.onAdminBillingClientChange();
+        } else {
+          fetchBillingData();
+        }
 
         if (modal && loadingState && successState) {
           loadingState.style.display = 'none';

@@ -3708,11 +3708,11 @@ app.post('/api/client/recharge', express.json(), (req, res) => {
   }
 
   let client = null;
-  if (clientId && clientsDb.has(clientId)) {
+  if (clientId && clientId !== 'admin' && clientsDb.has(clientId)) {
     client = clientsDb.get(clientId);
   } else {
-    // Fallback: use first client in database or primary client if clientId is 'admin' or missing
-    client = Array.from(clientsDb.values())[0];
+    // Fallback: find primary active client in database
+    client = Array.from(clientsDb.values()).find(c => c.phone_number || c.status === 'active') || Array.from(clientsDb.values())[0];
   }
 
   if (!client) {
@@ -3720,7 +3720,7 @@ app.post('/api/client/recharge', express.json(), (req, res) => {
       id: `client_${Date.now()}`,
       name: 'Primary Client',
       email: 'admin@growvo.in',
-      balance: 0,
+      balance: 500,
       plan: 'pro',
       used_minutes: 0,
       created_at: new Date().toISOString()
@@ -4005,11 +4005,11 @@ app.get('/api/client/billing', (req, res) => {
   const { clientId } = req.query;
 
   let client = null;
-  if (clientId && clientsDb.has(clientId)) {
+  if (clientId && clientId !== 'admin' && clientsDb.has(clientId)) {
     client = clientsDb.get(clientId);
   } else {
     // Fallback if clientId is 'admin' or empty or unknown
-    client = Array.from(clientsDb.values())[0];
+    client = Array.from(clientsDb.values()).find(c => c.phone_number || c.status === 'active') || Array.from(clientsDb.values())[0];
   }
 
   if (!client) {
@@ -4017,7 +4017,7 @@ app.get('/api/client/billing', (req, res) => {
       id: `client_${Date.now()}`,
       name: 'Primary Client',
       email: 'admin@growvo.in',
-      balance: 0,
+      balance: 500,
       plan: 'pro',
       used_minutes: 0,
       created_at: new Date().toISOString()
