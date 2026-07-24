@@ -5096,7 +5096,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           
           const callStateObj = activeCalls.get(callSid);
           const isIncomingCall = callStateObj && callStateObj.direction === 'incoming';
-          const greetingDelayMs = isIncomingCall ? 3500 : 2000;
+          const greetingDelayMs = isIncomingCall ? 1500 : 200;
           
           ws.greetingTimeout = setTimeout(() => {
             if (geminiWs && geminiWs.readyState === WebSocket.OPEN && !ws.userHasSpoken) {
@@ -5108,8 +5108,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               const firstName = isValidName ? getFirstName(cleanName) : '';
 
               const greetPrompt = (isValidName && firstName && firstName.toLowerCase() !== 'saas' && firstName.toLowerCase() !== 'lead')
-                ? `Greet ${firstName} politely by name in English to start the conversation.` 
-                : "Say hello politely in English to start the conversation.";
+                ? `Greet ${firstName} politely by name to start the conversation according to your persona.` 
+                : "Say hello politely to start the conversation according to your persona.";
               
               const initGreeting = {
                 clientContent: {
