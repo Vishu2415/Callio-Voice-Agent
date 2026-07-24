@@ -5404,14 +5404,15 @@ async function fetchAdminClients() {
 
       const isWL = window.isWhitelabelDomain();
       const customCredsBadge = (!isWL && client.vobiz_sub_auth_id) ? `<br><span style="font-size: 0.65rem; color: var(--color-cyan); background: rgba(6, 182, 212, 0.1); padding: 1px 4px; border-radius: 4px; font-weight: 600; display: inline-block; margin-top: 2px;">🔑 Custom Vobiz</span>` : '';
-      const assignBtnText = isWL ? '📱 Assign Number' : '📞 Telephony &amp; Credentials';
+      const resellerBadge = client.reseller_name ? `<span style="font-size: 0.65rem; color: #c084fc; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); padding: 1px 5px; border-radius: 4px; font-weight: 600; margin-left: 6px; display: inline-block;">🏷️ ${escapeHtml(client.reseller_name)}</span>` : '';
+      const assignBtnText = isWL ? '📱 Assign Number' : '📞 Telephony & Credentials';
 
       tr.innerHTML = `
         <td>
           <div class="client-info-cell">
             <div class="client-avatar-circle">${initials}</div>
             <div class="client-meta-details">
-              <span class="client-meta-name">${escapeHtml(client.name)}</span>
+              <span class="client-meta-name">${escapeHtml(client.name)}${resellerBadge}</span>
               <span class="client-meta-email">${escapeHtml(client.email)}</span>
             </div>
           </div>
