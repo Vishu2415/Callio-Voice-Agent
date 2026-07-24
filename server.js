@@ -1282,8 +1282,10 @@ const authMiddleware = (dataType) => (req, res, next) => {
               req.query?.api_key ||
               req.body?.apiKey || '';
 
-  if (isDashboard && !key) {
-    // Allow local web app dashboard requests to proceed without requiring API Key
+  const isWebhook = req.path.includes('/api/webhooks/');
+
+  if ((isDashboard || isWebhook) && !key) {
+    // Allow webhooks and local dashboard requests to proceed without requiring API Key
     return next();
   }
 
@@ -2779,35 +2781,41 @@ app.get('/api/crm-logs', authMiddleware('calls'), (req, res) => {
 });
 
 app.post('/api/webhooks/crm-lead-stage-change', express.json(), authMiddleware('calls'), async (req, res) => {
-  const targetClientId = req.query.clientId || req.body.clientId || 'default_rule';
-  let leadName = req.body.leadName;
-  let leadPhone = req.body.leadPhone;
-  let previousStage = req.body.previousStage;
-  let currentStage = req.body.currentStage;
+  const targetClientId = req.query.clientId || req.body.clientId || req.body.client_id || req.clientId || 'default_rule';
+  let leadName = req.body.leadName || req.body.lead_name || req.body.name;
+  let leadPhone = req.body.leadPhone || req.body.lead_phone || req.body.phone || req.body.phoneNumber || req.body.mobile;
+  let previousStage = req.body.previousStage || req.body.previous_stage || req.body.fromStage || req.body.from_stage || '';
+  let currentStage = req.body.currentStage || req.body.current_stage || req.body.toStage || req.body.to_stage || req.body.stage || '';
 
   // Extract nested CRM payload if present
   if (req.body.data) {
     const data = req.body.data;
-    leadName = data.name || leadName;
-    previousStage = data.previous_stage || previousStage;
-    currentStage = data.current_stage || currentStage;
+    leadName = data.name || data.lead_name || data.leadName || leadName;
+    previousStage = data.previous_stage || data.previousStage || data.from_stage || previousStage;
+    currentStage = data.current_stage || data.currentStage || data.to_stage || data.stage || currentStage;
     if (data.contact) {
-      leadPhone = data.contact.phone || leadPhone;
-      if (!leadName && (data.contact.first_name || data.contact.last_name)) {
-        leadName = `${data.contact.first_name || ''} ${data.contact.last_name || ''}`.trim();
+      leadPhone = data.contact.phone || data.contact.phone_number || data.contact.mobile || leadPhone;
+      if (!leadName && (data.contact.first_name || data.contact.last_name || data.contact.name)) {
+        leadName = data.contact.name || `${data.contact.first_name || ''} ${data.contact.last_name || ''}`.trim();
       }
+    } else if (data.phone || data.lead_phone || data.mobile) {
+      leadPhone = data.phone || data.lead_phone || data.mobile || leadPhone;
     }
   }
 
-  console.log(`[CRM Webhook] 📥 Received webhook request for lead: "${leadName || 'Unknown'}" (${leadPhone || 'No Phone'}). Transition: ${previousStage} ➔ ${currentStage} | Client: ${targetClientId}`);
+  console.log(`[CRM Webhook] 📥 Received webhook request for lead: "${leadName || 'Unknown'}" (${leadPhone || 'No Phone'}). Transition: "${previousStage}" ➔ "${currentStage}" | Client: ${targetClientId}`);
 
   if (!leadPhone) {
-    console.warn(`[CRM Webhook] ⚠️ Ignored request: missing leadPhone parameter.`);
+    console.warn(`[CRM Webhook] ⚠️ Ignored request: missing leadPhone parameter in body/payload.`);
     return res.status(400).json({ success: false, error: 'leadPhone is required in body' });
   }
   
-  const rule = crmRulesDb.get(targetClientId) || { enabled: false, fromStage: 'new', toStage: 'qualified' };
-  
+  // Smart Rule Lookup: Check client rule, req.clientId rule, or default_rule
+  let rule = crmRulesDb.get(targetClientId) || crmRulesDb.get(req.clientId || '') || crmRulesDb.get('default_rule');
+  if (!rule) {
+    rule = { enabled: true, fromStage: '', toStage: '', provider: 'vobiz' };
+  }
+
   const logId = `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
   const crmLog = {
     id: logId,
@@ -2823,27 +2831,36 @@ app.post('/api/webhooks/crm-lead-stage-change', express.json(), authMiddleware('
   
   const cleanFromInput = (previousStage || '').trim().toLowerCase();
   const cleanToInput = (currentStage || '').trim().toLowerCase();
-  const cleanRuleFrom = (rule.fromStage || 'new').trim().toLowerCase();
-  const cleanRuleTo = (rule.toStage || 'qualified').trim().toLowerCase();
+  const cleanRuleFrom = (rule.fromStage || '').trim().toLowerCase();
+  const cleanRuleTo = (rule.toStage || '').trim().toLowerCase();
   
-  const isMatch = rule.enabled && 
-                  cleanFromInput === cleanRuleFrom && 
-                  cleanToInput === cleanRuleTo;
+  // Flexible stage matching
+  const fromMatches = !cleanRuleFrom || cleanRuleFrom === 'any' || cleanRuleFrom === '*' || cleanFromInput === cleanRuleFrom || !cleanFromInput;
+  const toMatches = !cleanRuleTo || cleanRuleTo === 'any' || cleanRuleTo === '*' || cleanToInput === cleanRuleTo || (cleanToInput && cleanToInput.includes(cleanRuleTo)) || (cleanRuleTo && cleanRuleTo.includes(cleanToInput));
+  
+  const isMatch = rule.enabled !== false && fromMatches && toMatches;
                   
   if (!isMatch) {
-    console.log(`[CRM Webhook] 💤 Event skipped. Rule Enabled: ${rule.enabled}. Rule Trigger: ${cleanRuleFrom} ➔ ${cleanRuleTo}. Received: ${cleanFromInput} ➔ ${cleanToInput}`);
+    console.log(`[CRM Webhook] 💤 Event skipped. Rule Enabled: ${rule.enabled}. Rule Trigger: "${cleanRuleFrom}" ➔ "${cleanRuleTo}". Received: "${cleanFromInput}" ➔ "${cleanToInput}"`);
     crmLogsDb.set(logId, crmLog);
     saveCrmLogs();
     return res.json({ success: true, message: 'Webhook received. Event skipped.', log: crmLog });
   }
   
-  const agent = agentsDb.get(rule.agentId);
+  let agent = rule.agentId ? agentsDb.get(rule.agentId) : null;
+  if (!agent && targetClientId && targetClientId !== 'default_rule') {
+    agent = Array.from(agentsDb.values()).find(a => a.clientId === targetClientId || a.client_id === targetClientId);
+  }
   if (!agent) {
-    console.error(`[CRM Webhook] ❌ Error: Rule matched but assigned Agent (ID: ${rule.agentId}) was not found in agentsDb.`);
-    crmLog.status = 'Failed (Assigned agent not found)';
+    agent = Array.from(agentsDb.values())[0];
+  }
+
+  if (!agent) {
+    console.error(`[CRM Webhook] ❌ Error: Rule matched but no Agent is available in system.`);
+    crmLog.status = 'Failed (No agent available)';
     crmLogsDb.set(logId, crmLog);
     saveCrmLogs();
-    return res.status(400).json({ success: false, error: 'Assigned agent not found', log: crmLog });
+    return res.status(400).json({ success: false, error: 'No agent available in system', log: crmLog });
   }
   
   crmLog.agentName = agent.name;
@@ -2851,9 +2868,9 @@ app.post('/api/webhooks/crm-lead-stage-change', express.json(), authMiddleware('
   
   const localCallUrl = `http://localhost:${PORT}/make-call`;
   
-  let finalInstruction = agent.systemInstruction;
+  let finalInstruction = agent.systemInstruction || 'You are a helpful assistant.';
   if (agent.name) {
-    finalInstruction = `[IDENTITY DIRECTIVE: Your name is "${agent.name}". You must introduce yourself as "${agent.name}" and identify as "${agent.name}" if asked for your name. In Hindi/Hinglish, you can say "Mera naam ${agent.name} hai".]\n\n` + finalInstruction;
+    finalInstruction = `[IDENTITY DIRECTIVE: Your name is "${agent.name}". You must introduce yourself as "${agent.name}". In Hindi/Hinglish, say "Mera naam ${agent.name} hai".]\n\n` + finalInstruction;
   }
   if (agent.mood && agent.mood !== 'Professional') {
     finalInstruction = `[MOOD DIRECTIVE: You must act and speak in a ${agent.mood.toUpperCase()} mood at all times.]\n\n` + finalInstruction;
@@ -2871,7 +2888,7 @@ app.post('/api/webhooks/crm-lead-stage-change', express.json(), authMiddleware('
     systemInstruction: finalInstruction,
     recordCall: defaultCallConfig.gemini_record_call === 'true' || defaultCallConfig.recordCall || true,
     model: agent.model || 'gemini-3.1-flash-live-preview',
-    clientId: targetClientId !== 'default_rule' ? targetClientId : null,
+    clientId: targetClientId !== 'default_rule' ? targetClientId : (req.clientId || agent.clientId || null),
     
     exotelApiKey: defaultCallConfig.exotelApiKey,
     exotelApiToken: defaultCallConfig.exotelApiToken,
@@ -2884,7 +2901,7 @@ app.post('/api/webhooks/crm-lead-stage-change', express.json(), authMiddleware('
     vobizCallerId: defaultCallConfig.vobizCallerId
   };
   
-  console.log(`[CRM Webhook] 🚀 Rule matched! Dispatching outbound call using Agent: "${agent.name}" (${agent.voice}) via Provider: "${makeCallPayload.provider}" to "${leadPhone}". Public URL: "${makeCallPayload.publicUrl || 'MISSING'}"`);
+  console.log(`[CRM Webhook] 🚀 Rule matched! Dispatching outbound call using Agent: "${agent.name}" (${agent.voice}) via Provider: "${makeCallPayload.provider}" to "${leadPhone}".`);
   
   try {
     const callRes = await fetch(localCallUrl, {
