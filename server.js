@@ -2485,8 +2485,57 @@ app.get('/calls', (req, res) => {
   res.json({ success: true, calls: list });
 });
 
+// GET /api/admin/client-debug — Debug: inspect any client's balance and billing state
+app.get('/api/admin/client-debug', (req, res) => {
+  const { clientId, email } = req.query;
+  let client = null;
+  if (clientId) {
+    client = clientsDb.get(clientId);
+  } else if (email) {
+    for (const c of clientsDb.values()) {
+      if (c.email && c.email.toLowerCase() === email.toLowerCase()) { client = c; break; }
+    }
+  }
+  if (!client) {
+    return res.json({ success: false, error: 'Not found', allClients: Array.from(clientsDb.values()).map(c => ({ id: c.id, email: c.email, balance: c.balance, reseller_id: c.reseller_id, historyCount: (c.billing_history||[]).length })) });
+  }
+  const { password, ...safeClient } = client;
+  res.json({ success: true, client: safeClient });
+});
+
+// POST /api/admin/recalculate-balance — Recalculate a client's balance from billing_history
+app.post('/api/admin/recalculate-balance', express.json(), (req, res) => {
+  const { clientId, email } = req.body;
+  let client = null;
+  if (clientId) {
+    client = clientsDb.get(clientId);
+  } else if (email) {
+    for (const c of clientsDb.values()) {
+      if (c.email && c.email.toLowerCase() === email.toLowerCase()) { client = c; break; }
+    }
+  }
+  if (!client) {
+    return res.status(404).json({ success: false, error: 'Client not found.' });
+  }
+  const history = client.billing_history || [];
+  // Sum all recharges minus all charges
+  let calcBalance = 0;
+  for (const txn of history) {
+    if (txn.totalCharge !== undefined) {
+      calcBalance -= txn.totalCharge; // totalCharge is negative for credits, positive for debits
+    }
+  }
+  calcBalance = Math.max(0, Number(calcBalance.toFixed(2)));
+  console.log(`[RecalcBalance] Client ${client.name} (${client.id}): history-based balance = ${calcBalance}`);
+  client.balance = calcBalance;
+  clientsDb.set(client.id, client);
+  saveClients();
+  res.json({ success: true, clientId: client.id, name: client.name, newBalance: calcBalance, transactionCount: history.length });
+});
+
 // POST /api/admin/sanitize-calls — Force clean existing calls_db.json from virtual number corruption
 app.post('/api/admin/sanitize-calls', (req, res) => {
+
   let fixed = 0;
   let removed = 0;
   for (const [key, call] of activeCalls.entries()) {
