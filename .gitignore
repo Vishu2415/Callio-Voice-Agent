@@ -3,3 +3,11 @@ node_modules/
 *.log
 .DS_Store
 scratch/
+
+# Runtime DB and Uploads
+*_db.json
+recordings/
+uploads/
+backups/
+pemkey/
+
