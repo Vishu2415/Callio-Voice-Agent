@@ -3906,10 +3906,10 @@ elBtnToggleSharedKeyVisibility?.addEventListener('click', (e) => {
   e.preventDefault();
   if (elSharedApiKeyInput.type === 'password') {
     elSharedApiKeyInput.type = 'text';
-    elBtnToggleSharedKeyVisibility.innerText = '🔒 Hide';
+    elBtnToggleSharedKeyVisibility.innerHTML = '🙈 Hide';
   } else {
     elSharedApiKeyInput.type = 'password';
-    elBtnToggleSharedKeyVisibility.innerText = '👁️ Show';
+    elBtnToggleSharedKeyVisibility.innerHTML = '👁️ Show';
   }
 });
 
@@ -3920,10 +3920,10 @@ elBtnCopySharedKey?.addEventListener('click', (e) => {
     return;
   }
   navigator.clipboard.writeText(elSharedApiKeyInput.value).then(() => {
-    const originalText = elBtnCopySharedKey.innerText;
-    elBtnCopySharedKey.innerText = '✅ Copied!';
+    const originalText = elBtnCopySharedKey.innerHTML;
+    elBtnCopySharedKey.innerHTML = '✅ Copied!';
     setTimeout(() => {
-      elBtnCopySharedKey.innerText = originalText;
+      elBtnCopySharedKey.innerHTML = originalText;
     }, 2000);
   }).catch(err => {
     console.error('Clipboard copy failed:', err);
@@ -3938,9 +3938,9 @@ document.getElementById('btn-copy-client-id')?.addEventListener('click', (e) => 
   const btn = document.getElementById('btn-copy-client-id');
   if (input && input.value) {
     navigator.clipboard.writeText(input.value).then(() => {
-      const originalText = btn.innerText;
-      btn.innerText = '✅';
-      setTimeout(() => { btn.innerText = originalText; }, 2000);
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '✅ Copied!';
+      setTimeout(() => { btn.innerHTML = originalText; }, 2000);
     });
   }
 });

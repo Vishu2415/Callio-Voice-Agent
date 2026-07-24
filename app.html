@@ -1207,18 +1207,22 @@
               
               <div class="form-group" style="margin-bottom: 1.25rem;">
                 <label>Callio Client Auth ID</label>
-                <div class="secure-input-wrapper" style="margin-top: 5px;">
-                  <input type="text" id="shared-client-id-input" readonly placeholder="Not logged in" style="flex: 1; padding: 12px; font-size: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #fff; font-family: monospace;">
-                  <button id="btn-copy-client-id" class="input-copy-btn" title="Copy ID">📋</button>
+                <div class="secure-input-wrapper" style="margin-top: 5px; position: relative; display: flex; align-items: center;">
+                  <input type="text" id="shared-client-id-input" readonly placeholder="Not logged in" style="flex: 1; padding: 12px 60px 12px 12px; font-size: 0.95rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #fff; font-family: monospace;">
+                  <div class="input-action-group" style="position: absolute; right: 8px; display: flex; gap: 4px; align-items: center;">
+                    <button id="btn-copy-client-id" class="input-action-btn" title="Copy ID" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; cursor: pointer; padding: 6px 10px; font-size: 0.85rem; color: #fff; display: flex; align-items: center; gap: 4px;">📋</button>
+                  </div>
                 </div>
               </div>
 
               <div class="form-group">
                 <label>Callio Auth Token (API Key)</label>
-                <div class="secure-input-wrapper" style="margin-top: 5px;">
-                  <input type="password" id="shared-api-key-input" readonly placeholder="No API key generated yet" style="flex: 1; padding: 12px; font-size: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #fff; font-family: monospace;">
-                  <button id="btn-toggle-shared-key-visibility" class="input-copy-btn" style="right: 50px;" title="Toggle Visibility">👁️</button>
-                  <button id="btn-copy-shared-key" class="input-copy-btn" title="Copy Key">📋</button>
+                <div class="secure-input-wrapper" style="margin-top: 5px; position: relative; display: flex; align-items: center;">
+                  <input type="password" id="shared-api-key-input" readonly placeholder="No API key generated yet" style="flex: 1; padding: 12px 140px 12px 12px; font-size: 0.95rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #fff; font-family: monospace;">
+                  <div class="input-action-group" style="position: absolute; right: 8px; display: flex; gap: 6px; align-items: center;">
+                    <button id="btn-toggle-shared-key-visibility" class="input-action-btn" title="Toggle Visibility" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; cursor: pointer; padding: 6px 10px; font-size: 0.85rem; color: #fff; display: flex; align-items: center; gap: 4px; white-space: nowrap;">👁️ Show</button>
+                    <button id="btn-copy-shared-key" class="input-action-btn" title="Copy Key" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; cursor: pointer; padding: 6px 10px; font-size: 0.85rem; color: #fff; display: flex; align-items: center; gap: 4px; white-space: nowrap;">📋 Copy</button>
+                  </div>
                 </div>
               </div>
               

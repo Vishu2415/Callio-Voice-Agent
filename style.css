@@ -3779,27 +3779,18 @@ input[type="checkbox"]:checked::after {
 }
 
 .secure-input-wrapper input {
-  padding-right: 3.5rem !important;
   font-family: var(--font-mono) !important;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
 }
 
-.input-copy-btn {
-  position: absolute;
-  right: 10px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition-smooth);
+.input-action-btn {
+  transition: all 0.2s ease;
 }
 
-.input-copy-btn:hover {
-  color: #fff;
+.input-action-btn:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  transform: translateY(-1px);
 }
 
 /* --- Tab Content Centering & Bounds --- */
