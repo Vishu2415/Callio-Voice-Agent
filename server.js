@@ -251,6 +251,15 @@ function loadCalls() {
       call.updatedAt = new Date().toISOString();
       dirty = true;
     }
+    // Clean up corrupted calls where target 'to' was recorded as the Virtual Caller ID
+    if (call.to && isVirtualNumber(call.to)) {
+      if (call.from && !isVirtualNumber(call.from)) {
+        console.log(`[Startup Sanitization] Fixing call ${key}: Changing target 'to' from virtual number ${call.to} to real caller ${call.from}`);
+        call.to = call.from;
+        call.direction = 'incoming';
+        dirty = true;
+      }
+    }
   }
   if (dirty) {
     saveCalls();
@@ -491,6 +500,22 @@ function cleanAndComparePhone(p1, p2) {
   return d1 === d2;
 }
 
+function isVirtualNumber(phone) {
+  if (!phone) return false;
+  const cleaned = String(phone).replace(/\D/g, '');
+  if (!cleaned) return false;
+
+  const masterNum = (defaultCallConfig?.vobizCallerId || process.env.VOBIZ_CALLER_ID || '917971442441').replace(/\D/g, '');
+  if (cleanAndComparePhone(cleaned, masterNum)) return true;
+
+  if (typeof clientsDb !== 'undefined') {
+    for (const c of clientsDb.values()) {
+      if (c.phone_number && cleanAndComparePhone(cleaned, c.phone_number)) return true;
+    }
+  }
+  return false;
+}
+
 function findContactByPhone(phone) {
   if (!phone) return null;
   for (const contact of contactsDb.values()) {
@@ -517,11 +542,13 @@ function getFirstName(fullName) {
 
 function getOrCreateCallState(callSid, details = {}) {
   if (!callSid) return null;
+  const initialTo = (details.to && !isVirtualNumber(details.to)) ? details.to : (details.from && !isVirtualNumber(details.from) ? details.from : '');
   if (!activeCalls.has(callSid)) {
     activeCalls.set(callSid, {
       callSid: callSid,
       provider: details.provider || 'twilio',
-      to: details.to || '',
+      to: initialTo,
+      from: details.from || '',
       direction: details.direction || null,
       name: details.name || '',
       status: details.status || 'calling',
@@ -538,19 +565,25 @@ function getOrCreateCallState(callSid, details = {}) {
     const state = activeCalls.get(callSid);
     if (details.status) state.status = details.status;
     if (details.provider) state.provider = details.provider;
-    if (details.direction && !state.direction) state.direction = details.direction;
-    // Don't overwrite state.to if it already contains a phone number and details.to is just the callSid or a UUID
+    if (details.direction === 'outgoing') {
+      state.direction = 'outgoing';
+    } else if (details.direction && !state.direction) {
+      state.direction = details.direction;
+    }
+    if (details.from && !state.from) {
+      state.from = details.from;
+    }
+    // Don't overwrite state.to if it already contains a valid customer phone number and details.to is virtual or UUID
     if (details.to) {
       const isCallSidOrUuid = details.to === callSid || details.to.includes('-');
-      if (!state.to || !isCallSidOrUuid) {
+      const isVirtual = isVirtualNumber(details.to);
+      if (!isVirtual && (!state.to || !isCallSidOrUuid || isVirtualNumber(state.to))) {
         state.to = details.to;
       }
     }
     if (details.name) state.name = details.name;
-    // Only update recordCall if explicitly passed as true — never overwrite true with false
     if (details.recordCall === true) state.recordCall = true;
     if (details.clientId) state.clientId = details.clientId;
-    // Set startedAt when call becomes active
     if (details.status === 'active' && !state.startedAt) {
       state.startedAt = new Date().toISOString();
     }
@@ -1963,34 +1996,62 @@ app.all('/incoming-call-vobiz', (req, res) => {
   
   if (callSid) {
     let resolvedSid = callSid;
-    if (toNum) {
-      for (const [sid, state] of activeCalls.entries()) {
-        if (cleanAndComparePhone(state.to, toNum) && state.status === 'calling' && sid !== callSid) {
-          console.log(`[Vobiz Webhook] Dedup: Found existing 'calling' entry for ${toNum} (sid: ${sid}). Merging into callSid ${callSid}.`);
-          const oldState = { ...state, callSid: callSid };
-          activeCalls.delete(sid);
-          activeCalls.set(callSid, oldState);
-          callSettingsMap.set(callSid, callSettingsMap.get(sid) || callConfig);
+
+    // Smart dedup: find any existing call in 'calling' state or matching customer phone
+    for (const [sid, state] of activeCalls.entries()) {
+      const stateTo = state.to || '';
+      const matchesTo = toNum && !isVirtualNumber(toNum) && cleanAndComparePhone(stateTo, toNum);
+      const matchesFrom = fromNum && !isVirtualNumber(fromNum) && cleanAndComparePhone(stateTo, fromNum);
+      const isPendingOutbound = state.status === 'calling' && state.direction === 'outgoing' && sid !== callSid;
+
+      if (matchesTo || matchesFrom || isPendingOutbound) {
+        console.log(`[Vobiz Webhook] Smart Dedup: Merging existing call entry ${sid} (Target: ${stateTo}, status: ${state.status}) into callSid ${callSid}.`);
+        const oldState = { ...state, callSid: callSid };
+        activeCalls.delete(sid);
+        activeCalls.set(callSid, oldState);
+        const existingConfig = callSettingsMap.get(sid);
+        if (existingConfig) {
+          callSettingsMap.set(callSid, existingConfig);
           callSettingsMap.delete(sid);
-          resolvedSid = callSid;
-          break;
+          callConfig = { ...existingConfig, ...callConfig };
         }
+        resolvedSid = callSid;
+        break;
       }
     }
+
     callSettingsMap.set(resolvedSid, callConfig);
-    if (toNum) callSettingsMap.set(toNum, callConfig);
-    if (fromNum) callSettingsMap.set(fromNum, callConfig);
+    if (toNum && !isVirtualNumber(toNum)) callSettingsMap.set(toNum, callConfig);
+    if (fromNum && !isVirtualNumber(fromNum)) callSettingsMap.set(fromNum, callConfig);
     console.log(`[Vobiz Webhook] Config cached under CallSid: ${resolvedSid}`);
-    
+
     const existingCallState = activeCalls.get(resolvedSid);
-    const isOutbound = existingCallState && (existingCallState.direction === 'outgoing' || (toNum && cleanAndComparePhone(existingCallState.to, toNum)));
-    const targetCustomerPhone = isOutbound ? (existingCallState.to || toNum) : (fromNum || toNum);
+    const isFromVirtual = isVirtualNumber(fromNum);
+    const isToVirtual = isVirtualNumber(toNum);
+
+    let resolvedDirection = existingCallState?.direction;
+    if (!resolvedDirection) {
+      if (isFromVirtual && !isToVirtual) resolvedDirection = 'outgoing';
+      else if (isToVirtual && !isFromVirtual) resolvedDirection = 'incoming';
+      else resolvedDirection = 'outgoing';
+    }
+
+    let targetCustomerPhone = existingCallState?.to;
+    if (!targetCustomerPhone || isVirtualNumber(targetCustomerPhone)) {
+      if (resolvedDirection === 'outgoing') {
+        targetCustomerPhone = !isToVirtual ? toNum : (!isFromVirtual ? fromNum : '');
+      } else {
+        targetCustomerPhone = !isFromVirtual ? fromNum : (!isToVirtual ? toNum : '');
+      }
+    }
+
+    console.log(`[Vobiz Webhook] Resolved CallSid: ${resolvedSid}, Direction: ${resolvedDirection}, Target Customer: ${targetCustomerPhone}`);
 
     getOrCreateCallState(resolvedSid, {
       provider: 'vobiz',
       to: targetCustomerPhone,
       from: fromNum,
-      direction: isOutbound ? 'outgoing' : 'incoming',
+      direction: resolvedDirection,
       name: callConfig.name || existingCallState?.name || '',
       recordCall: callConfig.recordCall || false,
       status: 'active',
