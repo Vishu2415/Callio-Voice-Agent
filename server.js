@@ -505,14 +505,26 @@ function isVirtualNumber(phone) {
   const cleaned = String(phone).replace(/\D/g, '');
   if (!cleaned) return false;
 
-  const masterNum = (defaultCallConfig?.vobizCallerId || process.env.VOBIZ_CALLER_ID || '917971442441').replace(/\D/g, '');
+  let masterCallerId = process.env.VOBIZ_CALLER_ID || '917971442441';
+  try {
+    if (typeof defaultCallConfig !== 'undefined' && defaultCallConfig && defaultCallConfig.vobizCallerId) {
+      masterCallerId = defaultCallConfig.vobizCallerId;
+    }
+  } catch (e) {
+    // defaultCallConfig not initialized yet during early startup loadCalls
+  }
+
+  const masterNum = masterCallerId.replace(/\D/g, '');
   if (cleanAndComparePhone(cleaned, masterNum)) return true;
 
-  if (typeof clientsDb !== 'undefined') {
-    for (const c of clientsDb.values()) {
-      if (c.phone_number && cleanAndComparePhone(cleaned, c.phone_number)) return true;
+  try {
+    if (typeof clientsDb !== 'undefined' && clientsDb && clientsDb.size > 0) {
+      for (const c of clientsDb.values()) {
+        if (c.phone_number && cleanAndComparePhone(cleaned, c.phone_number)) return true;
+      }
     }
-  }
+  } catch (e) {}
+
   return false;
 }
 
