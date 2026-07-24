@@ -1047,38 +1047,45 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
       const end = new Date(callState.endedAt);
       let durationSec = (start && !isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.max(0, Math.round((end - start) / 1000)) : 0;
       // Safety cap: single call cannot exceed 180 minutes (3 hours)
-      if (durationSec > 10800) durationSec = 180;
+      if (durationSec > 10800) durationSec = 10800;
       
       // Ceiling billing: 1 second = 1 full minute (same as Vobiz)
       // e.g. 4s → 1 min billed, 65s → 2 mins billed
       const billedMinutes = durationSec > 0 ? Math.ceil(durationSec / 60) : 0;
       const durationMin = billedMinutes; // whole minutes only
 
-      const totalCharge = durationMin; // charge represents whole minutes deducted
-      
-      client.balance = Number((client.balance - totalCharge).toFixed(2));
-      client.used_minutes = Number(((client.used_minutes || 0) + durationMin).toFixed(2));
-      client.billing_history = client.billing_history || [];
-      client.billing_history.unshift({
-        id: `txn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        timestamp: new Date().toISOString(),
-        type: 'call_charge',
-        callSid: callSid,
-        phone: callState.to || '',
-        duration: durationSec,
-        callCost: 0,
-        recordingCost: 0,
-        sessionCost: 0,
-        totalCharge,
-        description: `Call to ${callState.to || 'Unknown'} (${durationSec}s → billed ${durationMin} min) ${callState.recordCall ? 'with recording' : 'no recording'}`
-      });
+      // Hard safety cap: single call cannot deduct more than 180 minutes
+      const totalCharge = Math.min(durationMin, 180);
 
-      console.log(`[SaaS Billing] Charged Client: ${client.name} (ID: ${clientId}) total: ${totalCharge} min for CallSid: ${callSid}. New balance: ${client.balance} mins`);
-      saveClients();
+      // Guard: never let balance go below -100 (prevent runaway negative balances)
+      const currentBalance = typeof client.balance === 'number' ? client.balance : 0;
+      if (currentBalance < -100) {
+        console.warn(`[SaaS Billing] Skipping charge for client ${clientId} — balance already critically negative: ${currentBalance}`);
+      } else {
+        client.balance = Number((currentBalance - totalCharge).toFixed(2));
+        client.used_minutes = Number(((client.used_minutes || 0) + durationMin).toFixed(2));
+        client.billing_history = client.billing_history || [];
+        client.billing_history.unshift({
+          id: `txn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          type: 'call_charge',
+          callSid: callSid,
+          phone: callState.to || '',
+          duration: durationSec,
+          callCost: 0,
+          recordingCost: 0,
+          sessionCost: 0,
+          totalCharge,
+          description: `Call to ${callState.to || 'Unknown'} (${durationSec}s → billed ${durationMin} min) ${callState.recordCall ? 'with recording' : 'no recording'}`
+        });
 
-      // Reseller billing: if client belongs to a reseller, charge reseller quota at wholesale rate
-      if (typeof global.chargeResellerForCall === 'function' && durationMin > 0) {
-        global.chargeResellerForCall(clientId, durationMin);
+        console.log(`[SaaS Billing] Charged Client: ${client.name} (ID: ${clientId}) total: ${totalCharge} min for CallSid: ${callSid}. New balance: ${client.balance} mins`);
+        saveClients();
+
+        // Reseller billing: if client belongs to a reseller, charge reseller quota at wholesale rate
+        if (typeof global.chargeResellerForCall === 'function' && durationMin > 0) {
+          global.chargeResellerForCall(clientId, durationMin);
+        }
       }
     }
   } catch (billingErr) {
@@ -2505,7 +2512,7 @@ app.get('/api/admin/client-debug', (req, res) => {
 
 // POST /api/admin/recalculate-balance — Recalculate a client's balance from billing_history
 app.post('/api/admin/recalculate-balance', express.json(), (req, res) => {
-  const { clientId, email } = req.body;
+  const { clientId, email, rechargesOnly } = req.body;
   let client = null;
   if (clientId) {
     client = clientsDb.get(clientId);
@@ -2518,19 +2525,32 @@ app.post('/api/admin/recalculate-balance', express.json(), (req, res) => {
     return res.status(404).json({ success: false, error: 'Client not found.' });
   }
   const history = client.billing_history || [];
-  // Sum all recharges minus all charges
   let calcBalance = 0;
+  let rechargeTotal = 0;
+  let chargeTotal = 0;
   for (const txn of history) {
     if (txn.totalCharge !== undefined) {
-      calcBalance -= txn.totalCharge; // totalCharge is negative for credits, positive for debits
+      // totalCharge is negative for credits (recharges), positive for debits (calls)
+      if (txn.type === 'recharge') {
+        rechargeTotal += -txn.totalCharge; // e.g. totalCharge=-500 → +500
+      } else {
+        chargeTotal += txn.totalCharge;
+      }
+    } else if (txn.type === 'recharge' && txn.amount) {
+      rechargeTotal += Number(txn.amount);
     }
   }
-  calcBalance = Math.max(0, Number(calcBalance.toFixed(2)));
-  console.log(`[RecalcBalance] Client ${client.name} (${client.id}): history-based balance = ${calcBalance}`);
+  if (rechargesOnly) {
+    // Only count recharges, ignore potentially-buggy call charges
+    calcBalance = Math.max(0, Number(rechargeTotal.toFixed(2)));
+  } else {
+    calcBalance = Math.max(0, Number((rechargeTotal - chargeTotal).toFixed(2)));
+  }
+  console.log(`[RecalcBalance] Client ${client.name} (${client.id}): recharges=${rechargeTotal}, charges=${chargeTotal}, newBalance=${calcBalance} (rechargesOnly=${!!rechargesOnly})`);
   client.balance = calcBalance;
   clientsDb.set(client.id, client);
   saveClients();
-  res.json({ success: true, clientId: client.id, name: client.name, newBalance: calcBalance, transactionCount: history.length });
+  res.json({ success: true, clientId: client.id, name: client.name, newBalance: calcBalance, rechargeTotal, chargeTotal, transactionCount: history.length });
 });
 
 // POST /api/admin/sanitize-calls — Force clean existing calls_db.json from virtual number corruption
