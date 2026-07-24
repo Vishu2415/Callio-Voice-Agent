@@ -554,25 +554,60 @@ function getFirstName(fullName) {
 
 function getOrCreateCallState(callSid, details = {}) {
   if (!callSid) return null;
-  const initialTo = (details.to && !isVirtualNumber(details.to)) ? details.to : (details.from && !isVirtualNumber(details.from) ? details.from : '');
+  const initialTo = (details.to && !isVirtualNumber(details.to) && !details.to.includes('-')) ? details.to : (details.from && !isVirtualNumber(details.from) ? details.from : '');
+
   if (!activeCalls.has(callSid)) {
-    activeCalls.set(callSid, {
-      callSid: callSid,
-      provider: details.provider || 'twilio',
-      to: initialTo,
-      from: details.from || '',
-      direction: details.direction || null,
-      name: details.name || '',
-      status: details.status || 'calling',
-      transcript: [],
-      summary: '',
-      recordingUrl: '',
-      recordingStatus: 'none',
-      recordCall: details.recordCall || false,
-      createdAt: new Date().toISOString(),
-      startedAt: null,
-      clientId: details.clientId || null
-    });
+    // Smart-linking: check if there is a pending outbound call in 'calling' state created recently
+    let pendingState = null;
+    let pendingSid = null;
+    for (const [sid, st] of activeCalls.entries()) {
+      if (st.status === 'calling' && st.direction === 'outgoing' && sid !== callSid) {
+        const isClientMatch = details.clientId && st.clientId === details.clientId;
+        const isPhoneMatch = initialTo && cleanAndComparePhone(st.to, initialTo);
+        const isRecent = st.createdAt && (Date.now() - new Date(st.createdAt).getTime()) < 120000;
+        if (isPhoneMatch || isClientMatch || isRecent) {
+          pendingState = st;
+          pendingSid = sid;
+          break;
+        }
+      }
+    }
+
+    if (pendingState && pendingSid) {
+      console.log(`[getOrCreateCallState] Smart-linking pending outbound call ${pendingSid} -> ${callSid} (Target: ${pendingState.to}, Client: ${pendingState.clientId || 'None'})`);
+      activeCalls.delete(pendingSid);
+      const transferredConfig = callSettingsMap.get(pendingSid);
+      if (transferredConfig) {
+        callSettingsMap.set(callSid, transferredConfig);
+        callSettingsMap.delete(pendingSid);
+      }
+      activeCalls.set(callSid, {
+        ...pendingState,
+        callSid: callSid,
+        provider: details.provider || pendingState.provider || 'vobiz',
+        status: details.status || 'active',
+        startedAt: details.status === 'active' ? (pendingState.startedAt || new Date().toISOString()) : pendingState.startedAt,
+        clientId: details.clientId || pendingState.clientId || null
+      });
+    } else {
+      activeCalls.set(callSid, {
+        callSid: callSid,
+        provider: details.provider || 'vobiz',
+        to: initialTo,
+        from: details.from || '',
+        direction: details.direction || null,
+        name: details.name || '',
+        status: details.status || 'calling',
+        transcript: [],
+        summary: '',
+        recordingUrl: '',
+        recordingStatus: 'none',
+        recordCall: details.recordCall || false,
+        createdAt: new Date().toISOString(),
+        startedAt: details.status === 'active' ? new Date().toISOString() : null,
+        clientId: details.clientId || null
+      });
+    }
   } else {
     const state = activeCalls.get(callSid);
     if (details.status) state.status = details.status;
@@ -589,11 +624,11 @@ function getOrCreateCallState(callSid, details = {}) {
     if (details.to) {
       const isCallSidOrUuid = details.to === callSid || details.to.includes('-');
       const isVirtual = isVirtualNumber(details.to);
-      if (!isVirtual && (!state.to || !isCallSidOrUuid || isVirtualNumber(state.to))) {
+      if (!isVirtual && !isCallSidOrUuid) {
         state.to = details.to;
       }
     }
-    if (details.name) state.name = details.name;
+    if (details.name && !state.name) state.name = details.name;
     if (details.recordCall === true) state.recordCall = true;
     if (details.clientId) state.clientId = details.clientId;
     if (details.status === 'active' && !state.startedAt) {
@@ -2918,8 +2953,8 @@ app.post('/api/webhooks/crm-trigger-call', express.json(), authMiddleware('calls
     finalInstruction += ` Status transition: ${previousStage} ➔ ${currentStage}.`;
   }
 
-  // Extract client_id from auth header if available
-  const crmClientId = req.clientId || req.body.client_id || req.query.client_id || null;
+  // Extract client_id from auth header, body, query, or agent mapping
+  let crmClientId = req.clientId || req.body.client_id || req.query.client_id || agent.clientId || agent.client_id || null;
 
   const makeCallPayload = {
     provider: defaultCallConfig.telephonyProvider || 'vobiz',
@@ -3560,7 +3595,7 @@ app.get('/api/client/dashboard-data', (req, res) => {
     }
 
     for (const call of activeCalls.values()) {
-      if (call.clientId === clientId || (client.phone_number && (call.to === client.phone_number || call.from === client.phone_number))) {
+      if (call.clientId === clientId || !call.clientId || (client.phone_number && (call.to === client.phone_number || call.from === client.phone_number))) {
         clientLogs.push(call);
       }
     }
