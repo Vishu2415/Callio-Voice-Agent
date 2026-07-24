@@ -6040,6 +6040,11 @@ async function fetchBillingData() {
   const container = document.getElementById('admin-client-select-container');
   const select = document.getElementById('admin-billing-client-select');
   const editBtn = document.getElementById('admin-edit-plan-btn');
+  const adminBillingCard = document.getElementById('admin-billing-card');
+  
+  if (adminBillingCard) {
+    adminBillingCard.style.display = loggedInUser.role === 'admin' ? 'flex' : 'none';
+  }
   
   if (loggedInUser.role === 'admin' && container && select && editBtn) {
     container.style.display = 'block';
@@ -7223,11 +7228,11 @@ window.initiateUserRecharge = function() {
           localStorage.setItem('user_session', JSON.stringify(loggedInUser));
         }
 
+        const balanceEl = document.getElementById('billing-wallet-balance');
         const headerWalletBalance = document.getElementById('header-wallet-balance');
-        if (headerWalletBalance) {
-          const remMins = data.balance !== undefined ? (data.balance >= 99999 ? '∞' : Math.max(0, data.balance).toFixed(1)) : '0.0';
-          headerWalletBalance.textContent = `${remMins}`;
-        }
+        const remMins = data.balance !== undefined ? (data.balance >= 99999 ? '∞' : Math.max(0, data.balance).toFixed(1)) : '0.0';
+        if (balanceEl) balanceEl.textContent = `${remMins} Mins`;
+        if (headerWalletBalance) headerWalletBalance.textContent = `${remMins}`;
 
         fetchBillingData();
 
