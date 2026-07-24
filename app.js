@@ -348,9 +348,27 @@ window.populateAIActionPlanner = function() {
   
   const cardsData = [];
   
+  // Helper: detect virtual/system numbers that should NOT appear as customer contacts
+  function isSystemNumber(phone) {
+    if (!phone) return true;
+    const cleaned = String(phone).replace(/\D/g, '');
+    if (!cleaned || cleaned.length < 8) return true;
+    // Known virtual/caller ID numbers — these should never be displayed as customer
+    const systemNumbers = ['917971442441', '7971442441', '971442441'];
+    return systemNumbers.some(n => cleaned === n || cleaned.endsWith(n) || n.endsWith(cleaned));
+  }
+
   // Convert actual calls to action cards
   if (typeof callsCache !== 'undefined' && callsCache && callsCache.length > 0) {
-    const latestCalls = [...callsCache].slice(0, 4);
+    // Filter out calls where 'to' is a system/virtual number, pick best candidate phone
+    const validCalls = callsCache
+      .filter(call => {
+        const candidatePhone = call.customerNumber || call.phone || call.to || call.from;
+        return candidatePhone && !isSystemNumber(candidatePhone);
+      })
+      .slice(0, 4);
+    const latestCalls = validCalls;
+
     latestCalls.forEach(call => {
       let urgency = 'Medium';
       let urgencyColor = '#eab308';
@@ -406,9 +424,11 @@ window.populateAIActionPlanner = function() {
         }
       }
       
+      const bestPhone = [call.customerNumber, call.phone, call.to, call.from]
+        .find(p => p && !isSystemNumber(p)) || '+91 XXXXXXXXXX';
       cardsData.push({
         id: call.callSid || call.sid || call.id || `call_${call.createdAt || Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        phone: call.customerNumber || call.phone || call.to || call.from || '+91 88474 92101',
+        phone: bestPhone,
         urgency,
         sentiment,
         color: sentimentColor,
@@ -4655,9 +4675,27 @@ function populateDashboardBoxes(calls) {
   const lastCallBox = document.getElementById('dashboard-last-call-box');
   if (lastCallBox) {
     if (calls && calls.length > 0) {
-      const sortedCalls = [...calls].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      // Filter out calls where 'to' is a virtual/system number (e.g. 917971442441)
+      const SYSTEM_NUMBERS = ['917971442441', '7971442441', '971442441'];
+      function isDashboardSystemNum(ph) {
+        if (!ph) return true;
+        const c = String(ph).replace(/\D/g, '');
+        return !c || c.length < 7 || SYSTEM_NUMBERS.some(n => c === n || c.endsWith(n) || n.endsWith(c));
+      }
+
+      const validCalls = calls.filter(call => {
+        // For outgoing: to should be customer, not virtual
+        // For incoming: from should be customer, not virtual
+        const customerPhone = call.customerNumber || (call.direction === 'incoming' ? call.from : call.to) || call.to;
+        return !isDashboardSystemNum(customerPhone);
+      });
+
+      const sortedCalls = [...validCalls].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       lastCallBox.innerHTML = '';
       
+      if (sortedCalls.length === 0) {
+        lastCallBox.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding-top: 30px; font-size: 0.85rem;">No calls yet</div>';
+      } else {
       sortedCalls.slice(0, 4).forEach(lastCall => {
         const div = document.createElement('div');
         div.style.display = 'flex';
@@ -4673,8 +4711,12 @@ function populateDashboardBoxes(calls) {
           `<span style="color: var(--color-green); font-weight: bold; margin-right: 6px;">⬇</span>` : 
           `<span style="color: var(--color-cyan); font-weight: bold; margin-right: 6px;">⬆</span>`;
         
-        const toNum = lastCall.to || 'Unknown';
-        const partiesText = isIncoming ? `Incoming ➔ You` : `You ➔ ${toNum}`;
+        // Show best customer-facing number (not the virtual number)
+        const customerNum = lastCall.customerNumber
+          || (!isDashboardSystemNum(lastCall.to) ? lastCall.to : null)
+          || (!isDashboardSystemNum(lastCall.from) ? lastCall.from : null)
+          || 'Unknown';
+        const partiesText = isIncoming ? `Incoming ➔ You` : `You ➔ ${customerNum}`;
         
         const callDate = new Date(lastCall.createdAt);
         const timeText = isNaN(callDate.getTime()) ? '-' : callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -4696,6 +4738,7 @@ function populateDashboardBoxes(calls) {
         `;
         lastCallBox.appendChild(div);
       });
+      }
     } else {
       lastCallBox.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding-top: 30px; font-size: 0.85rem;">No calls yet</div>';
     }

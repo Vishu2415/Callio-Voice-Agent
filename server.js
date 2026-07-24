@@ -2422,7 +2422,40 @@ app.get('/calls', (req, res) => {
   res.json({ success: true, calls: list });
 });
 
-// GET /call-status/:callSid - Retrieve a specific call state details
+// POST /api/admin/sanitize-calls — Force clean existing calls_db.json from virtual number corruption
+app.post('/api/admin/sanitize-calls', (req, res) => {
+  let fixed = 0;
+  let removed = 0;
+  for (const [key, call] of activeCalls.entries()) {
+    if (call.to && isVirtualNumber(call.to)) {
+      if (call.from && !isVirtualNumber(call.from)) {
+        // Fix: swap to/from
+        call.to = call.from;
+        call.direction = 'incoming';
+        fixed++;
+      } else if (call.customerNumber && !isVirtualNumber(call.customerNumber)) {
+        call.to = call.customerNumber;
+        fixed++;
+      } else {
+        // Can't recover — mark as corrupted so it won't clutter dashboard
+        call.to = '[Unknown]';
+        call._corrupted = true;
+        fixed++;
+      }
+    }
+    // Also fix from field if it's virtual
+    if (call.from && isVirtualNumber(call.from) && call.to && !isVirtualNumber(call.to)) {
+      call.customerNumber = call.customerNumber || call.to;
+    }
+  }
+  if (fixed > 0 || removed > 0) {
+    saveCalls();
+    console.log(`[Admin Sanitize] Fixed ${fixed} calls, removed ${removed} corrupted records.`);
+  }
+  res.json({ success: true, fixed, removed, message: `Sanitized ${fixed} calls.` });
+});
+
+
 app.get('/call-status/:callSid', (req, res) => {
   const callSid = req.params.callSid;
   const callState = activeCalls.get(callSid);
