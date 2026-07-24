@@ -2415,7 +2415,8 @@ app.get('/calls', (req, res) => {
   const { clientId } = req.query;
   let list = Array.from(activeCalls.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   if (clientId && clientId !== 'admin') {
-    list = list.filter(c => c.clientId === clientId);
+    // Include calls that belong to this client OR calls with no clientId (CRM/broadcast originating calls)
+    list = list.filter(c => c.clientId === clientId || !c.clientId);
   } else if (clientId === 'admin') {
     list = list.filter(c => c.clientId === 'admin' || !c.clientId);
   }
@@ -2917,6 +2918,9 @@ app.post('/api/webhooks/crm-trigger-call', express.json(), authMiddleware('calls
     finalInstruction += ` Status transition: ${previousStage} ➔ ${currentStage}.`;
   }
 
+  // Extract client_id from auth header if available
+  const crmClientId = req.clientId || req.body.client_id || req.query.client_id || null;
+
   const makeCallPayload = {
     provider: defaultCallConfig.telephonyProvider || 'vobiz',
     to: leadPhone,
@@ -2928,6 +2932,7 @@ app.post('/api/webhooks/crm-trigger-call', express.json(), authMiddleware('calls
     model: agent.model || 'gemini-3.1-flash-live-preview',
     leadId: leadId || null,
     saasApiUrl: saasApiUrl || null,
+    client_id: crmClientId,
     
     exotelApiKey: defaultCallConfig.exotelApiKey,
     exotelApiToken: defaultCallConfig.exotelApiToken,

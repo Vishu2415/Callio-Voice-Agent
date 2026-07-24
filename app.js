@@ -1503,15 +1503,9 @@ async function refreshCallsList() {
     const res = await fetch(`/calls?clientId=${clientId}`);
     const data = await res.json();
     if (data.success) {
-      if (loggedInUser && loggedInUser.role !== 'admin') {
-        // Isolate to only this client's calls!
-        callsCache = data.calls.filter(c => 
-          c.clientId === loggedInUser.id || 
-          (loggedInUser.phone_number && (c.to === loggedInUser.phone_number || c.from === loggedInUser.phone_number))
-        );
-      } else {
-        callsCache = data.calls;
-      }
+      // Server already filters by clientId (including calls with no clientId like CRM-triggered ones)
+      // Trust the server-side filter — no double-filtering here
+      callsCache = data.calls;
       
       const activeTab = localStorage.getItem('activeTab') || 'tab-dashboard';
       if (activeTab === 'tab-dashboard') {
@@ -1529,6 +1523,7 @@ async function refreshCallsList() {
     console.error('[Calls List Fetch Error] Failed:', err);
   }
 }
+
 
 function renderDashboard() {
   const elDashTotal = document.getElementById('dash-total');
