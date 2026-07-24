@@ -1981,12 +1981,17 @@ app.all('/incoming-call-vobiz', (req, res) => {
     if (toNum) callSettingsMap.set(toNum, callConfig);
     if (fromNum) callSettingsMap.set(fromNum, callConfig);
     console.log(`[Vobiz Webhook] Config cached under CallSid: ${resolvedSid}`);
+    
+    const existingCallState = activeCalls.get(resolvedSid);
+    const isOutbound = existingCallState && (existingCallState.direction === 'outgoing' || (toNum && cleanAndComparePhone(existingCallState.to, toNum)));
+    const targetCustomerPhone = isOutbound ? (existingCallState.to || toNum) : (fromNum || toNum);
+
     getOrCreateCallState(resolvedSid, {
       provider: 'vobiz',
-      to: fromNum || toNum,
+      to: targetCustomerPhone,
       from: fromNum,
-      direction: 'incoming',
-      name: callConfig.name || '',
+      direction: isOutbound ? 'outgoing' : 'incoming',
+      name: callConfig.name || existingCallState?.name || '',
       recordCall: callConfig.recordCall || false,
       status: 'active',
       clientId: callConfig.clientId || null
@@ -4896,19 +4901,35 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               const { requestedTime = '', isoTime = '', notes = '' } = call.args || {};
               console.log(`[Gemini ToolCall] scheduleCallback triggered. RequestedTime: "${requestedTime}", ISO: ${isoTime}`);
 
-              // 1. Persist callback to local callbacks_db.json
-              const cbId = `cb_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
               const settings = callSettingsMap.get(callSid);
               const callState = activeCalls.get(callSid);
+              const masterCallerId = (defaultCallConfig.vobizCallerId || '').replace(/\D/g, '');
+
+              // 0. Resolve correct customer phone number (never use Virtual Number)
+              let customerPhone = callState?.to || '';
+              if (!customerPhone || cleanAndComparePhone(customerPhone, masterCallerId)) {
+                customerPhone = callState?.from && !cleanAndComparePhone(callState.from, masterCallerId) ? callState.from : (settings?.to || customerPhone);
+              }
+
+              // 1. Ensure clean UTC ISO timestamp format (append Z if missing offset)
+              let cleanIso = (isoTime || '').trim();
+              if (cleanIso && !cleanIso.endsWith('Z') && !cleanIso.includes('+') && !cleanIso.includes('-')) {
+                if (cleanIso.length === 16) cleanIso += ':00Z';
+                else if (cleanIso.length === 19) cleanIso += 'Z';
+                else cleanIso += 'Z';
+              }
+
+              // 2. Persist callback to local callbacks_db.json
+              const cbId = `cb_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
               const cbRecord = {
                 id: cbId,
                 callSid,
-                phone: callState?.to || '',
+                phone: customerPhone,
                 name: callState?.name || '',
                 requestedTime,
-                isoTime,
+                isoTime: cleanIso,
                 notes,
-                scheduledAt: isoTime,
+                scheduledAt: cleanIso,
                 status: 'pending',      // pending → dialing → dialed/failed
                 leadId: settings?.leadId || null,
                 saasApiUrl: settings?.saasApiUrl || null,
@@ -4919,7 +4940,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               };
               callbacksDb.set(cbId, cbRecord);
               saveCallbacks();
-              console.log(`[ScheduleCallback] ✅ Callback saved to DB: ID=${cbId}, At=${isoTime}`);
+              console.log(`[ScheduleCallback] ✅ Callback saved to DB: ID=${cbId}, Phone=${customerPhone}, At=${cleanIso}`);
 
               // 2. Notify DigiNext CRM (fire-and-forget)
               if (settings?.saasApiUrl) {
@@ -5817,13 +5838,29 @@ setInterval(async () => {
 
     let scheduledAt;
     try {
-      scheduledAt = new Date(cb.scheduledAt);
+      let rawTime = (cb.scheduledAt || cb.isoTime || '').trim();
+      if (rawTime && !rawTime.endsWith('Z') && !rawTime.includes('+') && !rawTime.includes('-')) {
+        if (rawTime.length === 16) rawTime += ':00Z';
+        else rawTime += 'Z';
+      }
+      scheduledAt = new Date(rawTime);
     } catch (e) {
       continue;
     }
 
     // Only dial if scheduled time has passed
     if (scheduledAt > now) continue;
+
+    // Validate phone number: Ensure target is NOT the system virtual caller ID
+    const masterCallerId = (defaultCallConfig.vobizCallerId || '').replace(/\D/g, '');
+    if (!cb.phone || cleanAndComparePhone(cb.phone, masterCallerId)) {
+      console.warn(`[Callback Scheduler] ⚠️ Invalid phone for callback ID=${id}: "${cb.phone}" matches Virtual Number or is empty. Skipping.`);
+      cb.status = 'failed';
+      cb.error = 'Invalid target phone number (Virtual Number)';
+      callbacksDb.set(id, cb);
+      saveCallbacks();
+      continue;
+    }
 
     console.log(`[Callback Scheduler] ⏰ Due callback ID=${id} for ${cb.phone} (Requested: "${cb.requestedTime}"). Initiating call...`);
     cb.status = 'dialing';
