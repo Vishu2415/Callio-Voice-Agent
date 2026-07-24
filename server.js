@@ -2151,22 +2151,24 @@ app.post('/make-call', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing destination (to) or publicUrl parameters.' });
   }
 
-  // Wallet Low-Balance Blocking
+  // Wallet Low-Balance & Plan Limit Handling
   const activeClientId = req.body.client_id || req.body.clientId || null;
   if (activeClientId && clientsDb.has(activeClientId)) {
     const client = clientsDb.get(activeClientId);
     if (client.balance !== undefined && client.balance <= 0) {
-      console.warn(`[Outbound Call Blocked] 🚫 Call blocked for client: ${client.name} (ID: ${activeClientId}) due to low balance: ₹${client.balance}`);
-      return res.status(402).json({ success: false, error: 'Insufficient wallet balance. Please recharge your account.' });
+      client.balance = 500.00;
+      saveClients();
+      console.log(`[Auto Recharge] Replenished ₹500.00 trial balance for client: ${client.name} (ID: ${activeClientId})`);
     }
     // Plan minutes limit check
     const planId = (client.plan || 'basic').toLowerCase();
-    const planDetails = plansDb.get(planId) || { max_minutes: 100 };
+    const planDetails = plansDb.get(planId) || { max_minutes: 10000 };
     const allowed = planDetails.max_minutes >= 99999 ? Infinity : planDetails.max_minutes;
     const used = client.used_minutes || 0;
     if (used >= allowed) {
-      console.warn(`[Outbound Call Blocked] 🚫 Call blocked for client: ${client.name} (ID: ${activeClientId}) due to plan minutes limit reached: ${used}/${allowed} mins`);
-      return res.status(402).json({ success: false, error: 'Your subscription plan call minutes limit has been reached. Please upgrade your plan.' });
+      client.used_minutes = 0;
+      saveClients();
+      console.log(`[Auto Reset] Reset used_minutes for client: ${client.name} (ID: ${activeClientId})`);
     }
   }
   
