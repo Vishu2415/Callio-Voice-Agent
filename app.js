@@ -4396,15 +4396,10 @@ function applyUserRole(user) {
   const walletIndicator = document.getElementById('wallet-balance-indicator');
   const headerWalletBalance = document.getElementById('header-wallet-balance');
   if (walletIndicator && headerWalletBalance) {
-    if (user.role === 'client') {
-      walletIndicator.style.display = 'flex';
-      // Show remaining balance in wallet
-      const bal = user.balance !== undefined ? user.balance : 0;
-      const remaining = bal >= 99999 ? '∞' : Math.max(0, bal).toFixed(1);
-      headerWalletBalance.textContent = `${remaining}`;
-    } else {
-      walletIndicator.style.display = 'none';
-    }
+    walletIndicator.style.display = 'flex';
+    const bal = user.balance !== undefined ? user.balance : 0;
+    const remaining = bal >= 99999 ? '∞' : Math.max(0, bal).toFixed(1);
+    headerWalletBalance.textContent = `${remaining}`;
   }
 
   // Populate profile settings inputs
@@ -6050,27 +6045,42 @@ async function fetchBillingData() {
     container.style.display = 'block';
     editBtn.style.display = 'flex';
     
+    // Fetch clients if cache is empty
+    if (!window.adminClientsCache || window.adminClientsCache.length === 0) {
+      try {
+        const cRes = await fetch('/api/admin/clients');
+        const cData = await cRes.json();
+        if (cData.success && Array.isArray(cData.clients)) {
+          window.adminClientsCache = cData.clients;
+        }
+      } catch (e) {
+        console.error('Failed fetching admin clients:', e);
+      }
+    }
+    
     // Populate dropdown with all registered clients
     select.innerHTML = '';
     const clients = window.adminClientsCache || [];
-    
-    // Default option is the admin's own billing status
-    const optAdmin = document.createElement('option');
-    optAdmin.value = loggedInUser.id;
-    optAdmin.textContent = `${loggedInUser.name} (Admin Account)`;
-    select.appendChild(optAdmin);
     
     clients.forEach(client => {
       if (client.id === loggedInUser.id) return;
       const opt = document.createElement('option');
       opt.value = client.id;
-      opt.textContent = client.name;
+      opt.textContent = `${client.name} (${client.email || client.phone_number || client.id})`;
       select.appendChild(opt);
     });
     
-    // Select the currently managed client if any, otherwise default to admin
-    if (window.currentManagedClientId) {
+    const optAdmin = document.createElement('option');
+    optAdmin.value = loggedInUser.id;
+    optAdmin.textContent = `${loggedInUser.name} (Admin Account)`;
+    select.appendChild(optAdmin);
+    
+    // Select the currently managed client if any, otherwise default to first real client
+    if (window.currentManagedClientId && select.querySelector(`option[value="${window.currentManagedClientId}"]`)) {
       select.value = window.currentManagedClientId;
+    } else if (clients.length > 0) {
+      select.value = clients[0].id;
+      window.currentManagedClientId = clients[0].id;
     } else {
       select.value = loggedInUser.id;
     }
@@ -6097,7 +6107,7 @@ async function fetchBillingData() {
         const headerWalletBalance = document.getElementById('header-wallet-balance');
         const remMins = data.balance !== undefined ? (data.balance >= 99999 ? '∞' : Math.max(0, data.balance).toFixed(1)) : '0.0';
         if (balanceEl) balanceEl.textContent = `${remMins} Mins`;
-        if (headerWalletBalance && loggedInUser.role === 'client') {
+        if (headerWalletBalance) {
           headerWalletBalance.textContent = `${remMins}`;
         }
 
@@ -6131,11 +6141,15 @@ window.onAdminBillingClientChange = async function() {
     const res = await fetch(`/api/client/billing?clientId=${clientId}`);
     const data = await res.json();
     if (data.success) {
-      // Render remaining minutes (admin-view billing card for selected client)
+      // Render remaining minutes (admin-view billing card for selected client + header)
       const balanceEl = document.getElementById('billing-wallet-balance');
+      const headerWalletBalance = document.getElementById('header-wallet-balance');
+      const remMins = data.balance !== undefined ? (data.balance >= 99999 ? '∞' : Math.max(0, data.balance).toFixed(1)) : '0.0';
       if (balanceEl) {
-        const remMins = data.balance !== undefined ? (data.balance >= 99999 ? '∞' : Math.max(0, data.balance).toFixed(1)) : '0.0';
         balanceEl.textContent = `${remMins} Mins`;
+      }
+      if (headerWalletBalance) {
+        headerWalletBalance.textContent = `${remMins}`;
       }
       
       // Render rates
@@ -6150,7 +6164,7 @@ window.onAdminBillingClientChange = async function() {
       
       // Cache values for editing
       window.currentManagedClientId = clientId;
-      window.currentManagedClientName = select.options[select.selectedIndex].text;
+      window.currentManagedClientName = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : clientId;
       window.currentManagedRates = rates;
       
       // Render transactions table
