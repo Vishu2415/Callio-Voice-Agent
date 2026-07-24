@@ -4234,7 +4234,7 @@ function applyUserPlanAndLimits(user) {
     
     if (minutesStatus) minutesStatus.textContent = `${usedMins.toFixed(1)} / ${maxMins >= 99999 ? 'Unlimited' : maxMins} mins`;
     if (minutesProgress) {
-      const pct = Math.min(100, (usedMins / maxMins) * 100);
+      const pct = maxMins >= 99999 ? 0 : Math.min(100, Math.max(0, (usedMins / maxMins) * 100));
       minutesProgress.style.width = `${pct}%`;
     }
     if (agentsLimit) agentsLimit.textContent = planDetails.max_agents >= 99999 ? 'Unlimited Agents' : `${planDetails.max_agents} Agents max`;
@@ -4398,12 +4398,9 @@ function applyUserRole(user) {
   if (walletIndicator && headerWalletBalance) {
     if (user.role === 'client') {
       walletIndicator.style.display = 'flex';
-      // Show remaining minutes
-      const plan = user.plan || 'basic';
-      const planDetails = (window.activePlans || []).find(p => p.id.toLowerCase() === plan.toLowerCase());
-      const maxMins = planDetails ? (planDetails.max_minutes >= 99999 ? '∞' : planDetails.max_minutes) : 100;
-      const usedMins = user.used_minutes || 0;
-      const remaining = maxMins === '∞' ? '∞' : Math.max(0, maxMins - usedMins).toFixed(1);
+      // Show remaining balance in wallet
+      const bal = user.balance !== undefined ? user.balance : 0;
+      const remaining = bal >= 99999 ? '∞' : Math.max(0, bal).toFixed(1);
       headerWalletBalance.textContent = `${remaining}`;
     } else {
       walletIndicator.style.display = 'none';

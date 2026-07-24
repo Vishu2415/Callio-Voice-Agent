@@ -1021,7 +1021,10 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
       const client = clientsDb.get(clientId);
       const start = callState.startedAt ? new Date(callState.startedAt) : null;
       const end = new Date(callState.endedAt);
-      const durationSec = start ? Math.max(0, Math.round((end - start) / 1000)) : 0;
+      let durationSec = (start && !isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.max(0, Math.round((end - start) / 1000)) : 0;
+      // Safety cap: single call cannot exceed 180 minutes (3 hours)
+      if (durationSec > 10800) durationSec = 180;
+      
       // Ceiling billing: 1 second = 1 full minute (same as Vobiz)
       // e.g. 4s → 1 min billed, 65s → 2 mins billed
       const billedMinutes = durationSec > 0 ? Math.ceil(durationSec / 60) : 0;
@@ -2151,24 +2154,22 @@ app.post('/make-call', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing destination (to) or publicUrl parameters.' });
   }
 
-  // Wallet Low-Balance & Plan Limit Handling
+  // Wallet Low-Balance Blocking
   const activeClientId = req.body.client_id || req.body.clientId || null;
   if (activeClientId && clientsDb.has(activeClientId)) {
     const client = clientsDb.get(activeClientId);
     if (client.balance !== undefined && client.balance <= 0) {
-      client.balance = 500.00;
-      saveClients();
-      console.log(`[Auto Recharge] Replenished ₹500.00 trial balance for client: ${client.name} (ID: ${activeClientId})`);
+      console.warn(`[Outbound Call Blocked] 🚫 Call blocked for client: ${client.name} (ID: ${activeClientId}) due to low balance: ₹${client.balance}`);
+      return res.status(402).json({ success: false, error: 'Insufficient wallet balance. Please recharge your account.' });
     }
     // Plan minutes limit check
     const planId = (client.plan || 'basic').toLowerCase();
-    const planDetails = plansDb.get(planId) || { max_minutes: 10000 };
+    const planDetails = plansDb.get(planId) || { max_minutes: 100 };
     const allowed = planDetails.max_minutes >= 99999 ? Infinity : planDetails.max_minutes;
     const used = client.used_minutes || 0;
     if (used >= allowed) {
-      client.used_minutes = 0;
-      saveClients();
-      console.log(`[Auto Reset] Reset used_minutes for client: ${client.name} (ID: ${activeClientId})`);
+      console.warn(`[Outbound Call Blocked] 🚫 Call blocked for client: ${client.name} (ID: ${activeClientId}) due to plan minutes limit reached: ${used}/${allowed} mins`);
+      return res.status(402).json({ success: false, error: 'Your subscription plan call minutes limit has been reached. Please upgrade your plan.' });
     }
   }
   
@@ -3992,6 +3993,26 @@ app.get('/api/client/billing', (req, res) => {
   const client = clientsDb.get(clientId);
   if (!client) {
     return res.status(404).json({ success: false, error: 'Client not found.' });
+  }
+
+  // Auto-sanitize corrupted used_minutes (> 10000) by calculating real total from calls_db
+  if (client.used_minutes === undefined || client.used_minutes > 10000) {
+    let calcUsed = 0;
+    for (const call of activeCalls.values()) {
+      if (call.clientId === clientId) {
+        const start = call.startedAt ? new Date(call.startedAt) : null;
+        const end = call.endedAt ? new Date(call.endedAt) : (call.createdAt ? new Date(call.createdAt) : null);
+        let durSec = 0;
+        if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          durSec = Math.max(0, Math.round((end - start) / 1000));
+        }
+        if (durSec > 10800) durSec = 180;
+        calcUsed += durSec > 0 ? Math.ceil(durSec / 60) : 0;
+      }
+    }
+    client.used_minutes = calcUsed;
+    clientsDb.set(clientId, client);
+    saveClients();
   }
 
   res.json({
