@@ -137,27 +137,51 @@ function saveBranding() {
   saveDatabase(BRANDING_DB_FILE, brandingDb);
 }
 
+function isMainPlatformHost(host) {
+  if (!host) return true;
+  let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+  if (cleanHost.startsWith('www.')) cleanHost = cleanHost.substring(4);
+
+  const mainDomains = [
+    'callio.in', 'localhost', '127.0.0.1', '0.0.0.0',
+    'callingagent.com', 'vobiz.in', 'diginext360.com'
+  ];
+  if (mainDomains.includes(cleanHost)) return true;
+
+  // IPv4 or local hostname check (e.g. 192.168.x.x, 10.x.x.x, 172.16.x.x, ::1, .local)
+  const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipv4Pattern.test(cleanHost) || cleanHost === '::1' || cleanHost.endsWith('.local') || cleanHost.endsWith('.localhost')) {
+    return true;
+  }
+
+  return false;
+}
+
 function getResellerFromHost(host) {
   if (!host) return null;
-  // Clean host: strip protocol, path, port
+
+  if (isMainPlatformHost(host)) {
+    return null;
+  }
+
   let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
   const domainWithoutWww = cleanHost.startsWith('www.') ? cleanHost.substring(4) : cleanHost;
 
   for (const reseller of resellersDb.values()) {
     if (reseller.status === 'suspended') continue;
 
-    if (reseller.domain) {
-      let rDomain = reseller.domain.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+    if (reseller.domain && reseller.domain.trim() !== '') {
+      let rDomain = reseller.domain.trim().replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
       if (rDomain.startsWith('www.')) rDomain = rDomain.substring(4);
-      if (rDomain === domainWithoutWww || rDomain === cleanHost) {
+      if (rDomain && (rDomain === domainWithoutWww || rDomain === cleanHost)) {
         return reseller;
       }
     }
 
-    if (reseller.subdomain) {
-      let rSub = reseller.subdomain.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+    if (reseller.subdomain && reseller.subdomain.trim() !== '') {
+      let rSub = reseller.subdomain.trim().replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
       if (rSub.startsWith('www.')) rSub = rSub.substring(4);
-      if (rSub === domainWithoutWww || cleanHost === rSub || cleanHost.startsWith(rSub + '.')) {
+      if (rSub && (rSub === domainWithoutWww || cleanHost === rSub || cleanHost === `${rSub}.callio.in` || cleanHost === `${rSub}.localhost`)) {
         return reseller;
       }
     }
@@ -2971,8 +2995,8 @@ app.post('/api/webhooks/crm-trigger-call', express.json(), async (req, res) => {
     finalInstruction += ` Status transition: ${previousStage} ➔ ${currentStage}.`;
   }
 
-  // Extract client_id from auth header, body, query, or agent mapping
-  let crmClientId = req.clientId || req.body.client_id || req.query.client_id || agent.clientId || agent.client_id || null;
+  // Extract client_id from headers, body, query, or agent mapping
+  let crmClientId = req.clientId || req.headers['x-client-id'] || req.body.client_id || req.body.clientId || req.query.client_id || req.query.clientId || agent.clientId || agent.client_id || null;
 
   const makeCallPayload = {
     provider: defaultCallConfig.telephonyProvider || 'vobiz',
@@ -2985,6 +3009,7 @@ app.post('/api/webhooks/crm-trigger-call', express.json(), async (req, res) => {
     model: agent.model || 'gemini-3.1-flash-live-preview',
     leadId: leadId || null,
     saasApiUrl: saasApiUrl || null,
+    clientId: crmClientId,
     client_id: crmClientId,
     
     exotelApiKey: defaultCallConfig.exotelApiKey,
@@ -3468,12 +3493,13 @@ app.get('/api/admin/clients', (req, res) => {
   let list = Array.from(clientsDb.values());
   if (currentReseller) {
     list = list.filter(c => c.reseller_id === currentReseller.id);
-  } else {
-    // On main Callio portal, show all clients or direct clients
   }
 
   const safeList = list.map(c => {
     const { password, ...safeClient } = c;
+    if (c.reseller_id && resellersDb.has(c.reseller_id)) {
+      safeClient.reseller_name = resellersDb.get(c.reseller_id).name;
+    }
     return safeClient;
   });
   res.json({ success: true, clients: safeList });

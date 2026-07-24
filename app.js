@@ -5442,6 +5442,7 @@ async function fetchAdminClients() {
     console.error(err);
   }
 }
+window.fetchAdminClients = fetchAdminClients;
 
 // --- Recharge Modal & Form Handling ---
 window.openRechargeModal = function(clientId, clientName) {
@@ -5479,16 +5480,34 @@ window.submitRecharge = async function(event) {
   }
 };
 
+window.isMainPlatformHost = function(hostname) {
+  const host = (hostname || window.location.hostname || '').toLowerCase();
+  const mainPlatformHosts = ['callio.in', 'www.callio.in', 'localhost', '127.0.0.1', '0.0.0.0', 'callingagent.com', 'vobiz.in', 'diginext360.com'];
+  if (mainPlatformHosts.includes(host)) return true;
+
+  const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipv4Pattern.test(host) || host === '::1' || host.endsWith('.local') || host.endsWith('.localhost')) {
+    return true;
+  }
+  return false;
+};
+
 // --- Whitelabel UI Helper & Restrictions ---
 window.isWhitelabelDomain = function() {
+  if (window.isMainPlatformHost()) {
+    return false;
+  }
+  
   const branding = window.BrandingContext || {};
+  if (branding.isReseller === true || (branding.resellerId && branding.resellerId !== 'default')) {
+    return true;
+  }
+  
   const host = window.location.hostname.toLowerCase();
-  if (host !== 'callio.in' && host !== 'localhost' && host !== '127.0.0.1' && !host.endsWith('.callio.in')) {
+  if (!host.endsWith('.callio.in') && !host.endsWith('.localhost')) {
     return true;
   }
-  if (branding.id && branding.id !== 'default') {
-    return true;
-  }
+  
   return false;
 };
 
@@ -5737,6 +5756,9 @@ window.switchAdminSubtab = function(tabName) {
       if (sectionEl) sectionEl.style.display = 'block';
       if (btnEl) {
         btnEl.classList.add('active');
+      }
+      if (key === 'users') {
+        if (typeof window.fetchAdminClients === 'function') window.fetchAdminClients();
       }
       if (key === 'plans') {
         window.fetchAdminPlans();
