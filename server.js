@@ -3731,23 +3731,15 @@ app.post('/api/client/recharge', express.json(), (req, res) => {
   let client = null;
   if (clientId && clientId !== 'admin' && clientsDb.has(clientId)) {
     client = clientsDb.get(clientId);
-  } else {
-    // Fallback: find primary active client in database
+  } else if (!clientId || clientId === 'admin') {
+    // Only fallback when no clientId given (e.g. pure admin usage)
     client = Array.from(clientsDb.values()).find(c => c.phone_number || c.status === 'active') || Array.from(clientsDb.values())[0];
   }
 
   if (!client) {
-    client = {
-      id: `client_${Date.now()}`,
-      name: 'Primary Client',
-      email: 'admin@growvo.in',
-      balance: 500,
-      plan: 'pro',
-      used_minutes: 0,
-      created_at: new Date().toISOString()
-    };
-    clientsDb.set(client.id, client);
-    saveClients();
+    // STRICT: do not silently create a phantom client — return error
+    console.warn(`[Recharge] Client not found: clientId=${clientId}`);
+    return res.status(404).json({ success: false, error: 'Client account not found. Please log out and log back in.' });
   }
 
   const rechargeAmount = Number(amount);
@@ -4028,23 +4020,14 @@ app.get('/api/client/billing', (req, res) => {
   let client = null;
   if (clientId && clientId !== 'admin' && clientsDb.has(clientId)) {
     client = clientsDb.get(clientId);
-  } else {
-    // Fallback if clientId is 'admin' or empty or unknown
+  } else if (!clientId || clientId === 'admin') {
+    // Only fallback for admin or no clientId
     client = Array.from(clientsDb.values()).find(c => c.phone_number || c.status === 'active') || Array.from(clientsDb.values())[0];
   }
 
   if (!client) {
-    client = {
-      id: `client_${Date.now()}`,
-      name: 'Primary Client',
-      email: 'admin@growvo.in',
-      balance: 500,
-      plan: 'pro',
-      used_minutes: 0,
-      created_at: new Date().toISOString()
-    };
-    clientsDb.set(client.id, client);
-    saveClients();
+    console.warn(`[Billing] Client not found: clientId=${clientId}`);
+    return res.status(404).json({ success: false, error: 'Client account not found. Please log out and log back in.' });
   }
 
   // Auto-sanitize corrupted used_minutes (> 10000) by calculating real total from calls_db
