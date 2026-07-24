@@ -7160,78 +7160,82 @@ window.initiateUserRecharge = function() {
   }
 
   const method = methodSelect.value;
+  const adminSelect = document.getElementById('admin-billing-client-select');
+  const targetClientId = (loggedInUser && loggedInUser.role === 'admin' && adminSelect && adminSelect.value) 
+    ? adminSelect.value 
+    : (loggedInUser ? loggedInUser.id : '');
 
-  // Show simulated checkout modal
+  // Show simulated checkout modal if elements exist
   const modal = document.getElementById('payment-simulation-modal');
   const loadingState = document.getElementById('payment-loading-state');
   const successState = document.getElementById('payment-success-state');
   const successMsg = document.getElementById('payment-success-msg');
   const summaryEl = document.getElementById('payment-order-summary');
 
-  if (modal && loadingState && successState && successMsg) {
-    if (summaryEl) {
-      const plan = loggedInUser.plan || 'basic';
-      const planInfo = (window.activePlans || []).find(p => p.id.toLowerCase() === plan.toLowerCase());
-      const rate = planInfo ? planInfo.rate_per_minute : (plan.toLowerCase() === 'pro' ? 4.24 : 5.00);
-      const cost = amount * rate;
-      summaryEl.innerHTML = `
-        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;"><span>Plan:</span><strong style="text-transform: capitalize; color: var(--text-main);">${plan}</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;"><span>Minutes to Buy:</span><strong style="color: var(--text-main);">${amount} Mins</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;"><span>Rate/Min:</span><strong style="color: var(--text-main);">₹${rate.toFixed(2)}/min</strong></div>
-        <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--border-color); padding-top:6px; margin-top:6px; font-weight:bold; color:var(--color-cyan); font-size:0.9rem;"><span>Total Amount:</span><strong>₹${cost.toFixed(2)}</strong></div>
-      `;
-    }
+  if (summaryEl) {
+    const plan = loggedInUser ? (loggedInUser.plan || 'basic') : 'basic';
+    const planInfo = (window.activePlans || []).find(p => p.id.toLowerCase() === plan.toLowerCase());
+    const rate = planInfo ? planInfo.rate_per_minute : (plan.toLowerCase() === 'pro' ? 4.24 : 5.00);
+    const cost = amount * rate;
+    summaryEl.innerHTML = `
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;"><span>Plan:</span><strong style="text-transform: capitalize; color: var(--text-main);">${plan}</strong></div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;"><span>Minutes to Buy:</span><strong style="color: var(--text-main);">${amount} Mins</strong></div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;"><span>Rate/Min:</span><strong style="color: var(--text-main);">₹${rate.toFixed(2)}/min</strong></div>
+      <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--border-color); padding-top:6px; margin-top:6px; font-weight:bold; color:var(--color-cyan); font-size:0.9rem;"><span>Total Amount:</span><strong>₹${cost.toFixed(2)}</strong></div>
+    `;
+  }
 
+  if (modal && loadingState && successState) {
     loadingState.style.display = 'flex';
     successState.style.display = 'none';
     modal.style.display = 'flex';
+  }
 
-    // Simulate processing delay (1.5 seconds)
-    setTimeout(async () => {
-      try {
-        const res = await fetch('/api/client/recharge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientId: loggedInUser.id,
-            amount: amount,
-            paymentMethod: method
-          })
-        });
-        const data = await res.json();
-        if (data.success) {
-          // Update local session balance if applicable
+  setTimeout(async () => {
+    try {
+      const res = await fetch('/api/client/recharge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: targetClientId,
+          amount: amount,
+          paymentMethod: method
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (loggedInUser) {
           loggedInUser.balance = data.balance;
           localStorage.setItem('user_session', JSON.stringify(loggedInUser));
+        }
 
-          // Reload header indicator with updated minutes
-          const headerWalletBalance = document.getElementById('header-wallet-balance');
-          if (headerWalletBalance) {
-            const remMins = loggedInUser.balance !== undefined ? (loggedInUser.balance >= 99999 ? '∞' : Math.max(0, loggedInUser.balance).toFixed(1)) : '0.0';
-            headerWalletBalance.textContent = `${remMins}`;
-          }
+        const headerWalletBalance = document.getElementById('header-wallet-balance');
+        if (headerWalletBalance) {
+          const remMins = data.balance !== undefined ? (data.balance >= 99999 ? '∞' : Math.max(0, data.balance).toFixed(1)) : '0.0';
+          headerWalletBalance.textContent = `${remMins}`;
+        }
 
-          // Reload billing/recharge page data
-          fetchBillingData();
+        fetchBillingData();
 
-          // Show success state
+        if (modal && loadingState && successState) {
           loadingState.style.display = 'none';
           successState.style.display = 'flex';
-          successMsg.innerHTML = `Successfully added <strong>${amount} Mins</strong> to your wallet balance using ${method}.`;
-          
-          // Clear input field
-          amountInput.value = '';
+          if (successMsg) successMsg.innerHTML = `Successfully added <strong>${amount} Mins</strong> to your wallet balance using ${method}.`;
         } else {
-          alert(`Recharge failed: ${data.error}`);
-          modal.style.display = 'none';
+          alert(`Successfully added ${amount} Mins! New Balance: ${data.balance} Mins`);
         }
-      } catch (err) {
-        console.error(err);
-        alert("Payment simulation failed.");
-        modal.style.display = 'none';
+        
+        amountInput.value = '';
+      } else {
+        if (modal) modal.style.display = 'none';
+        alert(`Recharge failed: ${data.error}`);
       }
-    }, 1500);
-  }
+    } catch (err) {
+      console.error(err);
+      if (modal) modal.style.display = 'none';
+      alert("Payment simulation failed.");
+    }
+  }, 1000);
 };
 
 window.closePaymentModal = function() {
