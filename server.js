@@ -5117,9 +5117,9 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           
           const callStateObj = activeCalls.get(callSid);
           const isIncomingCall = callStateObj && callStateObj.direction === 'incoming';
-          const greetingDelayMs = isIncomingCall ? 1500 : 200;
+          const greetingDelayMs = isIncomingCall ? 800 : 0; // Instant 0ms for outbound calls
           
-          ws.greetingTimeout = setTimeout(() => {
+          const sendGreetingNow = () => {
             if (geminiWs && geminiWs.readyState === WebSocket.OPEN && !ws.userHasSpoken) {
               ws.userHasSpoken = true;
               const cleanName = name ? name.trim() : '';
@@ -5129,8 +5129,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               const firstName = isValidName ? getFirstName(cleanName) : '';
 
               const greetPrompt = (isValidName && firstName && firstName.toLowerCase() !== 'saas' && firstName.toLowerCase() !== 'lead')
-                ? `Greet ${firstName} politely by name to start the conversation according to your persona.` 
-                : "Say hello politely to start the conversation according to your persona.";
+                ? `Say a short friendly greeting to ${firstName} in 5 words or less in Hinglish.` 
+                : "Say a short friendly hello in 4 words or less in Hinglish.";
               
               const initGreeting = {
                 clientContent: {
@@ -5144,14 +5144,20 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 }
               };
               
-              console.log(`[WebSocket Stream Setup] Injecting initial greeting turn after ${greetingDelayMs}ms silence: "${greetPrompt}"`);
+              console.log(`[WebSocket Stream Setup] Injecting instant initial greeting turn (${greetingDelayMs}ms delay): "${greetPrompt}"`);
               try {
                 geminiWs.send(JSON.stringify(initGreeting));
               } catch (e) {
                 console.error('Failed to send initial greeting:', e.message);
               }
             }
-          }, greetingDelayMs); // 2s delay so audio path fully stabilizes before agent speaks
+          };
+
+          if (greetingDelayMs === 0) {
+            sendGreetingNow();
+          } else {
+            ws.greetingTimeout = setTimeout(sendGreetingNow, greetingDelayMs);
+          }
           
           resetInactivityTimer();
           return;
@@ -5399,10 +5405,12 @@ Follow these rules strictly to sound completely human, lively, and emotional:
             if (!callConfig) {
               callConfig = getIncomingCallConfig(urlObj.searchParams, '');
             }
+            const existingState = activeCalls.get(callSid);
             const callState = getOrCreateCallState(callSid, {
               provider: 'vobiz',
-              to: callSid,
-              name: callConfig.name || '',
+              to: existingState?.to || callSid,
+              direction: existingState?.direction || 'outgoing',
+              name: callConfig.name || existingState?.name || '',
               recordCall: callConfig.recordCall || false,
               status: 'active',
               clientId: callConfig.clientId || null
