@@ -3794,7 +3794,8 @@ document.getElementById('btn-simulate-crm-webhook')?.addEventListener('click', a
 
 async function fetchSharingConfig() {
   try {
-    const res = await fetch('/api/config');
+    const clientId = loggedInUser ? loggedInUser.id : '';
+    const res = await fetch(`/api/config?clientId=${clientId}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success) {
@@ -3840,8 +3841,10 @@ function updateSharingUI(config) {
 
 async function saveSharingConfig(apiKeyToSave = null) {
   const currentKey = apiKeyToSave !== null ? apiKeyToSave : elSharedApiKeyInput.value.trim();
+  const clientId = loggedInUser ? loggedInUser.id : '';
   
   const payload = {
+    clientId: clientId,
     apiKey: currentKey,
     shareAgents: elShareAgentsCheckbox.checked,
     shareContacts: elShareContactsCheckbox.checked,

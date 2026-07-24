@@ -1267,28 +1267,72 @@ const authMiddleware = (dataType) => (req, res, next) => {
 
 // Endpoint to retrieve sharing settings and API key status for local dashboard
 app.get('/api/config', (req, res) => {
+  const clientId = req.query.clientId || req.query.client_id || req.clientId || '';
+  let targetClient = null;
+  if (clientId && clientsDb.has(clientId)) {
+    targetClient = clientsDb.get(clientId);
+  } else if (clientId && resellersDb.has(clientId)) {
+    targetClient = resellersDb.get(clientId);
+  }
+
+  if (targetClient) {
+    if (!targetClient.api_key) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let newKey = 'ca_';
+      for (let i = 0; i < 32; i++) {
+        newKey += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      targetClient.api_key = newKey;
+      if (clientsDb.has(clientId)) saveClients();
+      else if (resellersDb.has(clientId)) saveResellers();
+    }
+    return res.json({
+      success: true,
+      apiKey: targetClient.api_key || '',
+      shareAgents: targetClient.shareAgents !== false,
+      shareContacts: targetClient.shareContacts !== false,
+      shareCalls: targetClient.shareCalls !== false
+    });
+  }
+
   res.json({
     success: true,
     apiKey: defaultCallConfig.apiKey || '',
-    shareAgents: defaultCallConfig.shareAgents !== false, // default to true
-    shareContacts: defaultCallConfig.shareContacts !== false, // default to true
-    shareCalls: defaultCallConfig.shareCalls !== false // default to true
+    shareAgents: defaultCallConfig.shareAgents !== false,
+    shareContacts: defaultCallConfig.shareContacts !== false,
+    shareCalls: defaultCallConfig.shareCalls !== false
   });
 });
 
 // Endpoint to dynamically synchronize backend config defaults for incoming calls and webhook dialer credentials
 app.post('/save-config', (req, res) => {
+  const { clientId, apiKey, shareAgents, shareContacts, shareCalls } = req.body;
+  const targetId = clientId || req.clientId || '';
+  let targetClient = null;
+
+  if (targetId && clientsDb.has(targetId)) {
+    targetClient = clientsDb.get(targetId);
+  } else if (targetId && resellersDb.has(targetId)) {
+    targetClient = resellersDb.get(targetId);
+  }
+
+  if (targetClient) {
+    if (apiKey !== undefined) targetClient.api_key = apiKey;
+    if (shareAgents !== undefined) targetClient.shareAgents = shareAgents;
+    if (shareContacts !== undefined) targetClient.shareContacts = shareContacts;
+    if (shareCalls !== undefined) targetClient.shareCalls = shareCalls;
+    
+    if (clientsDb.has(targetId)) saveClients();
+    else if (resellersDb.has(targetId)) saveResellers();
+
+    console.log(`[Config Sync] Updated isolated API key for Client ${targetId}`);
+    return res.json({ success: true, apiKey: targetClient.api_key });
+  }
+
   Object.assign(defaultCallConfig, req.body);
-  
-  console.log(`[Config Sync] Updated backend configurations: Voice: ${defaultCallConfig.voice}, Provider: ${defaultCallConfig.telephonyProvider}`);
-  
-  // Save to file persistently
   try {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultCallConfig, null, 2), 'utf-8');
-    console.log(`[Config Sync] Persistent config saved to ${CONFIG_FILE}`);
-  } catch (err) {
-    console.error(`[Config Sync Error] Failed to save to ${CONFIG_FILE}:`, err.message);
-  }
+  } catch (err) {}
   
   res.json({ success: true });
 });
@@ -2357,6 +2401,9 @@ app.get('/api/agents', authMiddleware('agents'), (req, res) => {
     list = list.filter(a => a.clientId === clientId || a.resellerId === clientId);
   } else if (clientId === 'admin') {
     list = list.filter(a => a.clientId === 'admin' || !a.clientId);
+  } else {
+    // If request comes via API key but clientId is unmapped or unknown: NEVER LEAK ALL AGENTS!
+    list = list.filter(a => !a.clientId || a.clientId === 'admin');
   }
   list.sort((a, b) => b.createdAt - a.createdAt);
   res.json({ success: true, agents: list });
