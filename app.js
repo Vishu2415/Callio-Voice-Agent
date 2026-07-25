@@ -2628,7 +2628,7 @@ async function loadRoutingConfig() {
     const clientId = loggedInUser ? loggedInUser.id : '';
     const [agentsRes, cfgRes] = await Promise.all([
       fetch(`/api/agents?clientId=${clientId}`),
-      fetch('/api/routing-config')
+      fetch(`/api/routing-config?client_id=${clientId}`)
     ]);
     const agentsData = await agentsRes.json();
     const cfgData = await cfgRes.json();
@@ -2682,7 +2682,8 @@ window.addTagRoutingRule = async function() {
   if (!agentId) { alert('Please select an agent.'); return; }
 
   try {
-    const cfgRes = await fetch('/api/routing-config');
+    const clientId = loggedInUser ? loggedInUser.id : '';
+    const cfgRes = await fetch(`/api/routing-config?client_id=${clientId}`);
     const cfgData = await cfgRes.json();
     const rules = cfgData.success ? (cfgData.tagRules || []) : [];
 
@@ -2694,10 +2695,10 @@ window.addTagRoutingRule = async function() {
 
     rules.push({ tag, agentId });
 
-    const saveRes = await fetch('/api/routing-config', {
+    const saveRes = await fetch(`/api/routing-config?client_id=${clientId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tagRules: rules })
+      body: JSON.stringify({ clientId, tagRules: rules })
     });
     const saveData = await saveRes.json();
     if (saveData.success) {
@@ -2714,14 +2715,15 @@ window.addTagRoutingRule = async function() {
 
 window.removeTagRoutingRule = async function(index) {
   try {
-    const cfgRes = await fetch('/api/routing-config');
+    const clientId = loggedInUser ? loggedInUser.id : '';
+    const cfgRes = await fetch(`/api/routing-config?client_id=${clientId}`);
     const cfgData = await cfgRes.json();
     const rules = cfgData.success ? (cfgData.tagRules || []) : [];
     rules.splice(index, 1);
-    const saveRes = await fetch('/api/routing-config', {
+    const saveRes = await fetch(`/api/routing-config?client_id=${clientId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tagRules: rules })
+      body: JSON.stringify({ clientId, tagRules: rules })
     });
     const saveData = await saveRes.json();
     if (saveData.success) renderTagRoutingRules(rules, _routingAgentsList);
@@ -2735,10 +2737,11 @@ document.getElementById('btn-save-default-incoming-agent')?.addEventListener('cl
   const agentId = sel ? sel.value : '';
   const statusEl = document.getElementById('default-agent-save-status');
   try {
-    const res = await fetch('/api/routing-config', {
+    const clientId = loggedInUser ? loggedInUser.id : '';
+    const res = await fetch(`/api/routing-config?client_id=${clientId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ incomingAgentId: agentId })
+      body: JSON.stringify({ clientId, incomingAgentId: agentId })
     });
     const data = await res.json();
     if (data.success) {
@@ -3498,7 +3501,7 @@ function updateVobizMetrics() {
   const totalCalls = callsCache.length;
   
   const completedCalls = callsCache.filter(c => c.status === 'completed').length;
-  const activeCalls = callsCache.filter(c => c.status === 'active' || c.status === 'in-progress' || c.status === 'ringing').length;
+  const activeCalls = callsCache.filter(c => c.status === 'active' || c.status === 'calling' || c.status === 'in-progress' || c.status === 'ringing' || c.status === 'queued' || c.status === 'initiated').length;
   const failedCalls = callsCache.filter(c => c.status === 'failed' || c.status === 'busy' || c.status === 'no-answer' || c.status === 'voicemail').length;
   
   // Calculate Interest (parsing summary)
@@ -4709,7 +4712,7 @@ async function refreshCallsListForDashboard() {
 
 function updateDashboardWithClientCalls(calls) {
   const totalCalls = calls.length;
-  const activeCalls = calls.filter(c => c.status === 'active' || c.status === 'calling' || c.status === 'in-progress' || c.status === 'ringing').length;
+  const activeCalls = calls.filter(c => c.status === 'active' || c.status === 'calling' || c.status === 'in-progress' || c.status === 'ringing' || c.status === 'queued' || c.status === 'initiated').length;
   const completedCalls = calls.filter(c => c.status === 'completed').length;
   const failedCalls = calls.filter(c => c.status === 'failed' || c.status === 'no-answer' || c.status === 'busy' || c.status === 'voicemail').length;
   const interestedCalls = calls.filter(c => c.summary?.toLowerCase().includes('interested') && !c.summary?.toLowerCase().includes('not interested')).length;

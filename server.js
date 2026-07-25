@@ -2128,11 +2128,14 @@ app.all('/incoming-call-vobiz', (req, res) => {
   }
   if (callSid) callSettingsMap.set('__xml_sent_' + callSid, true);
 
-  let callConfig = callSettingsMap.get(callSid) || callSettingsMap.get(toNum) || callSettingsMap.get(fromNum);
+  let callConfig = callSettingsMap.get(callSid);
+  if (!callConfig && toNum && isVirtualNumber(toNum)) {
+    callConfig = callSettingsMap.get(toNum);
+  }
   
   if (!callConfig) {
-    console.log(`[Vobiz Webhook] Resolving incoming call config for Client: ${clientId || 'None'}, From: ${fromNum}`);
-    callConfig = getIncomingCallConfig(req.query, fromNum, clientId);
+    console.log(`[Vobiz Webhook] Resolving incoming call config for Client: ${clientId || 'None'}, From: ${fromNum}, To: ${toNum}`);
+    callConfig = getIncomingCallConfig(req.query, fromNum, clientId, toNum);
   } else {
     console.log(`[Vobiz Webhook] Configuration successfully loaded from memory map.`);
     callConfig = { ...callConfig };
@@ -2147,15 +2150,18 @@ app.all('/incoming-call-vobiz', (req, res) => {
   if (callSid) {
     let resolvedSid = callSid;
 
-    // Smart dedup: find any existing call in 'calling' state or matching customer phone
+    // Smart dedup: find any existing ACTIVE call in 'calling'/'initiated'/'ringing' state
     for (const [sid, state] of activeCalls.entries()) {
+      const isCallActive = state.status === 'calling' || state.status === 'initiated' || state.status === 'ringing' || state.status === 'in-progress' || state.status === 'active';
+      if (!isCallActive) continue;
+
       const stateTo = state.to || '';
       const matchesTo = toNum && !isVirtualNumber(toNum) && cleanAndComparePhone(stateTo, toNum);
       const matchesFrom = fromNum && !isVirtualNumber(fromNum) && cleanAndComparePhone(stateTo, fromNum);
       const isPendingOutbound = state.status === 'calling' && state.direction === 'outgoing' && sid !== callSid;
 
       if (matchesTo || matchesFrom || isPendingOutbound) {
-        console.log(`[Vobiz Webhook] Smart Dedup: Merging existing call entry ${sid} (Target: ${stateTo}, status: ${state.status}) into callSid ${callSid}.`);
+        console.log(`[Vobiz Webhook] Smart Dedup: Merging existing active call entry ${sid} (Target: ${stateTo}, status: ${state.status}) into callSid ${callSid}.`);
         const oldState = { ...state, callSid: callSid };
         activeCalls.delete(sid);
         activeCalls.set(callSid, oldState);
@@ -2171,8 +2177,7 @@ app.all('/incoming-call-vobiz', (req, res) => {
     }
 
     callSettingsMap.set(resolvedSid, callConfig);
-    if (toNum && !isVirtualNumber(toNum)) callSettingsMap.set(toNum, callConfig);
-    if (fromNum && !isVirtualNumber(fromNum)) callSettingsMap.set(fromNum, callConfig);
+    if (toNum && isVirtualNumber(toNum)) callSettingsMap.set(toNum, callConfig);
     console.log(`[Vobiz Webhook] Config cached under CallSid: ${resolvedSid}`);
 
     const existingCallState = activeCalls.get(resolvedSid);
@@ -2556,8 +2561,17 @@ app.get('/calls', (req, res) => {
   const { clientId } = req.query;
   let list = Array.from(activeCalls.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   if (clientId && clientId !== 'admin') {
-    // Only include calls explicitly belonging to this client
-    list = list.filter(c => c.clientId === clientId);
+    const client = clientsDb.get(clientId);
+    const clientPhone = client?.phone_number;
+    // Only include calls explicitly belonging to this client or matching client's virtual number
+    list = list.filter(c => {
+      if (c.clientId === clientId) return true;
+      if (clientPhone && ((c.to && cleanAndComparePhone(c.to, clientPhone)) || (c.from && cleanAndComparePhone(c.from, clientPhone)))) {
+        c.clientId = clientId; // Auto-resolve missing clientId
+        return true;
+      }
+      return false;
+    });
   }
   res.json({ success: true, calls: list });
 });
@@ -3786,8 +3800,12 @@ app.get('/api/client/dashboard-data', (req, res) => {
       return res.status(404).json({ success: false, error: 'Client not found.' });
     }
 
+    const clientPhone = client.phone_number;
     for (const call of activeCalls.values()) {
       if (call.clientId === clientId) {
+        clientLogs.push(call);
+      } else if (clientPhone && ((call.to && cleanAndComparePhone(call.to, clientPhone)) || (call.from && cleanAndComparePhone(call.from, clientPhone)))) {
+        call.clientId = clientId;
         clientLogs.push(call);
       }
     }
@@ -3808,7 +3826,7 @@ app.get('/api/client/dashboard-data', (req, res) => {
       pricing: client.pricing || { rate_per_minute: 2.00, rate_recording_per_minute: 1.00, rate_per_session: 0.00 },
       billing_history: client.billing_history || []
     },
-    calls: clientLogs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    calls: clientLogs.sort((a, b) => new Date(b.createdAt || b.startedAt || 0) - new Date(a.createdAt || a.startedAt || 0))
   });
 });
 
