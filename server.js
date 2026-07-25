@@ -1043,48 +1043,67 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
     const clientId = callState.clientId;
     if (clientId && clientsDb.has(clientId)) {
       const client = clientsDb.get(clientId);
-      const start = callState.startedAt ? new Date(callState.startedAt) : null;
-      const end = new Date(callState.endedAt);
-      let durationSec = (start && !isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.max(0, Math.round((end - start) / 1000)) : 0;
-      // Safety cap: single call cannot exceed 180 minutes (3 hours)
-      if (durationSec > 10800) durationSec = 10800;
-      
-      // Ceiling billing: 1 second = 1 full minute (same as Vobiz)
-      // e.g. 4s → 1 min billed, 65s → 2 mins billed
-      const billedMinutes = durationSec > 0 ? Math.ceil(durationSec / 60) : 0;
-      const durationMin = billedMinutes; // whole minutes only
 
-      // Hard safety cap: single call cannot deduct more than 180 minutes
-      const totalCharge = Math.min(durationMin, 180);
+      // 1. If call failed, busy, no-answer, canceled, or voicemail -> ZERO CHARGE
+      const isFailedOrUnanswered = ['failed', 'busy', 'no-answer', 'canceled', 'voicemail'].includes(finalStatus) || 
+                                   ['failed', 'busy', 'no-answer', 'canceled', 'voicemail'].includes(callState.status);
 
-      // Guard: never let balance go below -100 (prevent runaway negative balances)
-      const currentBalance = typeof client.balance === 'number' ? client.balance : 0;
-      if (currentBalance < -100) {
-        console.warn(`[SaaS Billing] Skipping charge for client ${clientId} — balance already critically negative: ${currentBalance}`);
+      // 2. Also if transcript is completely empty and call was never answered -> ZERO CHARGE
+      const noConversation = (!callState.transcript || callState.transcript.length === 0) && (!callState.answeredAt);
+
+      let durationSec = 0;
+      let totalCharge = 0;
+
+      if (!isFailedOrUnanswered && !noConversation) {
+        const start = callState.answeredAt ? new Date(callState.answeredAt) : (callState.startedAt ? new Date(callState.startedAt) : null);
+        const end = new Date(callState.endedAt);
+        durationSec = (start && !isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.max(0, Math.round((end - start) / 1000)) : 0;
+
+        // Strict Max Call Duration Safety Cap: 15 minutes (900 seconds) MAX per AI call
+        if (durationSec > 900) {
+          console.warn(`[SaaS Billing Warning] Call ${callSid} exceeded 15 min safety limit (${durationSec}s). Capping billed duration to 15 min (900s).`);
+          durationSec = 900;
+        }
+
+        // Ceiling billing: 1 second = 1 full minute (standard AI calling rate)
+        const billedMinutes = durationSec > 0 ? Math.ceil(durationSec / 60) : 0;
+
+        // Hard safety cap: single call cannot deduct more than 15 minutes
+        totalCharge = Math.min(billedMinutes, 15);
       } else {
-        client.balance = Number((currentBalance - totalCharge).toFixed(2));
-        client.used_minutes = Number(((client.used_minutes || 0) + durationMin).toFixed(2));
-        client.billing_history = client.billing_history || [];
-        client.billing_history.unshift({
-          id: `txn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          timestamp: new Date().toISOString(),
-          type: 'call_charge',
-          callSid: callSid,
-          phone: callState.to || '',
-          duration: durationSec,
-          callCost: 0,
-          recordingCost: 0,
-          sessionCost: 0,
-          totalCharge,
-          description: `Call to ${callState.to || 'Unknown'} (${durationSec}s → billed ${durationMin} min) ${callState.recordCall ? 'with recording' : 'no recording'}`
-        });
+        console.log(`[SaaS Billing] Zero charge for call ${callSid}: status=${finalStatus}, noConversation=${noConversation}`);
+      }
 
-        console.log(`[SaaS Billing] Charged Client: ${client.name} (ID: ${clientId}) total: ${totalCharge} min for CallSid: ${callSid}. New balance: ${client.balance} mins`);
-        saveClients();
+      if (totalCharge > 0) {
+        // Guard: never let balance go below -100 (prevent runaway negative balances)
+        const currentBalance = typeof client.balance === 'number' ? client.balance : 0;
+        if (currentBalance < -100) {
+          console.warn(`[SaaS Billing] Skipping charge for client ${clientId} — balance already critically negative: ${currentBalance}`);
+        } else {
+          client.balance = Number((currentBalance - totalCharge).toFixed(2));
+          client.used_minutes = Number(((client.used_minutes || 0) + totalCharge).toFixed(2));
+          client.billing_history = client.billing_history || [];
+          client.billing_history.unshift({
+            id: `txn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            timestamp: new Date().toISOString(),
+            type: 'call_charge',
+            callSid: callSid,
+            phone: callState.to || '',
+            duration: durationSec,
+            callCost: 0,
+            recordingCost: 0,
+            sessionCost: 0,
+            totalCharge,
+            description: `Call to ${callState.to || 'Unknown'} (${durationSec}s → billed ${totalCharge} min) ${callState.recordCall ? 'with recording' : 'no recording'}`
+          });
 
-        // Reseller billing: if client belongs to a reseller, charge reseller quota at wholesale rate
-        if (typeof global.chargeResellerForCall === 'function' && durationMin > 0) {
-          global.chargeResellerForCall(clientId, durationMin);
+          console.log(`[SaaS Billing] Charged Client: ${client.name} (ID: ${clientId}) total: ${totalCharge} min for CallSid: ${callSid}. New balance: ${client.balance} mins`);
+          saveClients();
+
+          // Reseller billing: if client belongs to a reseller, charge reseller quota at wholesale rate
+          if (typeof global.chargeResellerForCall === 'function' && totalCharge > 0) {
+            global.chargeResellerForCall(clientId, totalCharge);
+          }
         }
       }
     }
