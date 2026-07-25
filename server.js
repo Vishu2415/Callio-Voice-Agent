@@ -2130,6 +2130,9 @@ app.all('/incoming-call-vobiz', (req, res) => {
 
     console.log(`[Vobiz Webhook] Resolved CallSid: ${resolvedSid}, Direction: ${resolvedDirection}, Target Customer: ${targetCustomerPhone}`);
 
+    // Resolve clientId: prioritize existing state > callConfig > URL query param
+    const resolvedClientId = existingCallState?.clientId || callConfig.clientId || clientId || null;
+
     getOrCreateCallState(resolvedSid, {
       provider: 'vobiz',
       to: targetCustomerPhone,
@@ -2138,7 +2141,7 @@ app.all('/incoming-call-vobiz', (req, res) => {
       name: callConfig.name || existingCallState?.name || '',
       recordCall: callConfig.recordCall || false,
       status: 'active',
-      clientId: callConfig.clientId || null
+      clientId: resolvedClientId
     });
   }
   
@@ -2486,8 +2489,8 @@ app.get('/calls', (req, res) => {
   const { clientId } = req.query;
   let list = Array.from(activeCalls.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   if (clientId && clientId !== 'admin') {
-    // Include calls that belong to this client OR calls with no clientId (CRM/broadcast originating calls)
-    list = list.filter(c => c.clientId === clientId || !c.clientId);
+    // Only include calls explicitly belonging to this client
+    list = list.filter(c => c.clientId === clientId);
   }
   res.json({ success: true, calls: list });
 });
@@ -2595,8 +2598,11 @@ app.get('/call-status/:callSid', (req, res) => {
     return res.status(404).json({ success: false, error: 'Call state not found' });
   }
   const { clientId } = req.query;
-  if (clientId && clientId !== 'admin' && callState.clientId !== clientId) {
-    return res.status(403).json({ success: false, error: 'Access denied' });
+  // Strict isolation: if clientId is provided and not admin, only allow if call belongs to that client
+  if (clientId && clientId !== 'admin') {
+    if (callState.clientId !== clientId) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
   }
   res.json({ success: true, callState });
 });
@@ -2607,6 +2613,11 @@ app.get('/recording-proxy/:callSid', async (req, res) => {
   const callState = activeCalls.get(callSid);
   if (!callState) {
     return res.status(404).json({ error: 'Call not found' });
+  }
+  // Isolation: only allow access if clientId matches
+  const { clientId } = req.query;
+  if (clientId && clientId !== 'admin' && callState.clientId !== clientId) {
+    return res.status(403).json({ error: 'Access denied' });
   }
 
   const localPath = path.join(__dirname, 'recordings', `${callSid}.mp3`);
@@ -2711,8 +2722,10 @@ app.get('/api/groups', authMiddleware('contacts'), (req, res) => {
   const { clientId } = req.query;
   let list = Array.from(groupsDb.values());
   if (clientId && clientId !== 'admin') {
+    // Strict isolation: only groups explicitly owned by this client
     list = list.filter(g => g.clientId === clientId);
   } else if (clientId === 'admin') {
+    // Admin sees only admin-owned groups (not client groups)
     list = list.filter(g => g.clientId === 'admin' || !g.clientId);
   }
   list.sort((a, b) => b.createdAt - a.createdAt);
@@ -2866,9 +2879,11 @@ app.get('/api/crm-logs', authMiddleware('calls'), (req, res) => {
   const { clientId } = req.query;
   let logs = Array.from(crmLogsDb.values());
   if (clientId && clientId !== 'admin') {
+    // Strict isolation: only logs for this client
     logs = logs.filter(l => l.clientId === clientId);
   } else if (clientId === 'admin') {
-    logs = logs.filter(l => l.clientId === 'admin' || !l.clientId);
+    // Admin sees logs not assigned to any specific client
+    logs = logs.filter(l => !l.clientId || l.clientId === 'admin');
   }
   logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   res.json({ success: true, logs: logs.slice(0, 100) });
@@ -3705,7 +3720,7 @@ app.get('/api/client/dashboard-data', (req, res) => {
     }
 
     for (const call of activeCalls.values()) {
-      if (call.clientId === clientId || !call.clientId || (client.phone_number && (call.to === client.phone_number || call.from === client.phone_number))) {
+      if (call.clientId === clientId) {
         clientLogs.push(call);
       }
     }

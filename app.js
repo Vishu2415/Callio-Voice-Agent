@@ -1512,6 +1512,9 @@ async function refreshCallsList() {
         renderCallsSidebar();
         renderDashboard();
         updateVobizMetrics();
+        if (typeof updateDashboardWithClientCalls === 'function') {
+          updateDashboardWithClientCalls(callsCache);
+        }
         if (selectedCallSid) {
           renderCallDetails(selectedCallSid);
         }
@@ -1788,7 +1791,7 @@ function renderCallDetails(callSid) {
           Fetching recording file...
         </div>`;
     } else if (call.recordingStatus === 'ready' && call.recordingUrl) {
-      const proxyUrl = `/recording-proxy/${call.callSid}`;
+      const proxyUrl = `/recording-proxy/${call.callSid}${loggedInUser && loggedInUser.id ? '?clientId=' + encodeURIComponent(loggedInUser.id) : ''}`;
       newRecHtml = `
         <div class="recording-status">
           <span class="recording-dot dot-ready"></span>
@@ -3295,7 +3298,7 @@ function renderHistoryDetail(phone) {
     if (!call.recordCall) {
       recHtml = `<div class="hd-call-recording"><span class="hd-rec-dot dot-off"></span> <span style="color:#aaa; font-size:0.9rem;">Recording not enabled</span></div>`;
     } else if (call.recordingStatus === 'ready' && call.recordingUrl) {
-      const proxyUrl = `/recording-proxy/${call.callSid}`;
+      const proxyUrl = `/recording-proxy/${call.callSid}${loggedInUser && loggedInUser.id ? '?clientId=' + encodeURIComponent(loggedInUser.id) : ''}`;
       recHtml = `
         <div class="hd-call-recording">
           <span class="hd-section-icon rec-icon">⏺</span>
@@ -4621,7 +4624,29 @@ async function fetchClientDashboardData() {
       applyUserPlanAndLimits(loggedInUser);
       if (typeof renderClientNumberStatus === 'function') renderClientNumberStatus(data.client);
       if (typeof renderClientAgentConfig === 'function') renderClientAgentConfig(data.client.agent_config);
-      updateDashboardWithClientCalls(data.calls || []);
+      
+      // First pass: store live active calls map/array from server snapshot
+      const activeSnapshot = data.calls || [];
+      
+      // Second pass: fetch full persistent call history
+      await refreshCallsListForDashboard();
+      
+      // Merge activeSnapshot calls into callsCache if activeSnapshot has more up-to-date active status
+      if (activeSnapshot.length > 0 && Array.isArray(callsCache)) {
+        const activeMap = new Map(activeSnapshot.map(c => [c.callSid || c.sid, c]));
+        // Ensure any active call in activeSnapshot is present or updated in callsCache
+        activeSnapshot.forEach(activeCall => {
+          const sid = activeCall.callSid || activeCall.sid;
+          const idx = callsCache.findIndex(c => (c.callSid || c.sid) === sid);
+          if (idx !== -1) {
+            callsCache[idx] = { ...callsCache[idx], ...activeCall };
+          } else {
+            callsCache.unshift(activeCall);
+          }
+        });
+        updateDashboardWithClientCalls(callsCache);
+      }
+      
       if (typeof window.populateAIActionPlanner === 'function') window.populateAIActionPlanner();
     }
   } catch (err) {
@@ -4629,8 +4654,28 @@ async function fetchClientDashboardData() {
   }
 }
 
+// Fetches full call history and updates dashboard boxes (used by whitelabel clients)
+async function refreshCallsListForDashboard() {
+  try {
+    const clientId = loggedInUser ? loggedInUser.id : '';
+    const res = await fetch(`/calls?clientId=${clientId}`);
+    const data = await res.json();
+    if (data.success) {
+      callsCache = data.calls;
+      // Re-render dashboard with full history
+      updateDashboardWithClientCalls(callsCache);
+      renderCallsSidebar();
+      if (typeof window.populateAIActionPlanner === 'function') window.populateAIActionPlanner();
+      if (typeof refreshCallbacksList === 'function') refreshCallbacksList();
+    }
+  } catch (err) {
+    console.error('[refreshCallsListForDashboard] Failed:', err);
+  }
+}
+
 function updateDashboardWithClientCalls(calls) {
   const totalCalls = calls.length;
+  const activeCalls = calls.filter(c => c.status === 'active' || c.status === 'calling' || c.status === 'in-progress' || c.status === 'ringing').length;
   const completedCalls = calls.filter(c => c.status === 'completed').length;
   const failedCalls = calls.filter(c => c.status === 'failed' || c.status === 'no-answer' || c.status === 'busy' || c.status === 'voicemail').length;
   const interestedCalls = calls.filter(c => c.summary?.toLowerCase().includes('interested') && !c.summary?.toLowerCase().includes('not interested')).length;
@@ -4644,13 +4689,13 @@ function updateDashboardWithClientCalls(calls) {
   const elInterestedCalls = document.getElementById('vb-interested-calls');
 
   if (elCallsMade) elCallsMade.innerText = totalCalls;
-  if (elActiveCalls) elActiveCalls.innerText = 0;
+  if (elActiveCalls) elActiveCalls.innerText = activeCalls;  // FIX: was hardcoded 0
   if (elPickupRate) elPickupRate.innerText = pickupRate + '%';
   if (elCompletedCalls) elCompletedCalls.innerText = completedCalls;
   if (elFailedCalls) elFailedCalls.innerText = failedCalls;
   if (elInterestedCalls) elInterestedCalls.innerText = interestedCalls;
 
-  // Populate new 3 boxes
+  // Populate dashboard boxes with the full calls list
   populateDashboardBoxes(calls);
 }
 
