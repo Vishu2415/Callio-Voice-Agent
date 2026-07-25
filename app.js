@@ -1503,23 +1503,29 @@ async function refreshCallsList() {
     const res = await fetch(`/calls?clientId=${clientId}`);
     const data = await res.json();
     if (data.success) {
-      // Server already filters by clientId (including calls with no clientId like CRM-triggered ones)
-      // Trust the server-side filter — no double-filtering here
       callsCache = data.calls;
+      
+      if (typeof updateDashboardWithClientCalls === 'function') {
+        updateDashboardWithClientCalls(callsCache);
+      }
       
       const activeTab = localStorage.getItem('activeTab') || 'tab-dashboard';
       if (activeTab === 'tab-dashboard') {
         renderCallsSidebar();
         renderDashboard();
         updateVobizMetrics();
-        if (typeof updateDashboardWithClientCalls === 'function') {
-          updateDashboardWithClientCalls(callsCache);
-        }
         if (selectedCallSid) {
           renderCallDetails(selectedCallSid);
         }
-        window.populateAIActionPlanner();
-        refreshCallbacksList();
+        if (typeof window.populateAIActionPlanner === 'function') window.populateAIActionPlanner();
+        if (typeof refreshCallbacksList === 'function') refreshCallbacksList();
+      }
+      
+      if (activeTab === 'tab-call-history' || activeTab === 'tab-quick-call') {
+        renderHistoryList();
+        if (historySelectedSid) {
+          renderHistoryDetail(historySelectedSid);
+        }
       }
     }
   } catch (err) {
@@ -1880,12 +1886,12 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
-// Start periodic polling for calls list
+// Start periodic polling for calls list (every 3 seconds for fast real-time UI updates)
 refreshCallsList();
 setInterval(() => {
   refreshCallsList();
   refreshHistoryIfOpen();
-}, 8000);
+}, 3000);
 
 // Clean up animations on page unload
 window.addEventListener('beforeunload', () => {
@@ -3075,19 +3081,29 @@ window.deleteHistoryGroup = async function(event, phone) {
   }
 }
 
+function getCallCustomerNumber(call) {
+  if (!call) return 'Unknown';
+  if (call.customerNumber) return String(call.customerNumber).trim();
+  if (call.direction === 'incoming') {
+    return String(call.from || call.to || 'Unknown').trim();
+  }
+  return String(call.to || call.from || 'Unknown').trim();
+}
+
 function renderHistoryList() {
   if (!elHistoryCallsList) return;
 
   const filtered = callsCache.filter(c => {
     if (!historySearchQuery) return true;
     const q = historySearchQuery.toLowerCase();
-    return (c.name || '').toLowerCase().includes(q) || (c.to || '').includes(q) || (c.provider || '').includes(q);
+    const custNum = getCallCustomerNumber(c);
+    return (c.name || '').toLowerCase().includes(q) || (c.to || '').includes(q) || (c.from || '').includes(q) || custNum.includes(q) || (c.provider || '').includes(q);
   });
 
   // Group by phone number
   const groups = new Map();
   filtered.forEach(call => {
-    const key = call.to || 'Unknown';
+    const key = getCallCustomerNumber(call);
     if (!groups.has(key)) {
       groups.set(key, { to: key, name: call.name || '', calls: [] });
     }
@@ -3232,7 +3248,7 @@ function renderHistoryList() {
 let lastRenderedHistorySid = null;
 
 function renderHistoryDetail(phone) {
-  const groupCalls = callsCache.filter(c => c.to === phone);
+  const groupCalls = callsCache.filter(c => getCallCustomerNumber(c) === phone || c.to === phone || c.from === phone);
   if (groupCalls.length === 0) return;
   
   // Sort desc
