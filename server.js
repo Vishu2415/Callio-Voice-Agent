@@ -1036,6 +1036,9 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
   callState.status = finalStatus;
   callState.endedAt = new Date().toISOString();
   callState.updatedAt = new Date().toISOString();
+  if (!callState.mediaEndedAt && callState.mediaStartedAt) {
+    callState.mediaEndedAt = callState.endedAt;
+  }
   scheduleSaveCalls();
 
   // SaaS Billing Calculation
@@ -1044,34 +1047,54 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
     if (clientId && clientsDb.has(clientId)) {
       const client = clientsDb.get(clientId);
 
-      // 1. If call failed, busy, no-answer, canceled, or voicemail -> ZERO CHARGE
-      const isFailedOrUnanswered = ['failed', 'busy', 'no-answer', 'canceled', 'voicemail'].includes(finalStatus) || 
-                                   ['failed', 'busy', 'no-answer', 'canceled', 'voicemail'].includes(callState.status);
+      // 1. Check if call was actually answered and had conversation audio
+      const wasAnswered = Boolean(callState.answeredAt || callState.mediaStartedAt);
+      const hasSpeechOrTranscript = Boolean((callState.transcript && callState.transcript.length > 0) || callState.userHasSpoken);
 
-      // 2. Also if transcript is completely empty and call was never answered -> ZERO CHARGE
-      const noConversation = (!callState.transcript || callState.transcript.length === 0) && (!callState.answeredAt);
+      const isUnbilledStatus = ['failed', 'busy', 'no-answer', 'canceled', 'voicemail'].includes(finalStatus) || 
+                               ['failed', 'busy', 'no-answer', 'canceled', 'voicemail'].includes(callState.status);
 
       let durationSec = 0;
       let totalCharge = 0;
 
-      if (!isFailedOrUnanswered && !noConversation) {
-        const start = callState.answeredAt ? new Date(callState.answeredAt) : (callState.startedAt ? new Date(callState.startedAt) : null);
-        const end = new Date(callState.endedAt);
-        durationSec = (start && !isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.max(0, Math.round((end - start) / 1000)) : 0;
+      if (!wasAnswered || !hasSpeechOrTranscript || isUnbilledStatus) {
+        console.log(`[SaaS Billing] Zero charge for call ${callSid}: wasAnswered=${wasAnswered}, hasSpeechOrTranscript=${hasSpeechOrTranscript}, status=${finalStatus}`);
+      } else {
+        let rawDuration = 0;
 
-        // Strict Max Call Duration Safety Cap: 15 minutes (900 seconds) MAX per AI call
-        if (durationSec > 900) {
-          console.warn(`[SaaS Billing Warning] Call ${callSid} exceeded 15 min safety limit (${durationSec}s). Capping billed duration to 15 min (900s).`);
-          durationSec = 900;
+        if (callState.providerDuration && !isNaN(callState.providerDuration) && Number(callState.providerDuration) > 0) {
+          rawDuration = Number(callState.providerDuration);
+        } else if (callState.mediaStartedAt && callState.mediaEndedAt) {
+          const mStart = new Date(callState.mediaStartedAt).getTime();
+          const mEnd = new Date(callState.mediaEndedAt).getTime();
+          if (!isNaN(mStart) && !isNaN(mEnd) && mEnd > mStart) {
+            rawDuration = Math.round((mEnd - mStart) / 1000);
+          }
+        } else if (callState.answeredAt) {
+          const aStart = new Date(callState.answeredAt).getTime();
+          const aEnd = new Date(callState.mediaEndedAt || callState.endedAt || Date.now()).getTime();
+          if (!isNaN(aStart) && !isNaN(aEnd) && aEnd > aStart) {
+            rawDuration = Math.round((aEnd - aStart) / 1000);
+          }
         }
+
+        // Safety cap: Duration CANNOT exceed actual WebSocket stream lifetime + 5 seconds
+        if (callState.mediaStartedAt) {
+          const maxStreamSec = Math.round((new Date(callState.mediaEndedAt || Date.now()).getTime() - new Date(callState.mediaStartedAt).getTime()) / 1000) + 5;
+          if (rawDuration > maxStreamSec && maxStreamSec > 0) {
+            console.warn(`[SaaS Billing] Capping raw duration ${rawDuration}s to max stream lifetime ${maxStreamSec}s for call ${callSid}`);
+            rawDuration = maxStreamSec;
+          }
+        }
+
+        // Hard cap: Single AI call cannot exceed 15 minutes (900 seconds)
+        durationSec = Math.min(Math.max(0, rawDuration), 900);
 
         // Ceiling billing: 1 second = 1 full minute (standard AI calling rate)
         const billedMinutes = durationSec > 0 ? Math.ceil(durationSec / 60) : 0;
 
         // Hard safety cap: single call cannot deduct more than 15 minutes
         totalCharge = Math.min(billedMinutes, 15);
-      } else {
-        console.log(`[SaaS Billing] Zero charge for call ${callSid}: status=${finalStatus}, noConversation=${noConversation}`);
       }
 
       if (totalCharge > 0) {
@@ -5743,6 +5766,9 @@ Follow these rules strictly to sound completely human, lively, and emotional:
             });
             if (callState) {
               callState.status = 'active';
+              const nowIso = new Date().toISOString();
+              if (!callState.answeredAt) callState.answeredAt = nowIso;
+              if (!callState.mediaStartedAt) callState.mediaStartedAt = nowIso;
               if (callState.recordCall) {
                 startVobizCallRecording(callSid, callConfig);
               }
@@ -5766,6 +5792,9 @@ Follow these rules strictly to sound completely human, lively, and emotional:
             });
             if (callState) {
               callState.status = 'active';
+              const nowIso = new Date().toISOString();
+              if (!callState.answeredAt) callState.answeredAt = nowIso;
+              if (!callState.mediaStartedAt) callState.mediaStartedAt = nowIso;
             }
             initializeGemini(callConfig.voice, callConfig.systemInstruction, callConfig.name || '', callSid, callConfig.model);
           } else {
@@ -5786,6 +5815,9 @@ Follow these rules strictly to sound completely human, lively, and emotional:
             });
             if (callState) {
               callState.status = 'active';
+              const nowIso = new Date().toISOString();
+              if (!callState.answeredAt) callState.answeredAt = nowIso;
+              if (!callState.mediaStartedAt) callState.mediaStartedAt = nowIso;
             }
             initializeGemini(callConfig.voice, callConfig.systemInstruction, callConfig.name || '', callSid, callConfig.model);
           }
