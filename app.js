@@ -2977,16 +2977,31 @@ function getInitials(name, phone) {
   return phone ? phone.replace(/\D/g, '').slice(-2) : '??';
 }
 
+function isCallTrulyActive(call) {
+  if (!call) return false;
+  const status = (call.status || '').toLowerCase();
+  if (status !== 'active' && status !== 'calling' && status !== 'in-progress' && status !== 'ringing') return false;
+  const startStr = call.startedAt || call.createdAt;
+  if (!startStr) return false;
+  const start = new Date(startStr).getTime();
+  if (isNaN(start)) return false;
+  // If call started > 15 minutes ago, it is a stale/ghost call
+  if ((Date.now() - start) > 15 * 60 * 1000) return false;
+  return true;
+}
+
 function formatDuration(call) {
   const startStr = call.startedAt || call.createdAt;
   if (!startStr || call.status === 'calling') return '—';
   const start = new Date(startStr);
   let end = new Date();
   
-  // If call is done, use its endedAt, updatedAt or now
-  if (call.status === 'completed' || call.status === 'failed') {
+  const isStale = (Date.now() - start.getTime()) > (15 * 60 * 1000);
+  
+  // If call is completed/failed or stale (>15m old), calculate cleanly without running clock
+  if (call.status === 'completed' || call.status === 'failed' || isStale) {
     const endStr = call.endedAt || call.updatedAt;
-    if (endStr) {
+    if (endStr && !isStale) {
       end = new Date(endStr);
     } else {
       return '—';
@@ -2996,7 +3011,8 @@ function formatDuration(call) {
   // Ensure end is not before start
   if (end < start) end = start;
 
-  const seconds = Math.max(0, Math.floor((end - start) / 1000));
+  let seconds = Math.max(0, Math.floor((end - start) / 1000));
+  if (seconds > 900) seconds = 900;
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}m ${s}s`;
@@ -3271,7 +3287,7 @@ function renderHistoryDetail(phone) {
   const container = document.getElementById('hd-calls-container');
   if (!container) return;
   
-  const hasActiveCall = groupCalls.some(c => c.status === 'active' || c.status === 'calling');
+  const hasActiveCall = groupCalls.some(isCallTrulyActive);
   const groupStateKey = groupCalls.map(c => `${c.callSid}-${c.status}-${c.recordingStatus}-${c.transcript?.length || 0}-${c.summary ? '1' : '0'}`).join('|');
   
   if (!hasActiveCall && container.dataset.renderedState === groupStateKey) {
@@ -3282,8 +3298,10 @@ function renderHistoryDetail(phone) {
   container.innerHTML = ''; // Clear container
 
   groupCalls.forEach(call => {
+    const isTrulyActive = isCallTrulyActive(call);
+    const effectiveStatus = isTrulyActive ? call.status : ((call.status === 'active' || call.status === 'calling') ? 'failed' : call.status);
     const callBlock = document.createElement('div');
-    callBlock.className = `hd-call-card status-${call.status}`;
+    callBlock.className = `hd-call-card status-${effectiveStatus}`;
 
     const callDate = call.startedAt ? new Date(call.startedAt).toLocaleString() : (call.createdAt ? new Date(call.createdAt).toLocaleString() : 'Unknown');
     const duration = call.startedAt ? formatDuration(call) : '—';
@@ -3294,7 +3312,7 @@ function renderHistoryDetail(phone) {
     const headerHtml = `
       <div class="hd-call-header">
         <div class="hd-call-status" style="display: flex; gap: 6px; align-items: center;">
-          <span class="status-badge badge-${call.status}">${call.status.toUpperCase()}</span>
+          <span class="status-badge badge-${effectiveStatus}">${effectiveStatus.toUpperCase()}</span>
           ${isIncomingCall 
             ? `<span class="status-badge" style="background: rgba(16, 185, 129, 0.1); color: var(--color-green); border: 1px solid rgba(16, 185, 129, 0.2); text-transform: uppercase;">⬇ Incoming</span>`
             : `<span class="status-badge" style="background: rgba(6, 182, 212, 0.1); color: var(--color-cyan); border: 1px solid rgba(6, 182, 212, 0.2); text-transform: uppercase;">⬆ Outgoing</span>`}
@@ -3302,7 +3320,7 @@ function renderHistoryDetail(phone) {
         <div class="hd-call-time">
           <span>${callDate}</span>
           <span class="hd-call-duration">${duration}</span>
-          ${call.status === 'active' || call.status === 'calling' 
+          ${isTrulyActive 
             ? `<button class="hd-btn hd-btn-end" onclick="terminateHistoryCall('${call.callSid}')" title="End Call">Hang Up</button>` 
             : `<button class="hd-btn hd-btn-delete" onclick="deleteCall('${call.callSid}')" title="Delete Call">🗑</button>`}
         </div>
