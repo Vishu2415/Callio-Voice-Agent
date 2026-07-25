@@ -589,7 +589,8 @@ function getOrCreateCallState(callSid, details = {}) {
         const isClientMatch = details.clientId && st.clientId === details.clientId;
         const isPhoneMatch = initialTo && cleanAndComparePhone(st.to, initialTo);
         const isRecent = st.createdAt && (Date.now() - new Date(st.createdAt).getTime()) < 120000;
-        if (isPhoneMatch || isClientMatch || isRecent) {
+        // Require explicit phone match OR (client match AND recent) to avoid hijacking calls across clients/numbers
+        if (isPhoneMatch || (isClientMatch && isRecent)) {
           pendingState = st;
           pendingSid = sid;
           break;
@@ -1199,12 +1200,34 @@ try {
   console.error('[Config Startup Error] Failed to load config.json:', err.message);
 }
 
-function getIncomingCallConfig(query = {}, fromNum = '', clientId = '') {
+function getIncomingCallConfig(query = {}, fromNum = '', clientId = '', toNum = '') {
   const recordCall = defaultCallConfig.gemini_record_call === 'true' || defaultCallConfig.recordCall || false;
 
+  let effectiveClientId = clientId || (typeof query === 'object' && query ? (query.client_id || query['amp;client_id']) : '') || '';
+  
+  // Auto-resolve client by target/caller virtual number if clientId not explicitly provided
+  if (!effectiveClientId) {
+    if (toNum) {
+      for (const [cId, c] of clientsDb.entries()) {
+        if (c.phone_number && cleanAndComparePhone(c.phone_number, toNum)) {
+          effectiveClientId = cId;
+          break;
+        }
+      }
+    }
+    if (!effectiveClientId && fromNum) {
+      for (const [cId, c] of clientsDb.entries()) {
+        if (c.phone_number && cleanAndComparePhone(c.phone_number, fromNum)) {
+          effectiveClientId = cId;
+          break;
+        }
+      }
+    }
+  }
+
   let clientObj = null;
-  if (clientId && clientsDb.has(clientId)) {
-    clientObj = clientsDb.get(clientId);
+  if (effectiveClientId && clientsDb.has(effectiveClientId)) {
+    clientObj = clientsDb.get(effectiveClientId);
   }
 
   // 1. Determine tagRules and incomingAgentId (client-specific first, fallback to global)
@@ -1227,6 +1250,8 @@ function getIncomingCallConfig(query = {}, fromNum = '', clientId = '') {
 
       if (!taggedAgent) {
         for (const agent of agentsDb.values()) {
+          // If effectiveClientId exists, isolate search to agents belonging to this client or unassigned
+          if (effectiveClientId && agent.clientId && agent.clientId !== effectiveClientId) continue;
           if (agent.name && agent.name.toLowerCase().trim() === contactTag) {
             taggedAgent = agent;
             break;
@@ -1249,7 +1274,7 @@ function getIncomingCallConfig(query = {}, fromNum = '', clientId = '') {
           model: taggedAgent.model || defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
           name: callerContact.name || '',
           recordCall: recordCall,
-          clientId: clientId || null,
+          clientId: effectiveClientId || null,
           vobizAuthId: clientObj?.vobiz_sub_auth_id || defaultCallConfig.vobizAuthId,
           vobizAuthToken: clientObj?.vobiz_sub_auth_token || defaultCallConfig.vobizAuthToken,
           vobizCallerId: defaultCallConfig.vobizCallerId
@@ -1276,7 +1301,7 @@ function getIncomingCallConfig(query = {}, fromNum = '', clientId = '') {
         model: agent.model || defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
         name: '',
         recordCall: recordCall,
-        clientId: clientId || null,
+        clientId: effectiveClientId || null,
         vobizAuthId: clientObj?.vobiz_sub_auth_id || defaultCallConfig.vobizAuthId,
         vobizAuthToken: clientObj?.vobiz_sub_auth_token || defaultCallConfig.vobizAuthToken,
         vobizCallerId: defaultCallConfig.vobizCallerId
@@ -1295,15 +1320,15 @@ function getIncomingCallConfig(query = {}, fromNum = '', clientId = '') {
       model: defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
       name: clientObj.name || '',
       recordCall: recordCall,
-      clientId: clientId,
+      clientId: effectiveClientId,
       vobizAuthId: clientObj.vobiz_sub_auth_id || defaultCallConfig.vobizAuthId,
       vobizAuthToken: clientObj.vobiz_sub_auth_token || defaultCallConfig.vobizAuthToken
     };
   }
 
   return {
-    voice: query.voice || defaultCallConfig.voice || 'Aoede',
-    systemInstruction: query.systemInstruction || defaultCallConfig.systemInstruction,
+    voice: (typeof query === 'object' && query?.voice) || defaultCallConfig.voice || 'Aoede',
+    systemInstruction: (typeof query === 'object' && query?.systemInstruction) || defaultCallConfig.systemInstruction,
     model: defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
     name: '',
     recordCall: recordCall,
@@ -5732,29 +5757,24 @@ Follow these rules strictly to sound completely human, lively, and emotional:
             // Vobiz sends mediaFormat as object {type,sampleRate} OR as a string — handle both safely
             const rawFmt = msg.start?.mediaFormat || msg.start?.media_format || msg.start?.contentType || '';
             ws.vobizMediaFormat = (typeof rawFmt === 'string' ? rawFmt : (rawFmt?.type || rawFmt?.encoding || rawFmt?.contentType || '')).toLowerCase();
-            console.log(`[Vobiz Start] StreamSid: ${streamSid}, CallSid: ${callSid}, ClientId: ${clientId || 'None'}, MediaFormat: "${ws.vobizMediaFormat}", Full start: ${JSON.stringify(msg.start)}`);
+            console.log(`[Vobiz Start] StreamSid: ${streamSid}, CallSid: ${callSid}, ClientId: ${clientId || 'None'}, MediaFormat: "${ws.vobizMediaFormat}"`);
             
-            // Retrieve config by CallSid, To, or ClientId
-            let callConfig = callSettingsMap.get(callSid) || (clientId && clientsDb.has(clientId) ? null : null);
-            if (!callConfig && clientId && clientsDb.has(clientId)) {
-              const client = clientsDb.get(clientId);
-              console.log(`[Vobiz WS Stream] Selected client agent for ${client.name} (ID: ${client.id})`);
-              callConfig = {
-                voice: client.agent_config?.voice || defaultCallConfig.voice || 'Aoede',
-                systemInstruction: client.agent_config?.system_prompt || defaultCallConfig.systemInstruction,
-                model: defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
-                name: client.name || '',
-                recordCall: defaultCallConfig.gemini_record_call === 'true' || defaultCallConfig.recordCall || false,
-                clientId: clientId,
-                vobizAuthId: client.vobiz_sub_auth_id,
-                vobizAuthToken: client.vobiz_sub_auth_token
-              };
+            const existingState = activeCalls.get(callSid);
+            const fromNum = existingState?.from || urlObj.searchParams.get('from') || '';
+            const toNum = existingState?.to || urlObj.searchParams.get('to') || '';
+            const effectiveClientId = clientId || existingState?.clientId || null;
+
+            // Multi-key lookup in callSettingsMap
+            let callConfig = callSettingsMap.get(callSid)
+                          || (toNum ? callSettingsMap.get(toNum) : null)
+                          || (fromNum ? callSettingsMap.get(fromNum) : null);
+
+            if (!callConfig) {
+              console.log(`[Vobiz WS Stream] Config not found in memory map for ${callSid}, resolving via getIncomingCallConfig (Client: ${effectiveClientId || 'None'}, To: ${toNum}, From: ${fromNum})`);
+              callConfig = getIncomingCallConfig(urlObj.searchParams, fromNum, effectiveClientId, toNum);
               callSettingsMap.set(callSid, callConfig);
             }
-            if (!callConfig) {
-              callConfig = getIncomingCallConfig(urlObj.searchParams, '');
-            }
-            const existingState = activeCalls.get(callSid);
+
             const callState = getOrCreateCallState(callSid, {
               provider: 'vobiz',
               to: existingState?.to || callSid,
@@ -5762,10 +5782,11 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               name: callConfig.name || existingState?.name || '',
               recordCall: callConfig.recordCall || false,
               status: 'active',
-              clientId: callConfig.clientId || null
+              clientId: callConfig.clientId || effectiveClientId || null
             });
             if (callState) {
               callState.status = 'active';
+              if (callConfig.clientId && !callState.clientId) callState.clientId = callConfig.clientId;
               const nowIso = new Date().toISOString();
               if (!callState.answeredAt) callState.answeredAt = nowIso;
               if (!callState.mediaStartedAt) callState.mediaStartedAt = nowIso;
@@ -5780,18 +5801,31 @@ Follow these rules strictly to sound completely human, lively, and emotional:
             activeCallSid = callSid;
             console.log(`Exotel call started. StreamSid: ${streamSid}, CallSid: ${callSid}`);
             
-            // Retrieve config by CallSid or fallback to default
-            const rawConfig = callSettingsMap.get(callSid) || defaultCallConfig;
-            const callConfig = (rawConfig === defaultCallConfig) ? getIncomingCallConfig() : rawConfig;
+            const existingState = activeCalls.get(callSid);
+            const fromNum = existingState?.from || urlObj.searchParams.get('from') || '';
+            const toNum = existingState?.to || urlObj.searchParams.get('to') || '';
+            const effectiveClientId = clientId || existingState?.clientId || null;
+
+            let callConfig = callSettingsMap.get(callSid)
+                          || (toNum ? callSettingsMap.get(toNum) : null)
+                          || (fromNum ? callSettingsMap.get(fromNum) : null);
+
+            if (!callConfig) {
+              callConfig = getIncomingCallConfig(urlObj.searchParams, fromNum, effectiveClientId, toNum);
+              callSettingsMap.set(callSid, callConfig);
+            }
+
             const callState = getOrCreateCallState(callSid, {
               provider: 'exotel',
               to: callSid,
               name: callConfig.name || '',
               recordCall: callConfig.recordCall || false,
-              status: 'active'
+              status: 'active',
+              clientId: callConfig.clientId || effectiveClientId || null
             });
             if (callState) {
               callState.status = 'active';
+              if (callConfig.clientId && !callState.clientId) callState.clientId = callConfig.clientId;
               const nowIso = new Date().toISOString();
               if (!callState.answeredAt) callState.answeredAt = nowIso;
               if (!callState.mediaStartedAt) callState.mediaStartedAt = nowIso;
@@ -5803,18 +5837,31 @@ Follow these rules strictly to sound completely human, lively, and emotional:
             activeCallSid = callSid;
             console.log(`Twilio call started. StreamSid: ${streamSid}, CallSid: ${callSid}`);
             
-            // Retrieve config by CallSid or fallback to default
-            const rawConfig = callSettingsMap.get(callSid) || defaultCallConfig;
-            const callConfig = (rawConfig === defaultCallConfig) ? getIncomingCallConfig() : rawConfig;
+            const existingState = activeCalls.get(callSid);
+            const fromNum = existingState?.from || urlObj.searchParams.get('from') || '';
+            const toNum = existingState?.to || urlObj.searchParams.get('to') || '';
+            const effectiveClientId = clientId || existingState?.clientId || null;
+
+            let callConfig = callSettingsMap.get(callSid)
+                          || (toNum ? callSettingsMap.get(toNum) : null)
+                          || (fromNum ? callSettingsMap.get(fromNum) : null);
+
+            if (!callConfig) {
+              callConfig = getIncomingCallConfig(urlObj.searchParams, fromNum, effectiveClientId, toNum);
+              callSettingsMap.set(callSid, callConfig);
+            }
+
             const callState = getOrCreateCallState(callSid, {
               provider: 'twilio',
               to: callSid,
               name: callConfig.name || '',
               recordCall: callConfig.recordCall || false,
-              status: 'active'
+              status: 'active',
+              clientId: callConfig.clientId || effectiveClientId || null
             });
             if (callState) {
               callState.status = 'active';
+              if (callConfig.clientId && !callState.clientId) callState.clientId = callConfig.clientId;
               const nowIso = new Date().toISOString();
               if (!callState.answeredAt) callState.answeredAt = nowIso;
               if (!callState.mediaStartedAt) callState.mediaStartedAt = nowIso;
