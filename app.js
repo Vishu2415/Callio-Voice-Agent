@@ -110,17 +110,17 @@ window.campaignLeads = {};
 
 // Load API key from localStorage if it exists
 if (localStorage.getItem('gemini_api_key')) {
-  elApiKey.value = localStorage.getItem('gemini_api_key');
+  if (elApiKey) elApiKey.value = localStorage.getItem('gemini_api_key');
 }
 
 // Load System Instruction from localStorage if it exists
 if (localStorage.getItem('gemini_system_instruction')) {
-  elSystemInstruction.value = localStorage.getItem('gemini_system_instruction');
+  if (elSystemInstruction) elSystemInstruction.value = localStorage.getItem('gemini_system_instruction');
 }
 
 // Load Agent Voice from localStorage if it exists
 if (localStorage.getItem('gemini_agent_voice')) {
-  elVoiceName.value = localStorage.getItem('gemini_agent_voice');
+  if (elVoiceName) elVoiceName.value = localStorage.getItem('gemini_agent_voice');
 }
 
 // --- Navbar Main Tab Navigation ---
@@ -135,7 +135,8 @@ document.querySelectorAll('.glass-navbar .nav-btn').forEach(btn => {
     btn.classList.add('active');
     // Show target tab pane
     const targetId = btn.getAttribute('data-tab');
-    document.getElementById(targetId).classList.add('active');
+    const targetPane = document.getElementById(targetId);
+    if (targetPane) targetPane.classList.add('active');
 
     // Save active tab to localStorage
     localStorage.setItem('activeTab', targetId);
@@ -173,31 +174,31 @@ document.querySelectorAll('.glass-navbar .nav-btn').forEach(btn => {
 });
 
 // --- Tab Navigation (Logs/Transcript) ---
-elTabTranscript.addEventListener('click', () => {
-  elTabTranscript.classList.add('active');
-  elTabLogs.classList.remove('active');
-  elTabSummary.classList.remove('active');
-  elTranscriptContainer.classList.add('active');
-  elLogsContainer.classList.remove('active');
-  elSummaryContainer.classList.remove('active');
+elTabTranscript?.addEventListener('click', () => {
+  elTabTranscript?.classList.add('active');
+  elTabLogs?.classList.remove('active');
+  elTabSummary?.classList.remove('active');
+  elTranscriptContainer?.classList.add('active');
+  elLogsContainer?.classList.remove('active');
+  elSummaryContainer?.classList.remove('active');
 });
 
-elTabLogs.addEventListener('click', () => {
-  elTabLogs.classList.add('active');
-  elTabTranscript.classList.remove('active');
-  elTabSummary.classList.remove('active');
-  elLogsContainer.classList.add('active');
-  elTranscriptContainer.classList.remove('active');
-  elSummaryContainer.classList.remove('active');
+elTabLogs?.addEventListener('click', () => {
+  elTabLogs?.classList.add('active');
+  elTabTranscript?.classList.remove('active');
+  elTabSummary?.classList.remove('active');
+  elLogsContainer?.classList.add('active');
+  elTranscriptContainer?.classList.remove('active');
+  elSummaryContainer?.classList.remove('active');
 });
 
-elTabSummary.addEventListener('click', () => {
-  elTabSummary.classList.add('active');
-  elTabTranscript.classList.remove('active');
-  elTabLogs.classList.remove('active');
-  elSummaryContainer.classList.add('active');
-  elTranscriptContainer.classList.remove('active');
-  elLogsContainer.classList.remove('active');
+elTabSummary?.addEventListener('click', () => {
+  elTabSummary?.classList.add('active');
+  elTabTranscript?.classList.remove('active');
+  elTabLogs?.classList.remove('active');
+  elSummaryContainer?.classList.add('active');
+  elTranscriptContainer?.classList.remove('active');
+  elLogsContainer?.classList.remove('active');
   if (!selectedCallSid) {
     showListView();
   } else {
@@ -4779,18 +4780,17 @@ function applyUserRole(user) {
   
   if (user.role === 'admin') {
     // Admin has access to all standard tabs + admin tab + billing + settings
-    document.getElementById('nav-dashboard').style.display = 'block';
-    document.getElementById('nav-agents').style.display = 'block';
-    document.getElementById('nav-contacts').style.display = 'block';
-    document.getElementById('nav-broadcast').style.display = 'block';
-    document.getElementById('nav-quick-call').style.display = 'block';
-    document.getElementById('nav-crm-automation').style.display = 'block';
-    document.getElementById('nav-api-sharing').style.display = 'block';
-    document.getElementById('nav-admin-panel').style.display = 'block';
+    ['nav-dashboard', 'nav-agents', 'nav-contacts', 'nav-broadcast', 'nav-quick-call', 'nav-crm-automation', 'nav-api-sharing', 'nav-admin-panel'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'inline-flex';
+    });
     
     // Populate branding settings form
-    window.loadBrandingToForm();
-    document.getElementById('nav-billing').style.display = 'none';
+    if (typeof window.loadBrandingToForm === 'function') {
+      window.loadBrandingToForm();
+    }
+    const navBilling = document.getElementById('nav-billing');
+    if (navBilling) navBilling.style.display = 'none';
     
     // Show settings and provider selection for admin
     const settingsBtn = document.getElementById('btn-toggle-settings');
@@ -4830,14 +4830,12 @@ function applyUserRole(user) {
     fetchClientDashboardData();
   } else {
     // Client has access to all standard tabs except Admin Panel
-    document.getElementById('nav-dashboard').style.display = 'block';
-    document.getElementById('nav-agents').style.display = 'block';
-    document.getElementById('nav-contacts').style.display = 'block';
-    document.getElementById('nav-broadcast').style.display = 'block';
-    document.getElementById('nav-quick-call').style.display = 'block';
-    document.getElementById('nav-crm-automation').style.display = 'block';
-    document.getElementById('nav-api-sharing').style.display = 'block';
-    document.getElementById('nav-billing').style.display = 'block';
+    ['nav-dashboard', 'nav-agents', 'nav-contacts', 'nav-broadcast', 'nav-quick-call', 'nav-crm-automation', 'nav-api-sharing', 'nav-billing'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'inline-flex';
+    });
+    const navAdmin = document.getElementById('nav-admin-panel');
+    if (navAdmin) navAdmin.style.display = 'none';
     
     // Show settings for client but hide admin-only config panels
     const settingsBtn = document.getElementById('btn-toggle-settings');
