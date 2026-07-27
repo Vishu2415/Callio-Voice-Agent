@@ -2803,11 +2803,8 @@ app.get('/api/groups', authMiddleware('contacts'), (req, res) => {
   const { clientId } = req.query;
   let list = Array.from(groupsDb.values());
   if (clientId && clientId !== 'admin') {
-    // Strict isolation: only groups explicitly owned by this client
-    list = list.filter(g => g.clientId === clientId);
-  } else if (clientId === 'admin') {
-    // Admin sees only admin-owned groups (not client groups)
-    list = list.filter(g => g.clientId === 'admin' || !g.clientId);
+    // Include groups explicitly owned by this client + unassigned/legacy groups
+    list = list.filter(g => !g.clientId || g.clientId === clientId);
   }
   list.sort((a, b) => b.createdAt - a.createdAt);
   // Attach contacts to each group
@@ -2859,13 +2856,23 @@ app.post('/api/contacts/batch', authMiddleware('contacts'), (req, res) => {
   
   let added = 0;
   contacts.forEach(c => {
-    if (c.phone) {
+    let phone = c.phone ? String(c.phone).trim() : '';
+    let name = c.name ? String(c.name).trim() : '';
+
+    // Auto-swap if phone contains letters and name contains digits
+    if (/[a-zA-Z]/.test(phone) && /^[\d\s\-\(\)\+]+$/.test(name)) {
+      const temp = phone;
+      phone = name;
+      name = temp;
+    }
+
+    if (phone) {
       const contactId = `cont_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       contactsDb.set(contactId, {
         id: contactId,
         groupId,
-        phone: c.phone,
-        name: c.name || '',
+        phone,
+        name,
         createdAt: Date.now()
       });
       added++;

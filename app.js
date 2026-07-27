@@ -2490,21 +2490,29 @@ document.getElementById('campaign-file-input')?.addEventListener('change', async
       const nameIdx = headers.findIndex(h => h.includes('name'));
 
       if (phoneIdx === -1 && rows.length > 1) {
-        // Fallback: Assume first column is phone
-        rows.forEach(r => {
+        // Fallback: Check columns
+        rows.forEach((r, idx) => {
+          if (idx === 0 && (r.toLowerCase().includes('name') || r.toLowerCase().includes('phone'))) return;
           const cols = r.split(',');
-          if (cols[0] && cols[0].trim().length >= 10) {
-            pendingContacts.push({ phone: cols[0].trim(), name: cols[1] ? cols[1].trim() : '' });
+          let p = cols[0] ? cols[0].trim() : '';
+          let n = cols[1] ? cols[1].trim() : '';
+          if (/[a-zA-Z]/.test(p) && /^[\d\s\-\(\)\+]+$/.test(n)) {
+            const tmp = p; p = n; n = tmp;
+          }
+          if (p && p.length >= 7) {
+            pendingContacts.push({ phone: p, name: n });
           }
         });
       } else {
         for (let i = 1; i < rows.length; i++) {
           const cols = rows[i].split(',');
           if (cols[phoneIdx] && cols[phoneIdx].trim()) {
-            pendingContacts.push({ 
-              phone: cols[phoneIdx].trim(), 
-              name: nameIdx !== -1 && cols[nameIdx] ? cols[nameIdx].trim() : ''
-            });
+            let p = cols[phoneIdx].trim();
+            let n = nameIdx !== -1 && cols[nameIdx] ? cols[nameIdx].trim() : '';
+            if (/[a-zA-Z]/.test(p) && /^[\d\s\-\(\)\+]+$/.test(n)) {
+              const tmp = p; p = n; n = tmp;
+            }
+            pendingContacts.push({ phone: p, name: n });
           }
         }
       }
