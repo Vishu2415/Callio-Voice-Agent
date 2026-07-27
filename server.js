@@ -552,10 +552,17 @@ function isVirtualNumber(phone) {
   return false;
 }
 
-function findContactByPhone(phone) {
+function findContactByPhone(phone, clientId = null) {
   if (!phone) return null;
   for (const contact of contactsDb.values()) {
     if (cleanAndComparePhone(contact.phone, phone)) {
+      if (clientId && clientId !== 'admin') {
+        const group = groupsDb.get(contact.groupId);
+        // Strict isolation: skip contacts owned by a different client
+        if (group && group.clientId && group.clientId !== clientId) {
+          continue;
+        }
+      }
       return contact;
     }
   }
@@ -1236,7 +1243,7 @@ function getIncomingCallConfig(query = {}, fromNum = '', clientId = '', toNum = 
 
   // ─── TAG-BASED ROUTING ──────────────────────────────────────────────────────
   if (fromNum) {
-    const callerContact = findContactByPhone(fromNum);
+    const callerContact = findContactByPhone(fromNum, effectiveClientId);
     if (callerContact && callerContact.tag) {
       const contactTag = callerContact.tag.toLowerCase().trim();
       console.log(`[Incoming Routing] Caller ${fromNum} has tag: "${contactTag}" — searching for matching agent…`);
@@ -1965,7 +1972,7 @@ app.post('/incoming-call', (req, res) => {
     callConfig = { ...callConfig };
   }
   
-  const matchedContact = findContactByPhone(fromNum);
+  const matchedContact = findContactByPhone(fromNum, clientId);
   if (matchedContact && matchedContact.name) {
     console.log(`[Twilio Webhook] Found saved contact matching ${fromNum}: "${matchedContact.name}"`);
     callConfig.name = matchedContact.name;
@@ -2040,7 +2047,7 @@ app.all('/incoming-call-exotel', (req, res) => {
     callConfig = { ...callConfig };
   }
   
-  const matchedContact = findContactByPhone(fromNum);
+  const matchedContact = findContactByPhone(fromNum, clientId);
   if (matchedContact && matchedContact.name) {
     console.log(`[Exotel Webhook] Found saved contact matching ${fromNum}: "${matchedContact.name}"`);
     callConfig.name = matchedContact.name;
@@ -2141,7 +2148,7 @@ app.all('/incoming-call-vobiz', (req, res) => {
     callConfig = { ...callConfig };
   }
   
-  const matchedContact = findContactByPhone(fromNum);
+  const matchedContact = findContactByPhone(fromNum, clientId);
   if (matchedContact && matchedContact.name) {
     console.log(`[Vobiz Webhook] Found saved contact matching ${fromNum}: "${matchedContact.name}"`);
     callConfig.name = matchedContact.name;
@@ -2280,7 +2287,7 @@ app.post('/make-call', async (req, res) => {
   }
   
   if (!name && to) {
-    const contact = findContactByPhone(to);
+    const contact = findContactByPhone(to, activeClientId);
     if (contact && contact.name) {
       name = contact.name;
       console.log(`[Outbound Call Resolution] Resolved phone ${to} to contact name: "${name}"`);
