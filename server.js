@@ -4988,17 +4988,17 @@ Follow these rules strictly to sound completely human, lively, and emotional:
         clearTimeout(inactivityTimeout);
       }
       const now = Date.now();
-      const delay = Math.max(10000, (agentSpeakingUntil - now) + 10000);
+      const delay = Math.max(35000, (agentSpeakingUntil - now) + 35000);
       
       inactivityTimeout = setTimeout(() => {
-        console.log(`[Inactivity Timeout] User silent for 10s on CallSid: ${callSid}. Triggering automated farewell...`);
+        console.log(`[Inactivity Timeout] User silent for 35s on CallSid: ${callSid}. Triggering automated farewell...`);
         if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
           const timeoutGreeting = {
             clientContent: {
               turns: [
                 {
                   role: "user",
-                  parts: [{ text: "The user has been silent for 10 seconds. Say a quick polite goodbye in Hinglish and hang up the call using the hangupCall tool." }]
+                  parts: [{ text: "The user has been silent for 35 seconds. Say a quick polite goodbye in Hinglish and hang up the call using the hangupCall tool." }]
                 }
               ],
               turnComplete: true
@@ -5203,8 +5203,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 return;
               }
 
-              // Hard hang-up detection: if user explicitly says to stop/cut, send hangup signal immediately
-              const userWantsHangup = /\b(not interested|no interest|interested nahi|dilchaspi nahi|no thanks|no thank you|hang up|cut the call|end the call|stop calling|don't call|don't call again|bye|goodbye|ruk|band karo|call mat karo|phone rakho|rakho phone|kat do|kato|nahi chahiye|nahi chahie)\b/i.test(transText);
+              // Hard hang-up detection: if user explicitly commands to stop/cut call
+              const userWantsHangup = /\b(hang up|cut the call|end the call|stop calling me|don't call again|disconnect the call|call mat karna dobara)\b/i.test(transText);
               if (userWantsHangup && !callState._terminating) {
                 console.log(`[Hard Hangup Detected] User said: "${transText}". Injecting hangup instruction to Gemini...`);
                 callState._terminating = true;
