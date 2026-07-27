@@ -5517,17 +5517,13 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           console.log('Gemini setup complete. Call channel active.');
           isGeminiReady = true;
 
-          // Trigger initial greeting with a 3.5-second delay for incoming calls (2s for outbound), unless user speaks first
+          // Trigger instant initial greeting immediately upon setup completion
           ws.userHasSpoken = false;
           ws.isInterrupted = false;
           
-          const callStateObj = activeCalls.get(callSid);
-          const isIncomingCall = callStateObj && callStateObj.direction === 'incoming';
-          const greetingDelayMs = isIncomingCall ? 800 : 0; // Instant 0ms for outbound calls
-          
           const sendGreetingNow = () => {
-            if (geminiWs && geminiWs.readyState === WebSocket.OPEN && !ws.userHasSpoken) {
-              ws.userHasSpoken = true;
+            if (geminiWs && geminiWs.readyState === WebSocket.OPEN && !ws.hasGreetingSent) {
+              ws.hasGreetingSent = true;
               const cleanName = name ? name.trim() : '';
               const isPhoneNumber = /^[+\d\s\-\(\)]+$/.test(cleanName);
               const isDefaultLead = cleanName.toLowerCase() === 'saas lead' || cleanName.toLowerCase() === 'saas' || cleanName.toLowerCase() === 'customer' || cleanName.toLowerCase() === 'a customer';
@@ -5550,7 +5546,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 }
               };
               
-              console.log(`[WebSocket Stream Setup] Injecting instant initial greeting turn (${greetingDelayMs}ms delay): "${greetPrompt}"`);
+              console.log(`[WebSocket Stream Setup] Injecting instant initial greeting turn: "${greetPrompt}"`);
               try {
                 geminiWs.send(JSON.stringify(initGreeting));
               } catch (e) {
@@ -5559,12 +5555,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
             }
           };
 
-          if (greetingDelayMs === 0) {
-            sendGreetingNow();
-          } else {
-            ws.greetingTimeout = setTimeout(sendGreetingNow, greetingDelayMs);
-          }
-          
+          sendGreetingNow();
           resetInactivityTimer();
           return;
         }
