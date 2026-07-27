@@ -4813,7 +4813,10 @@ function applyUserRole(user) {
 }
 
 // 1. Signup Action
+let isSigningUp = false;
 document.getElementById('btn-signup-submit')?.addEventListener('click', async () => {
+  if (isSigningUp) return;
+
   const name = document.getElementById('signup-name').value.trim();
   const email = document.getElementById('signup-email').value.trim();
   const phone = document.getElementById('signup-phone').value.trim();
@@ -4824,7 +4827,16 @@ document.getElementById('btn-signup-submit')?.addEventListener('click', async ()
     return;
   }
 
+  const btn = document.getElementById('btn-signup-submit');
+
   try {
+    isSigningUp = true;
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+      btn.style.cursor = 'not-allowed';
+    }
+
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Tenant-Id': window.BrandingContext ? window.BrandingContext.id : '' },
@@ -4852,6 +4864,13 @@ document.getElementById('btn-signup-submit')?.addEventListener('click', async ()
   } catch (err) {
     console.error('Signup error:', err);
     alert('Signup failed. Please try again.');
+  } finally {
+    isSigningUp = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+    }
   }
 });
 

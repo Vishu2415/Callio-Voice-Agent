@@ -3324,6 +3324,39 @@ function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
 
+function deduplicateClientsDb() {
+  const seenEmails = new Map();
+  let modified = false;
+
+  for (const [clientId, client] of clientsDb.entries()) {
+    if (!client || !client.email) continue;
+    const emailKey = client.email.trim().toLowerCase();
+
+    if (seenEmails.has(emailKey)) {
+      const existingId = seenEmails.get(emailKey);
+      const existingClient = clientsDb.get(existingId);
+
+      // Keep client that has assigned phone_number if available, otherwise keep latest
+      if (!existingClient.phone_number && client.phone_number) {
+        clientsDb.delete(existingId);
+        seenEmails.set(emailKey, clientId);
+      } else {
+        clientsDb.delete(clientId);
+      }
+      modified = true;
+      console.log(`[Database Cleanup] Deleted duplicate client account for email: ${emailKey}`);
+    } else {
+      seenEmails.set(emailKey, clientId);
+    }
+  }
+
+  if (modified) {
+    saveClients();
+  }
+}
+
+const inFlightSignups = new Set();
+
 // 1. Signup Endpoint (Client Onboarding)
 app.post('/api/auth/signup', async (req, res) => {
   const { name, email, phone, password } = req.body;
@@ -3331,93 +3364,108 @@ app.post('/api/auth/signup', async (req, res) => {
     return res.status(400).json({ success: false, error: 'All fields are required.' });
   }
 
+  const cleanEmail = String(email).trim().toLowerCase();
+
+  // Run cleanup to strip existing duplicates
+  deduplicateClientsDb();
+
   // Check if email already exists
   for (const client of clientsDb.values()) {
-    if (client.email.toLowerCase() === email.toLowerCase()) {
+    if (client.email && client.email.trim().toLowerCase() === cleanEmail) {
       return res.status(400).json({ success: false, error: 'Email already registered.' });
     }
   }
 
-  const clientId = `client_${Date.now()}`;
-  let subAuthId = 'SA_G0OY05TV'; // Default test sub-account from prompt
-  let subAuthToken = 'token_test_subaccount';
-
-  // Attempt to call Vobiz API to create a sub-account
-  const masterAuthId = defaultCallConfig.vobizAuthId || process.env.VOBIZ_MASTER_AUTH_ID || 'MA_5VY3LRDW';
-  const masterAuthToken = defaultCallConfig.vobizAuthToken || process.env.VOBIZ_MASTER_AUTH_TOKEN;
-
-  if (masterAuthId && masterAuthToken) {
-    try {
-      console.log(`[Vobiz API] Creating sub-account for: ${email}`);
-      const vobizUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Subaccount/`;
-      const response = await fetch(vobizUrl, {
-        method: 'POST',
-        headers: {
-          'X-Auth-ID': masterAuthId.trim(),
-          'X-Auth-Token': masterAuthToken.trim(),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: name,
-          email: email,
-          phone: phone
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        subAuthId = data.sub_auth_id || subAuthId;
-        subAuthToken = data.sub_auth_token || subAuthToken;
-        console.log(`[Vobiz API] Sub-account created successfully: ${subAuthId}`);
-      } else {
-        console.warn(`[Vobiz API] Failed to create sub-account: ${response.status}. Using test sub-account.`);
-      }
-    } catch (err) {
-      console.error(`[Vobiz API Exception] Using test sub-account:`, err.message);
-    }
-  } else {
-    console.log(`[Vobiz API] Master credentials missing. Using test sub-account: ${subAuthId}`);
+  // Check in-flight atomic lock to prevent race conditions from concurrent clicks
+  if (inFlightSignups.has(cleanEmail)) {
+    return res.status(400).json({ success: false, error: 'Account creation in progress. Please wait.' });
   }
 
-  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
-  const currentReseller = getResellerFromHost(host);
-  const resellerId = currentReseller ? currentReseller.id : null;
+  inFlightSignups.add(cleanEmail);
 
-  const tenantId = req.headers['x-tenant-id'] || req.body.tenantId || '';
-  const clientData = {
-    tenantId: tenantId || null,
-    reseller_id: resellerId,
-    id: clientId,
-    name,
-    email,
-    password: hashPassword(password),
-    vobiz_sub_auth_id: subAuthId,
-    vobiz_sub_auth_token: subAuthToken,
-    phone_number: null,
-    agent_config: {
-      system_prompt: defaultCallConfig.systemInstruction || "You are a helpful voice assistant.",
-      voice: "Aoede",
-      language: "Hinglish"
-    },
-    status: 'pending_number',
-    created_at: new Date().toISOString()
-  };
+  try {
+    const clientId = `client_${Date.now()}`;
+    let subAuthId = 'SA_G0OY05TV'; // Default test sub-account from prompt
+    let subAuthToken = 'token_test_subaccount';
 
+    // Attempt to call Vobiz API to create a sub-account
+    const masterAuthId = defaultCallConfig.vobizAuthId || process.env.VOBIZ_MASTER_AUTH_ID || 'MA_5VY3LRDW';
+    const masterAuthToken = defaultCallConfig.vobizAuthToken || process.env.VOBIZ_MASTER_AUTH_TOKEN;
 
-  clientsDb.set(clientId, clientData);
-  saveClients();
+    if (masterAuthId && masterAuthToken) {
+      try {
+        console.log(`[Vobiz API] Creating sub-account for: ${cleanEmail}`);
+        const vobizUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Subaccount/`;
+        const response = await fetch(vobizUrl, {
+          method: 'POST',
+          headers: {
+            'X-Auth-ID': masterAuthId.trim(),
+            'X-Auth-Token': masterAuthToken.trim(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: name,
+            email: cleanEmail,
+            phone: phone
+          })
+        });
 
-  res.json({
-    success: true,
-    client: {
-      id: clientId,
-      name: clientData.name,
-      email: clientData.email,
-      phone_number: clientData.phone_number,
-      status: clientData.status,
-      vobiz_sub_auth_id: clientData.vobiz_sub_auth_id
+        if (response.ok) {
+          const data = await response.json();
+          subAuthId = data.sub_auth_id || subAuthId;
+          subAuthToken = data.sub_auth_token || subAuthToken;
+          console.log(`[Vobiz API] Sub-account created successfully: ${subAuthId}`);
+        } else {
+          console.warn(`[Vobiz API] Failed to create sub-account: ${response.status}. Using test sub-account.`);
+        }
+      } catch (err) {
+        console.error(`[Vobiz API Exception] Using test sub-account:`, err.message);
+      }
+    } else {
+      console.log(`[Vobiz API] Master credentials missing. Using test sub-account: ${subAuthId}`);
     }
-  });
+
+    const realHost = getRealHostFromRequest(req);
+    const currentReseller = getResellerFromHost(realHost);
+    const resellerId = currentReseller ? currentReseller.id : null;
+
+    const tenantId = req.headers['x-tenant-id'] || req.body.tenantId || '';
+    const clientData = {
+      tenantId: tenantId || null,
+      reseller_id: resellerId,
+      id: clientId,
+      name,
+      email: cleanEmail,
+      password: hashPassword(password),
+      vobiz_sub_auth_id: subAuthId,
+      vobiz_sub_auth_token: subAuthToken,
+      phone_number: null,
+      agent_config: {
+        system_prompt: defaultCallConfig.systemInstruction || "You are a helpful voice assistant.",
+        voice: "Aoede",
+        language: "Hinglish"
+      },
+      status: 'pending_number',
+      created_at: new Date().toISOString()
+    };
+
+    clientsDb.set(clientId, clientData);
+    saveClients();
+
+    return res.json({
+      success: true,
+      client: {
+        id: clientId,
+        name: clientData.name,
+        email: clientData.email,
+        phone_number: clientData.phone_number,
+        status: clientData.status,
+        vobiz_sub_auth_id: clientData.vobiz_sub_auth_id
+      }
+    });
+  } finally {
+    inFlightSignups.delete(cleanEmail);
+  }
 });
 
 // 2. Login Endpoint
@@ -3723,6 +3771,7 @@ app.get('/api/admin/pending-requests', (req, res) => {
 
 // 6. Get All Clients (Admin)
 app.get('/api/admin/clients', (req, res) => {
+  deduplicateClientsDb();
   const host = req.headers.host || req.headers.origin || req.headers.referer || '';
   const currentReseller = getResellerFromHost(host);
 
