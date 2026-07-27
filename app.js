@@ -4495,7 +4495,8 @@ function applyUserRole(user) {
     if (panel) panel.style.display = 'flex';
     
     // Restore active tab or default to dashboard
-    const savedTab = localStorage.getItem('activeTab') || 'tab-dashboard';
+    let savedTab = localStorage.getItem('activeTab');
+    if (!savedTab || savedTab === 'tab-dashboard') savedTab = 'tab-recordings';
     const targetNavBtn = document.querySelector(`.glass-navbar .nav-btn[data-tab="${savedTab}"]`);
     if (targetNavBtn && targetNavBtn.style.display !== 'none') {
       targetNavBtn.click();
@@ -4541,7 +4542,8 @@ function applyUserRole(user) {
     if (panel) panel.style.display = 'flex';
     
     // Restore active tab or default to dashboard
-    const savedTab = localStorage.getItem('activeTab') || 'tab-dashboard';
+    let savedTab = localStorage.getItem('activeTab');
+    if (!savedTab || savedTab === 'tab-dashboard') savedTab = 'tab-recordings';
     const targetNavBtn = document.querySelector(`.glass-navbar .nav-btn[data-tab="${savedTab}"]`);
     if (targetNavBtn && targetNavBtn.style.display !== 'none') {
       targetNavBtn.click();
@@ -4588,7 +4590,7 @@ document.getElementById('btn-signup-submit')?.addEventListener('click', async ()
       const loginData = await loginRes.json();
       if (loginData.success) {
         localStorage.setItem('user_session', JSON.stringify(loginData.user));
-        localStorage.setItem('activeTab', 'tab-dashboard');
+        localStorage.setItem('activeTab', 'tab-recordings');
         loggedInUser = loginData.user;
         applyUserRole(loggedInUser);
       }
@@ -4620,7 +4622,7 @@ document.getElementById('btn-login-submit')?.addEventListener('click', async () 
     const data = await res.json();
     if (data.success) {
       localStorage.setItem('user_session', JSON.stringify(data.user));
-      localStorage.setItem('activeTab', 'tab-dashboard');
+      localStorage.setItem('activeTab', 'tab-recordings');
       loggedInUser = data.user;
       applyUserRole(loggedInUser);
     } else {
