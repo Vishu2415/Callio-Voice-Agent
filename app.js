@@ -4495,16 +4495,13 @@ function applyUserRole(user) {
     if (panel) panel.style.display = 'flex';
     
     // Restore active tab or default to dashboard
-    const savedTab = localStorage.getItem('activeTab');
-    if (savedTab) {
-      const tabButton = document.querySelector(`.glass-navbar .nav-btn[data-tab="${savedTab}"]`);
-      if (tabButton && tabButton.style.display !== 'none') {
-        tabButton.click();
-      } else {
-        document.getElementById('nav-dashboard').click();
-      }
+    const savedTab = localStorage.getItem('activeTab') || 'tab-dashboard';
+    const targetNavBtn = document.querySelector(`.glass-navbar .nav-btn[data-tab="${savedTab}"]`);
+    if (targetNavBtn && targetNavBtn.style.display !== 'none') {
+      targetNavBtn.click();
     } else {
-      document.getElementById('nav-dashboard').click();
+      const dashBtn = document.getElementById('nav-dashboard');
+      if (dashBtn) dashBtn.click();
     }
     
     // Fetch Admin data
@@ -4544,16 +4541,13 @@ function applyUserRole(user) {
     if (panel) panel.style.display = 'flex';
     
     // Restore active tab or default to dashboard
-    const savedTab = localStorage.getItem('activeTab');
-    if (savedTab) {
-      const tabButton = document.querySelector(`.glass-navbar .nav-btn[data-tab="${savedTab}"]`);
-      if (tabButton && tabButton.style.display !== 'none') {
-        tabButton.click();
-      } else {
-        document.getElementById('nav-dashboard').click();
-      }
+    const savedTab = localStorage.getItem('activeTab') || 'tab-dashboard';
+    const targetNavBtn = document.querySelector(`.glass-navbar .nav-btn[data-tab="${savedTab}"]`);
+    if (targetNavBtn && targetNavBtn.style.display !== 'none') {
+      targetNavBtn.click();
     } else {
-      document.getElementById('nav-dashboard').click();
+      const dashBtn = document.getElementById('nav-dashboard');
+      if (dashBtn) dashBtn.click();
     }
     
     // Fetch Client data
@@ -4594,6 +4588,7 @@ document.getElementById('btn-signup-submit')?.addEventListener('click', async ()
       const loginData = await loginRes.json();
       if (loginData.success) {
         localStorage.setItem('user_session', JSON.stringify(loginData.user));
+        localStorage.setItem('activeTab', 'tab-dashboard');
         loggedInUser = loginData.user;
         applyUserRole(loggedInUser);
       }
@@ -4625,6 +4620,7 @@ document.getElementById('btn-login-submit')?.addEventListener('click', async () 
     const data = await res.json();
     if (data.success) {
       localStorage.setItem('user_session', JSON.stringify(data.user));
+      localStorage.setItem('activeTab', 'tab-dashboard');
       loggedInUser = data.user;
       applyUserRole(loggedInUser);
     } else {
