@@ -1546,81 +1546,83 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
 async function playVoiceSample(voiceName, buttonEl) {
-  const apiKey = elApiKey.value.trim();
-  if (!apiKey) {
-    alert("Please enter your Gemini API Key in the Settings drawer first to test voices.");
-    document.getElementById('settings-drawer')?.classList.add('active');
-    return;
-  }
-  
   const originalText = buttonEl.innerText;
   buttonEl.innerText = "⏳...";
   buttonEl.disabled = true;
-  
-  const prompt = "Hello! Main ready hoon.";
-  
-  const payload = {
-    contents: [{
-      role: "user",
-      parts: [{ text: prompt }]
-    }],
-    generationConfig: {
-      responseModalities: ["AUDIO"],
-      speechConfig: {
-        "voiceConfig": {
-          "prebuiltVoiceConfig": {
-            "voiceName": voiceName
+
+  const sampleText = `Namaste! Main aapka AI calling agent hoon. Yeh mera ${voiceName || 'standard'} voice sample hai.`;
+
+  try {
+    const apiKey = typeof elApiKey !== 'undefined' && elApiKey ? elApiKey.value.trim() : '';
+    if (apiKey) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const payload = {
+          contents: [{ role: "user", parts: [{ text: sampleText }] }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: voiceName || "Aoede" }
+              }
+            }
+          }
+        };
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const candidate = data.candidates?.[0];
+          const part = candidate?.content?.parts?.[0];
+
+          if (part?.inlineData?.data) {
+            const base64Audio = part.inlineData.data;
+            const arrayBuffer = base64ToArrayBuffer(base64Audio);
+            const float32Data = pcmToFloat32(arrayBuffer);
+
+            const sampleCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const audioBuffer = sampleCtx.createBuffer(1, float32Data.length, 24000);
+            audioBuffer.getChannelData(0).set(float32Data);
+
+            const source = sampleCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(sampleCtx.destination);
+            source.start(0);
+
+            source.onended = () => {
+              setTimeout(() => sampleCtx.close(), 1000);
+            };
+            return;
           }
         }
+      } catch (geminiErr) {
+        console.warn('[Voice Sample] Gemini REST API preview skipped, using Web Speech API fallback:', geminiErr);
       }
     }
-  };
-  
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${apiKey}`;
-  
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
-    }
-    
-    const data = await res.json();
-    const candidate = data.candidates?.[0];
-    const part = candidate?.content?.parts?.[0];
-    
-    if (part?.inlineData?.data) {
-      const base64Audio = part.inlineData.data;
-      const arrayBuffer = base64ToArrayBuffer(base64Audio);
-      const float32Data = pcmToFloat32(arrayBuffer);
-      
-      const sampleCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const audioBuffer = sampleCtx.createBuffer(1, float32Data.length, 24000);
-      audioBuffer.getChannelData(0).set(float32Data);
-      
-      const source = sampleCtx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(sampleCtx.destination);
-      source.start(0);
-      
-      source.onended = () => {
-        setTimeout(() => sampleCtx.close(), 1000);
-      };
+
+    // High Quality Web Speech Synthesis Fallback
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(sampleText);
+      utterance.rate = 0.95;
+      utterance.pitch = voiceName === 'Charon' ? 0.8 : (voiceName === 'Puck' ? 1.2 : 1.0);
+      utterance.lang = 'hi-IN';
+
+      const voices = window.speechSynthesis.getVoices();
+      const hindiVoice = voices.find(v => v.lang && (v.lang.includes('hi') || v.name.includes('Hindi') || v.name.includes('India')));
+      if (hindiVoice) utterance.voice = hindiVoice;
+
+      window.speechSynthesis.speak(utterance);
     } else {
-      throw new Error("No audio data returned in the response.");
+      alert("Audio preview unavailable on this browser.");
     }
   } catch (err) {
-    if (err.message.includes("quota") || err.message.includes("Quota") || err.message.includes("rate-limit") || err.message.includes("429") || err.message.includes("limit")) {
-      alert("⚠️ Gemini API Rate Limit Exceeded!\n\nAapki API Key Free Tier par chal rahi hai, jiske karan 1 minute me max 10 voice test requests hi allowed hain. Kripya 1 minute baad firse try karein.");
-    } else {
-      alert(`Failed to play voice sample: ${err.message}`);
-    }
     console.error(err);
+    alert(`Voice sample playback error: ${err.message}`);
   } finally {
     buttonEl.innerText = originalText;
     buttonEl.disabled = false;
@@ -2219,20 +2221,31 @@ window.editAgent = function(id) {
   const saveBtn = document.getElementById('btn-save-agent');
   if (saveBtn) {
     saveBtn.innerText = 'Update Agent';
-    
-    // Create/toggle Cancel button if it doesn't exist
+    saveBtn.style.flex = '1';
+    saveBtn.style.marginTop = '0';
+
+    let parent = saveBtn.parentNode;
+    if (!parent.classList.contains('agent-btn-flex-wrapper')) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'agent-btn-flex-wrapper';
+      wrapper.style.cssText = 'display: flex; gap: 10px; margin-top: 0.75rem; width: 100%; box-sizing: border-box;';
+      parent.insertBefore(wrapper, saveBtn);
+      wrapper.appendChild(saveBtn);
+      parent = wrapper;
+    }
+
     let cancelBtn = document.getElementById('btn-cancel-agent-edit');
     if (!cancelBtn) {
       cancelBtn = document.createElement('button');
       cancelBtn.id = 'btn-cancel-agent-edit';
       cancelBtn.className = 'btn btn-secondary';
       cancelBtn.innerText = 'Cancel';
-      cancelBtn.style.marginLeft = '8px';
+      cancelBtn.style.cssText = 'flex: 1; height: 42px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-top: 0;';
       cancelBtn.addEventListener('click', (e) => {
         e.preventDefault();
         clearAgentForm();
       });
-      saveBtn.parentNode.appendChild(cancelBtn);
+      parent.appendChild(cancelBtn);
     }
   }
 };
@@ -2241,10 +2254,18 @@ window.clearAgentForm = function() {
   editingAgentId = null;
   document.getElementById('agent-name').value = '';
   document.getElementById('agent-prompt').value = '';
-  
+
   const saveBtn = document.getElementById('btn-save-agent');
   if (saveBtn) {
     saveBtn.innerText = 'Save Agent';
+    saveBtn.style.width = '100%';
+    saveBtn.style.marginTop = '0.5rem';
+
+    const wrapper = saveBtn.closest('.agent-btn-flex-wrapper');
+    if (wrapper) {
+      wrapper.parentNode.insertBefore(saveBtn, wrapper);
+      wrapper.remove();
+    }
   }
   const cancelBtn = document.getElementById('btn-cancel-agent-edit');
   if (cancelBtn) {
@@ -2675,6 +2696,35 @@ window.addSingleContactFromSidebar = async function() {
     console.error(e);
     alert("Error adding contact.");
   }
+};
+
+window.exportContactsCSV = function() {
+  if (!localGroupsCache || localGroupsCache.length === 0) {
+    alert("No contacts available to export.");
+    return;
+  }
+  let csvContent = "data:text/csv;charset=utf-8,Group Name,Contact Name,Phone Number,Tag\n";
+  let count = 0;
+  localGroupsCache.forEach(g => {
+    if (g.contacts && g.contacts.length > 0) {
+      g.contacts.forEach(c => {
+        const row = `"${(g.name||'').replace(/"/g, '""')}","${(c.name||'').replace(/"/g, '""')}","${c.phone || ''}","${(c.tag||'').replace(/"/g, '""')}"`;
+        csvContent += row + "\n";
+        count++;
+      });
+    }
+  });
+  if (count === 0) {
+    alert("No contacts found in your groups to export.");
+    return;
+  }
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `contacts_export_${Date.now()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
 
 // Event listener to close modal
@@ -3946,8 +3996,9 @@ function renderCrmLogsTable(logs) {
   if (!tbody) return;
   
   tbody.innerHTML = '';
-  if (logs.length > 0) {
-    logs.forEach(log => {
+  const displayLogs = Array.isArray(logs) ? logs.slice(0, 50) : [];
+  if (displayLogs.length > 0) {
+    displayLogs.forEach(log => {
       const tr = document.createElement('tr');
       const d = new Date(log.timestamp).toLocaleString();
       
