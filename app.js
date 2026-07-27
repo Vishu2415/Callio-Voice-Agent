@@ -360,31 +360,29 @@ window.populateAIActionPlanner = function() {
 
   // Convert actual calls to action cards
   if (typeof callsCache !== 'undefined' && callsCache && callsCache.length > 0) {
-    // Filter out calls where 'to' is a system/virtual number, pick best candidate phone
-    const validCalls = callsCache
-      .filter(call => {
-        const candidatePhone = call.customerNumber || call.phone || call.to || call.from;
-        return candidatePhone && !isSystemNumber(candidatePhone);
-      })
-      .slice(0, 4);
-    const latestCalls = validCalls;
+    // Filter out calls where 'to' is a system/virtual number
+    const validCalls = callsCache.filter(call => {
+      const candidatePhone = call.customerNumber || call.phone || call.to || call.from;
+      return candidatePhone && !isSystemNumber(candidatePhone);
+    });
 
-    latestCalls.forEach(call => {
+    validCalls.forEach(call => {
+      const parsed = parseCallSummary(call.summary);
+
       let urgency = 'Medium';
       let urgencyColor = '#eab308';
       let urgencyBg = 'rgba(234, 179, 8, 0.15)';
       let urgencyBorder = 'rgba(234, 179, 8, 0.25)';
       
-      let sentiment = 'Neutral';
+      let sentiment = parsed.verdict || 'Neutral';
       let sentimentColor = '#94a3b8';
       let sentimentBg = 'rgba(255, 255, 255, 0.05)';
       let sentimentBorder = 'rgba(255, 255, 255, 0.15)';
       
-      let summaryText = call.summary || '';
       let actionText = 'Call Back';
       
-      if (call.sentiment) {
-        const s = call.sentiment.toLowerCase();
+      if (call.sentiment || parsed.verdict) {
+        const s = (call.sentiment || parsed.verdict || '').toLowerCase();
         if (s.includes('positive') || s.includes('interest')) {
           sentiment = 'Interested';
           sentimentColor = '#10b981';
@@ -394,21 +392,24 @@ window.populateAIActionPlanner = function() {
           urgencyColor = '#ef4444';
           urgencyBg = 'rgba(239, 68, 68, 0.15)';
           urgencyBorder = 'rgba(239, 68, 68, 0.25)';
-        } else if (s.includes('negative') || s.includes('angry') || s.includes('frust')) {
-          sentiment = 'Frustrated';
+          actionText = 'Call Back';
+        } else if (s.includes('not interested') || s.includes('negative') || s.includes('angry') || s.includes('frust')) {
+          sentiment = s.includes('not interested') ? 'Not Interested' : 'Frustrated';
           sentimentColor = '#ef4444';
           sentimentBg = 'rgba(239, 68, 68, 0.12)';
           sentimentBorder = 'rgba(239, 68, 68, 0.3)';
-          urgency = 'Urgent';
-          urgencyColor = '#ef4444';
-          urgencyBg = 'rgba(239, 68, 68, 0.15)';
-          urgencyBorder = 'rgba(239, 68, 68, 0.25)';
+          urgency = 'Medium';
+          urgencyColor = '#eab308';
+          urgencyBg = 'rgba(234, 179, 8, 0.15)';
+          urgencyBorder = 'rgba(234, 179, 8, 0.25)';
+          actionText = 'Call Back';
         }
       }
       
+      let summaryText = parsed.cleanSummary;
       if (!summaryText) {
         if (call.status === 'no-answer' || call.status === 'busy') {
-          summaryText = 'Call was not answered. Customer was busy or did not pick up the phone.';
+          summaryText = 'Call was not answered. Customer was busy or did not pick up.';
           urgency = 'Medium';
           urgencyColor = '#eab308';
           sentiment = 'No Answer';
@@ -417,15 +418,18 @@ window.populateAIActionPlanner = function() {
           sentimentBorder = 'rgba(255, 255, 255, 0.15)';
           actionText = 'Retry Call';
         } else if (call.status === 'completed') {
-          summaryText = `Call completed successfully (Duration: ${typeof formatDuration === 'function' ? formatDuration(call.duration || 0) : (call.duration || 0) + 's'}). Follow up on customer requirement.`;
+          summaryText = `Call completed (Duration: ${typeof formatDuration === 'function' ? formatDuration(call.duration || 0) : (call.duration || 0) + 's'}).`;
           actionText = 'Follow Up';
         } else {
-          summaryText = `Call ended with status: ${call.status || 'ended'}. Follow up needed.`;
+          summaryText = `Call ended with status: ${call.status || 'ended'}.`;
         }
       }
       
       const bestPhone = [call.customerNumber, call.phone, call.to, call.from]
         .find(p => p && !isSystemNumber(p)) || '+91 XXXXXXXXXX';
+        
+      const actionToTake = call.action_to_take || parsed.actionToTake || 'Follow up with lead';
+
       cardsData.push({
         id: call.callSid || call.sid || call.id || `call_${call.createdAt || Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         phone: bestPhone,
@@ -438,6 +442,7 @@ window.populateAIActionPlanner = function() {
         urgencyBg,
         urgencyBorder,
         summary: summaryText,
+        actionToTake: actionToTake,
         actionText
       });
     });
@@ -451,6 +456,9 @@ window.populateAIActionPlanner = function() {
     }
   }
   
+  // Store all active cards globally for modal view
+  window.allActiveActionCards = cardsData;
+
   // Load dismissed leads from localStorage (User Isolated)
   const storageKey = typeof loggedInUser !== 'undefined' && loggedInUser 
     ? `dismissed_leads_${loggedInUser.id || loggedInUser.username || 'default'}` 
@@ -466,58 +474,219 @@ window.populateAIActionPlanner = function() {
   // Filter out dismissed cards & ignore corrupted call_undefined IDs
   let activeCards = cardsData.filter(c => c && c.id && c.id !== 'call_undefined' && !dismissed.includes(c.id));
   
-  // If activeCards is empty, fall back to mockLeads so cards area is never blank
   if (activeCards.length === 0) {
     activeCards = mockLeads;
   }
   
-  container.innerHTML = '';
-  activeCards.forEach(card => {
-    const cardEl = document.createElement('div');
-    cardEl.className = 'action-lead-card';
-    cardEl.dataset.id = card.id; // Store unique ID for persistence!
-    cardEl.style.cssText = 'flex: 0 0 290px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; transition: all 0.25s ease; position: relative; backdrop-filter: blur(10px); box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);';
-    
-    cardEl.onmouseover = () => {
-      cardEl.style.borderColor = 'rgba(6, 182, 212, 0.4)';
-      cardEl.style.transform = 'translateY(-4px)';
-      cardEl.style.boxShadow = '0 12px 40px 0 rgba(6, 182, 212, 0.15)';
-    };
-    cardEl.onmouseout = () => {
-      cardEl.style.borderColor = 'var(--border-color)';
-      cardEl.style.transform = 'none';
-      cardEl.style.boxShadow = '0 1px 8px rgba(0, 0, 0, 0.1)';
-    };
+  // Limit display to MAX 7 CARDS on the top Dashboard area
+  const top7Cards = activeCards.slice(0, 7);
 
-    cardEl.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0;">
-        <span style="font-size: 0.95rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono); letter-spacing: -0.2px;">${card.phone}</span>
-        <span style="font-size: 0.6rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.5px;">${card.urgency}</span>
+  container.innerHTML = '';
+  top7Cards.forEach(card => {
+    const cardEl = createActionCardElement(card);
+    container.appendChild(cardEl);
+  });
+
+  // Append See All card as the 8th item
+  const seeAllCardEl = document.createElement('div');
+  seeAllCardEl.className = 'action-lead-card see-all-card';
+  seeAllCardEl.onclick = () => window.openAllActionCardsModal();
+  seeAllCardEl.style.cssText = 'flex: 0 0 220px; background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(124, 58, 237, 0.08)); border: 1px dashed rgba(6, 182, 212, 0.4); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; transition: all 0.25s ease; box-sizing: border-box; height: 100%;';
+  
+  seeAllCardEl.onmouseover = () => {
+    seeAllCardEl.style.borderColor = 'var(--color-cyan)';
+    seeAllCardEl.style.transform = 'translateY(-3px)';
+    seeAllCardEl.style.boxShadow = '0 10px 30px 0 rgba(6, 182, 212, 0.2)';
+  };
+  seeAllCardEl.onmouseout = () => {
+    seeAllCardEl.style.borderColor = 'rgba(6, 182, 212, 0.4)';
+    seeAllCardEl.style.transform = 'none';
+    seeAllCardEl.style.boxShadow = 'none';
+  };
+
+  seeAllCardEl.innerHTML = `
+    <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(6, 182, 212, 0.15); display: flex; align-items: center; justify-content: center; margin-bottom: 8px; color: var(--color-cyan);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 20px; height: 20px;"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </div>
+    <span style="font-weight: 800; font-size: 0.9rem; color: var(--text-main); margin-bottom: 4px;">See All Cards</span>
+    <span style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 10px;">${activeCards.length} action leads total</span>
+    <button class="btn btn-primary" style="padding: 4px 12px; font-size: 0.72rem; border-radius: 8px; background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 800; pointer-events: none;">Explore All (${activeCards.length}) →</button>
+  `;
+  container.appendChild(seeAllCardEl);
+};
+
+function parseCallSummary(summaryRaw) {
+  if (!summaryRaw) {
+    return { cleanSummary: '', verdict: '', actionToTake: '', keyPoints: [] };
+  }
+
+  const raw = String(summaryRaw);
+
+  let verdict = '';
+  const verdictMatch = raw.match(/\*\*(?:VERDICT|Verdict):\*\*\s*([^\n\*]+)/i) || raw.match(/(?:VERDICT|Verdict):\s*([^\n\*]+)/i);
+  if (verdictMatch) {
+    verdict = verdictMatch[1].trim().replace(/\*\*/g, '');
+  }
+
+  let actionToTake = '';
+  const actionMatch = raw.match(/\*\*(?:Next Action|Action to Take|Key Action|Next Steps):\*\*\s*([^\n]+)/i) 
+                   || raw.match(/(?:Next Action|Action to Take|Key Action|Next Steps):\s*([^\n]+)/i);
+  if (actionMatch) {
+    actionToTake = actionMatch[1].trim().replace(/\*\*/g, '');
+  }
+
+  let keyPoints = [];
+  const keyPointsMatch = raw.match(/\*\*(?:Key Points|Key Details):\*\*\s*([\s\S]*?)(?=\*\*(?:Next Action|Action to Take|VERDICT|Verdict):|$)/i);
+  if (keyPointsMatch && keyPointsMatch[1]) {
+    keyPoints = keyPointsMatch[1]
+      .split('\n')
+      .map(line => line.replace(/^[\-\*\s\•]+/, '').replace(/\*\*/g, '').trim())
+      .filter(Boolean);
+  }
+
+  let cleanSummary = raw;
+  cleanSummary = cleanSummary.replace(/\*\*(?:VERDICT|Verdict):\*\*\s*[^\n]*/gi, '');
+  cleanSummary = cleanSummary.replace(/\*\*(?:Next Action|Action to Take|Key Action|Next Steps):\*\*\s*[^\n]*/gi, '');
+  cleanSummary = cleanSummary.replace(/\*\*(?:Key Points|Key Details):\*\*/gi, '');
+  cleanSummary = cleanSummary.replace(/\*\*/g, '');
+  cleanSummary = cleanSummary.replace(/^[-\s\n]+/, '').trim();
+  cleanSummary = cleanSummary.replace(/\n+/g, ' • ');
+
+  return { cleanSummary, verdict, actionToTake, keyPoints };
+}
+
+function createActionCardElement(card, isModal = false) {
+  const cardEl = document.createElement('div');
+  cardEl.className = 'action-lead-card';
+  cardEl.dataset.id = card.id;
+
+  const flexBasis = isModal ? '100%' : '290px';
+  cardEl.style.cssText = `flex: 0 0 ${flexBasis}; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; transition: all 0.25s ease; position: relative; backdrop-filter: blur(10px); box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);`;
+
+  cardEl.onmouseover = () => {
+    cardEl.style.borderColor = 'rgba(6, 182, 212, 0.4)';
+    cardEl.style.transform = 'translateY(-3px)';
+    cardEl.style.boxShadow = '0 10px 30px 0 rgba(6, 182, 212, 0.15)';
+  };
+  cardEl.onmouseout = () => {
+    cardEl.style.borderColor = 'var(--border-color)';
+    cardEl.style.transform = 'none';
+    cardEl.style.boxShadow = '0 1px 8px rgba(0, 0, 0, 0.1)';
+  };
+
+  const actionToTakeHtml = card.actionToTake ? `
+    <div style="background: rgba(6, 182, 212, 0.08); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 8px; padding: 5px 8px; font-size: 0.72rem; color: var(--color-cyan); font-weight: 600; margin-top: 4px; text-align: left; display: flex; align-items: flex-start; gap: 5px; line-height: 1.3;" title="Action to Take">
+      <span style="font-size: 0.8rem; line-height: 1;">⚡</span>
+      <span style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;"><strong>Action:</strong> ${card.actionToTake}</span>
+    </div>
+  ` : '';
+
+  cardEl.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0;">
+      <span style="font-size: 0.92rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono); letter-spacing: -0.2px;">${card.phone}</span>
+      <span style="font-size: 0.6rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.5px;">${card.urgency}</span>
+    </div>
+    
+    <div style="margin-bottom: 6px; text-align: left; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;">
+      <span style="display: inline-block; padding: 3px 8px; border-radius: 6px; background: ${card.sentimentBg}; color: ${card.color}; font-weight: 800; font-size: 0.75rem; border: 1px solid ${card.sentimentBorder}; text-transform: uppercase; letter-spacing: 0.5px;">
+        ${card.sentiment}
+      </span>
+    </div>
+    
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; text-align: left;">
+      <div style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
+        ${card.summary}
       </div>
-      
-      <div style="margin-bottom: 10px; text-align: left; flex-shrink: 0;">
-        <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; background: ${card.sentimentBg}; color: ${card.color}; font-weight: 800; font-size: 0.8rem; border: 1px solid ${card.sentimentBorder}; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 8px ${card.sentimentBg};">
-          ${card.sentiment}
-        </span>
-      </div>
-      
-      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; text-align: left;">
-        <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;" title="${card.summary}">
-          ${card.summary}
-        </div>
-      </div>
-      
-      <div style="display: flex; gap: 8px; margin-top: auto; flex-shrink: 0;">
-        <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}')" style="flex: 1; padding: 4px; font-size: 0.72rem; border-radius: 8px; background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 6px; height: 28px; cursor: pointer; border: none; transition: background 0.2s;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-          ${card.actionText}
-        </button>
-        <button class="btn btn-secondary" onclick="window.dismissLeadCard(this)" style="padding: 4px 12px; font-size: 0.72rem; border-radius: 8px; font-weight: 600; height: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: background 0.2s;">
-          Done
-        </button>
+      ${actionToTakeHtml}
+    </div>
+    
+    <div style="display: flex; gap: 6px; margin-top: auto; flex-shrink: 0;">
+      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}')" style="flex: 1; padding: 4px; font-size: 0.72rem; border-radius: 8px; background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 6px; height: 28px; cursor: pointer; border: none; transition: background 0.2s;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        ${card.actionText}
+      </button>
+      <button class="btn btn-secondary" onclick="window.dismissLeadCard(this)" style="padding: 4px 10px; font-size: 0.72rem; border-radius: 8px; font-weight: 600; height: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: background 0.2s;">
+        Done
+      </button>
+    </div>
+  `;
+  return cardEl;
+}
+
+window.actionCardsFilter = 'all';
+
+window.openAllActionCardsModal = function() {
+  const modal = document.getElementById('all-action-cards-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  window.renderAllActionCardsModalGrid();
+};
+
+window.closeAllActionCardsModal = function() {
+  const modal = document.getElementById('all-action-cards-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.filterActionCardsModal = function(filter, btnEl) {
+  window.actionCardsFilter = filter;
+  const buttons = document.querySelectorAll('#action-cards-filter-buttons .btn-filter-card');
+  buttons.forEach(btn => {
+    btn.style.borderColor = 'var(--border-color)';
+    btn.style.background = 'var(--bg-surface)';
+    btn.style.color = 'var(--text-muted)';
+    btn.style.fontWeight = '600';
+  });
+  if (btnEl) {
+    btnEl.style.borderColor = 'var(--color-cyan)';
+    btnEl.style.background = 'rgba(6, 182, 212, 0.15)';
+    btnEl.style.color = 'var(--color-cyan)';
+    btnEl.style.fontWeight = '700';
+  }
+
+  window.renderAllActionCardsModalGrid();
+};
+
+window.renderAllActionCardsModalGrid = function() {
+  const grid = document.getElementById('all-action-cards-grid');
+  const searchInput = document.getElementById('action-cards-search-input');
+  const countEl = document.getElementById('all-action-cards-count');
+  if (!grid) return;
+
+  const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  const filter = window.actionCardsFilter || 'all';
+
+  const cards = window.allActiveActionCards || [];
+  grid.innerHTML = '';
+
+  const filtered = cards.filter(card => {
+    if (!card) return false;
+    const matchesSearch = !searchTerm || card.phone.toLowerCase().includes(searchTerm) || card.summary.toLowerCase().includes(searchTerm) || (card.actionToTake && card.actionToTake.toLowerCase().includes(searchTerm));
+    
+    if (!matchesSearch) return false;
+
+    if (filter === 'interested') return card.sentiment.toLowerCase().includes('interest');
+    if (filter === 'not-interested') return card.sentiment.toLowerCase().includes('not interested') || card.sentiment.toLowerCase().includes('frust');
+    if (filter === 'no-answer') return card.sentiment.toLowerCase().includes('no answer');
+
+    return true;
+  });
+
+  if (countEl) {
+    countEl.innerText = `${filtered.length} Lead${filtered.length === 1 ? '' : 's'}`;
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
+        <p style="font-size: 0.95rem; margin: 0;">No matching action cards found.</p>
       </div>
     `;
-    container.appendChild(cardEl);
+    return;
+  }
+
+  filtered.forEach(card => {
+    const cardEl = createActionCardElement(card, true);
+    grid.appendChild(cardEl);
   });
 };
 
