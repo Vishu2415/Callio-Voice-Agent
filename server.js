@@ -1624,15 +1624,29 @@ app.post('/api/upload-branding-asset', (req, res) => {
 app.use('/uploads', express.static('./uploads'));
 
 app.get('/app', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, 'app.html'));
 });
 
 app.get('/reseller', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, 'reseller.html'));
 });
 
-// Serving the static front-end files for fallback UI
-app.use(express.static('./'));
+// Serving the static front-end files for fallback UI (with no-cache headers)
+app.use(express.static('./', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js') || filePath.endsWith('.html') || filePath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // ─── Routing Config API ───────────────────────────────────────────────────────
 // GET: return current incomingAgentId + tagRules from client or defaultCallConfig

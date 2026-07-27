@@ -5,6 +5,30 @@
 
 let loggedInUser = null;
 
+// Global Subtab & API Doc Switchers (attached immediately to window)
+window.switchAdminSubtab = function(subtabName) {
+  document.querySelectorAll('.admin-console-tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('div[id^="admin-panel-section-"]').forEach(sec => sec.style.display = 'none');
+
+  const activeBtn = document.getElementById(`admin-subtab-${subtabName}`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const activeSection = document.getElementById(`admin-panel-section-${subtabName}`);
+  if (activeSection) activeSection.style.display = 'block';
+
+  if (typeof fetchAdminClients === 'function' && subtabName === 'users') fetchAdminClients();
+  if (typeof fetchAdminRequests === 'function' && subtabName === 'requests') fetchAdminRequests();
+  if (typeof fetchAdminTransactions === 'function' && subtabName === 'logs') fetchAdminTransactions();
+};
+
+window.switchApiDocTab = function(lang) {
+  if (typeof currentApiDocTab !== 'undefined') currentApiDocTab = lang;
+  document.querySelectorAll('#tab-api-sharing .tab-btn').forEach(btn => btn.classList.remove('active'));
+  const activeTab = document.getElementById(`api-tab-${lang}`);
+  if (activeTab) activeTab.classList.add('active');
+  if (typeof updateApiCodeSnippet === 'function') updateApiCodeSnippet();
+};
+
 // --- DOM References ---
 const elApiKey = document.getElementById('api-key');
 const elModelName = document.getElementById('model-name');
