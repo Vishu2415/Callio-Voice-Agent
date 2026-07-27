@@ -560,58 +560,130 @@ function createActionCardElement(card, isModal = false) {
   cardEl.className = 'action-lead-card';
   cardEl.dataset.id = card.id;
 
-  const flexBasis = isModal ? '100%' : '290px';
-  cardEl.style.cssText = `flex: 0 0 ${flexBasis}; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; transition: all 0.25s ease; position: relative; backdrop-filter: blur(10px); box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);`;
+  const flexBasis = isModal ? '100%' : '315px';
+  cardEl.style.cssText = `flex: 0 0 ${flexBasis}; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; transition: all 0.25s ease; position: relative; backdrop-filter: blur(10px); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); cursor: pointer;`;
+
+  cardEl.onclick = (e) => {
+    // If user clicks on button or inside a button, don't trigger modal
+    if (e.target.closest('button')) return;
+    window.openLeadDetailModal(card.id);
+  };
 
   cardEl.onmouseover = () => {
-    cardEl.style.borderColor = 'rgba(6, 182, 212, 0.4)';
+    cardEl.style.borderColor = 'rgba(6, 182, 212, 0.5)';
     cardEl.style.transform = 'translateY(-3px)';
-    cardEl.style.boxShadow = '0 10px 30px 0 rgba(6, 182, 212, 0.15)';
+    cardEl.style.boxShadow = '0 12px 35px 0 rgba(6, 182, 212, 0.18)';
   };
   cardEl.onmouseout = () => {
     cardEl.style.borderColor = 'var(--border-color)';
     cardEl.style.transform = 'none';
-    cardEl.style.boxShadow = '0 1px 8px rgba(0, 0, 0, 0.1)';
+    cardEl.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.08)';
   };
 
   const actionToTakeHtml = card.actionToTake ? `
-    <div style="background: rgba(6, 182, 212, 0.08); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 8px; padding: 5px 8px; font-size: 0.72rem; color: var(--color-cyan); font-weight: 600; margin-top: 4px; text-align: left; display: flex; align-items: flex-start; gap: 5px; line-height: 1.3;" title="Action to Take">
-      <span style="font-size: 0.8rem; line-height: 1;">⚡</span>
+    <div style="background: rgba(6, 182, 212, 0.08); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 8px; padding: 6px 10px; font-size: 0.74rem; color: var(--color-cyan); font-weight: 600; margin-top: 4px; text-align: left; display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;" title="Action to Take">
+      <span style="font-size: 0.85rem; line-height: 1;">⚡</span>
       <span style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;"><strong>Action:</strong> ${card.actionToTake}</span>
     </div>
   ` : '';
 
   cardEl.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0;">
-      <span style="font-size: 0.92rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono); letter-spacing: -0.2px;">${card.phone}</span>
-      <span style="font-size: 0.6rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.5px;">${card.urgency}</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0;">
+      <span style="font-size: 0.95rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono); letter-spacing: -0.2px;">${card.phone}</span>
+      <span style="font-size: 0.6rem; font-weight: 800; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.5px;">${card.urgency}</span>
     </div>
     
-    <div style="margin-bottom: 6px; text-align: left; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;">
-      <span style="display: inline-block; padding: 3px 8px; border-radius: 6px; background: ${card.sentimentBg}; color: ${card.color}; font-weight: 800; font-size: 0.75rem; border: 1px solid ${card.sentimentBorder}; text-transform: uppercase; letter-spacing: 0.5px;">
+    <div style="margin-bottom: 8px; text-align: left; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;">
+      <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; background: ${card.sentimentBg}; color: ${card.color}; font-weight: 800; font-size: 0.78rem; border: 1px solid ${card.sentimentBorder}; text-transform: uppercase; letter-spacing: 0.5px;">
         ${card.sentiment}
       </span>
     </div>
     
-    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; text-align: left;">
-      <div style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; text-align: left;">
+      <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
         ${card.summary}
       </div>
       ${actionToTakeHtml}
     </div>
     
-    <div style="display: flex; gap: 6px; margin-top: auto; flex-shrink: 0;">
-      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}')" style="flex: 1; padding: 4px; font-size: 0.72rem; border-radius: 8px; background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 6px; height: 28px; cursor: pointer; border: none; transition: background 0.2s;">
+    <div style="display: flex; gap: 8px; margin-top: auto; flex-shrink: 0;">
+      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}'); event.stopPropagation();" style="flex: 1; padding: 4px; font-size: 0.74rem; border-radius: 8px; background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 6px; height: 30px; cursor: pointer; border: none; transition: background 0.2s;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         ${card.actionText}
       </button>
-      <button class="btn btn-secondary" onclick="window.dismissLeadCard(this)" style="padding: 4px 10px; font-size: 0.72rem; border-radius: 8px; font-weight: 600; height: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: background 0.2s;">
+      <button class="btn btn-secondary" onclick="window.dismissLeadCard(this); event.stopPropagation();" style="padding: 4px 12px; font-size: 0.74rem; border-radius: 8px; font-weight: 600; height: 30px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: background 0.2s;">
         Done
       </button>
     </div>
   `;
   return cardEl;
 }
+
+window.openLeadDetailModal = function(cardId) {
+  const cards = window.allActiveActionCards || [];
+  const card = cards.find(c => c && c.id === cardId);
+  if (!card) return;
+
+  const modal = document.getElementById('lead-card-detail-modal');
+  if (!modal) return;
+
+  const phoneEl = document.getElementById('lead-detail-phone');
+  const sentimentEl = document.getElementById('lead-detail-sentiment');
+  const urgencyEl = document.getElementById('lead-detail-urgency');
+  const actionTextEl = document.getElementById('lead-detail-action-text');
+  const summaryEl = document.getElementById('lead-detail-summary');
+  const btnCall = document.getElementById('btn-lead-detail-call');
+  const btnDone = document.getElementById('btn-lead-detail-done');
+
+  if (phoneEl) phoneEl.innerText = card.phone;
+
+  if (sentimentEl) {
+    sentimentEl.innerText = card.sentiment;
+    sentimentEl.style.background = card.sentimentBg;
+    sentimentEl.style.color = card.color;
+    sentimentEl.style.border = `1px solid ${card.sentimentBorder}`;
+  }
+
+  if (urgencyEl) {
+    urgencyEl.innerText = card.urgency;
+    urgencyEl.style.background = card.urgencyBg;
+    urgencyEl.style.color = card.urgencyColor;
+    urgencyEl.style.border = `1px solid ${card.urgencyBorder}`;
+  }
+
+  if (actionTextEl) {
+    actionTextEl.innerText = card.actionToTake || 'Follow up with lead';
+  }
+
+  if (summaryEl) {
+    summaryEl.innerText = card.summary || 'No detailed summary available.';
+  }
+
+  if (btnCall) {
+    btnCall.onclick = () => {
+      window.closeLeadDetailModal();
+      window.triggerLeadCall(card.phone);
+    };
+  }
+
+  if (btnDone) {
+    btnDone.onclick = () => {
+      window.closeLeadDetailModal();
+      const cardOnDom = document.querySelector(`.action-lead-card[data-id="${cardId}"]`);
+      if (cardOnDom) {
+        const doneBtn = cardOnDom.querySelector('button.btn-secondary');
+        if (doneBtn) window.dismissLeadCard(doneBtn);
+      }
+    };
+  }
+
+  modal.style.display = 'flex';
+};
+
+window.closeLeadDetailModal = function() {
+  const modal = document.getElementById('lead-card-detail-modal');
+  if (modal) modal.style.display = 'none';
+};
 
 window.actionCardsFilter = 'all';
 

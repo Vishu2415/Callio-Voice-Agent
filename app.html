@@ -468,12 +468,12 @@
               <!-- AI Agent Configuration -->
               <!-- Active Call Monitor Card -->
               <!-- Active Call Monitor & AI Action Planner Container (Transparent Wrapper) -->
-              <div id="live-call-monitor-card" style="height: 190px; margin-top: 0; padding: 0; box-sizing: border-box; overflow: hidden; position: relative; background: transparent; border: none; box-shadow: none;">
+              <div id="live-call-monitor-card" style="height: 220px; margin-top: 0; padding: 0; box-sizing: border-box; overflow: hidden; position: relative; background: transparent; border: none; box-shadow: none;">
                 
                 <!-- VIEW 1: AI Action Planner (Idle State) -->
                 <div id="ai-action-planner-view" style="display: flex; flex-direction: column; height: 100%; width: 100%;">
                   <!-- Horizontal scrollable container for Action Cards -->
-                  <div id="ai-action-cards-container" style="display: flex; gap: 12px; overflow-x: auto; flex-grow: 1; padding-bottom: 2px; scrollbar-width: none; align-items: stretch; height: 100%;">
+                  <div id="ai-action-cards-container" style="display: flex; gap: 16px; overflow-x: auto; flex-grow: 1; padding-bottom: 4px; scrollbar-width: none; align-items: stretch; height: 100%;">
                     <!-- Dynamically populated action cards -->
                   </div>
                 </div>
@@ -2733,6 +2733,55 @@
       <!-- Grid Container -->
       <div id="all-action-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; overflow-y: auto; flex-grow: 1; padding: 4px; max-height: 62vh;">
         <!-- Dynamically populated cards -->
+      </div>
+    </div>
+  <!-- Lead Card Detail Modal (Opens when card is clicked) -->
+  <div id="lead-card-detail-modal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); z-index: 999999; align-items: center; justify-content: center;">
+    <div class="modal-content" style="max-width: 650px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 20px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); box-sizing: border-box;">
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+        <div>
+          <h3 id="lead-detail-phone" style="margin: 0; font-size: 1.3rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono);">+91 XXXXXXXXXX</h3>
+          <p id="lead-detail-subtitle" style="margin: 4px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Lead Action Card Overview</p>
+        </div>
+        <button onclick="window.closeLeadDetailModal()" class="btn-icon-close" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Content Body -->
+      <div style="overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 16px; padding-right: 4px;">
+        <!-- Badges row -->
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <span id="lead-detail-sentiment" style="padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 0.85rem; text-transform: uppercase;">INTERESTED</span>
+          <span id="lead-detail-urgency" style="padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; text-transform: uppercase;">URGENT</span>
+        </div>
+
+        <!-- Action to Take Box -->
+        <div id="lead-detail-action-box" style="background: rgba(6, 182, 212, 0.1); border: 1px dashed var(--color-cyan); border-radius: 12px; padding: 12px 14px; font-size: 0.88rem; color: var(--color-cyan); font-weight: 600; line-height: 1.4;">
+          ⚡ <strong>Recommended Action:</strong> <span id="lead-detail-action-text">Follow up with lead</span>
+        </div>
+
+        <!-- Full Call Summary Section -->
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; display: block; margin-bottom: 6px;">Call Summary & Insights</label>
+          <div id="lead-detail-summary" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; font-size: 0.88rem; color: var(--text-main); line-height: 1.55;">
+            No summary available.
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer Actions -->
+      <div style="display: flex; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+        <button id="btn-lead-detail-call" class="btn btn-primary" style="flex: 1; padding: 10px; font-size: 0.88rem; border-radius: 10px; background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; border: none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 16px; height: 16px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          Call Back Now
+        </button>
+        <button id="btn-lead-detail-done" class="btn btn-secondary" style="padding: 10px 20px; font-size: 0.88rem; border-radius: 10px; font-weight: 600; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer;">
+          Mark Done
+        </button>
       </div>
     </div>
   </div>

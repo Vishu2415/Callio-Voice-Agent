@@ -3465,24 +3465,23 @@ app.post('/api/auth/login', (req, res) => {
   const tenantId = req.headers['x-tenant-id'] || req.body.tenantId || '';
   for (const client of clientsDb.values()) {
     if (client.email.toLowerCase() === email.toLowerCase() && client.password === hashedPassword) {
-      // Domain isolation check
+      // Strict Portal Domain Isolation Check
       if (currentReseller) {
-        if (!client.reseller_id) {
-          // Auto-migrate client created on this reseller portal before fix
-          client.reseller_id = currentReseller.id;
-          client.tenantId = tenantId || currentReseller.id;
-          clientsDb.set(client.id, client);
-          saveClients();
-          console.log(`[Auto Migration] Linked unassigned client ${client.email} to reseller ${currentReseller.name}`);
-        } else if (client.reseller_id !== currentReseller.id) {
-          return res.status(403).json({ success: false, error: 'User account does not belong to this portal.' });
-        } else if (tenantId && client.tenantId !== tenantId) {
-          client.tenantId = tenantId;
-          clientsDb.set(client.id, client);
-          saveClients();
+        // Logging in on a reseller portal (e.g. Growvo / growvo.in)
+        if (client.reseller_id !== currentReseller.id) {
+          return res.status(403).json({ 
+            success: false, 
+            error: 'This account does not belong to this reseller portal. Please log in on your respective portal website.' 
+          });
         }
       } else {
-        // Direct Callio portal — allow all active clients to log in cleanly
+        // Logging in on Main Callio Portal (callio.in)
+        if (client.reseller_id) {
+          return res.status(403).json({ 
+            success: false, 
+            error: 'This account belongs to a reseller portal. Please log in through your white-label portal URL.' 
+          });
+        }
       }
 
       if (client.status === 'suspended') {
