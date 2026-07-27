@@ -3421,15 +3421,18 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const isMainPlatform = isMainPlatformHost(host);
   const currentReseller = getResellerFromHost(host);
 
-  // 1. Admin login check — Super Admin can ONLY log in on main Callio portal, NOT reseller portals
+  const hashedPassword = hashPassword(password);
+
+  // 1. Super Admin login check — Super Admin can ONLY log in on main Callio platform
   const adminEmail = defaultCallConfig.adminEmail || 'admin@callingagent.com';
   const adminPassword = defaultCallConfig.adminPassword || 'admin123';
   const adminName = defaultCallConfig.adminName || 'Admin';
 
-  if (email.toLowerCase() === adminEmail.toLowerCase() && password === adminPassword) {
-    if (currentReseller) {
+  if (email.toLowerCase() === adminEmail.toLowerCase() && (password === adminPassword || hashedPassword === hashPassword(adminPassword))) {
+    if (!isMainPlatform) {
       return res.status(401).json({ success: false, error: 'Invalid email or password.' });
     }
     return res.json({
@@ -3438,8 +3441,6 @@ app.post('/api/auth/login', (req, res) => {
     });
   }
 
-  const hashedPassword = hashPassword(password);
-
   // 2. Reseller Admin login check (Strict Domain Isolation)
   for (const reseller of resellersDb.values()) {
     if (reseller.email.toLowerCase() === email.toLowerCase() && reseller.password === hashedPassword) {
@@ -3447,9 +3448,9 @@ app.post('/api/auth/login', (req, res) => {
         return res.status(401).json({ success: false, error: 'Invalid email or password.' });
       }
 
-      // Reseller Admin MUST log in ONLY on their specific reseller portal domain/subdomain!
-      // They are NOT permitted to log in on main Callio portal (currentReseller is null) OR on another reseller domain.
-      if (!currentReseller || currentReseller.id !== reseller.id) {
+      // Reseller admin MUST log in ONLY on their specific reseller domain/subdomain
+      // They cannot log in on main Callio platform or another reseller domain
+      if (isMainPlatform || !currentReseller || currentReseller.id !== reseller.id) {
         return res.status(401).json({ success: false, error: 'Invalid email or password.' });
       }
 
@@ -3475,14 +3476,15 @@ app.post('/api/auth/login', (req, res) => {
         return res.status(401).json({ success: false, error: 'Invalid email or password.' });
       }
 
-      // Domain Isolation
-      if (currentReseller) {
-        // Logging in on a reseller portal (e.g. Growvo / growvo.in)
-        if (client.reseller_id !== currentReseller.id) {
+      if (!isMainPlatform) {
+        // Logging in on a white-label / reseller portal (e.g. Growvo / growwo.in)
+        // Client MUST belong to this specific reseller portal
+        if (!currentReseller || !client.reseller_id || client.reseller_id !== currentReseller.id) {
           return res.status(401).json({ success: false, error: 'Invalid email or password.' });
         }
       } else {
-        // Logging in on Main Callio Portal (callio.in)
+        // Logging in on Main Callio Platform (callio.in / localhost)
+        // White-label clients (reseller_id != null) CANNOT log in on main Callio
         if (client.reseller_id) {
           return res.status(401).json({ success: false, error: 'Invalid email or password.' });
         }
