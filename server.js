@@ -2803,8 +2803,8 @@ app.get('/api/groups', authMiddleware('contacts'), (req, res) => {
   const { clientId } = req.query;
   let list = Array.from(groupsDb.values());
   if (clientId && clientId !== 'admin') {
-    // Include groups explicitly owned by this client + unassigned/legacy groups
-    list = list.filter(g => !g.clientId || g.clientId === clientId);
+    // Strict multi-tenant isolation: only return groups belonging to this client
+    list = list.filter(g => g.clientId === clientId);
   }
   list.sort((a, b) => b.createdAt - a.createdAt);
   // Attach contacts to each group
