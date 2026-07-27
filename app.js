@@ -5,30 +5,6 @@
 
 let loggedInUser = null;
 
-// Global Subtab & API Doc Switchers (attached immediately to window)
-window.switchAdminSubtab = function(subtabName) {
-  document.querySelectorAll('.admin-console-tab-btn').forEach(btn => btn.classList.remove('active'));
-  document.querySelectorAll('div[id^="admin-panel-section-"]').forEach(sec => sec.style.display = 'none');
-
-  const activeBtn = document.getElementById(`admin-subtab-${subtabName}`);
-  if (activeBtn) activeBtn.classList.add('active');
-
-  const activeSection = document.getElementById(`admin-panel-section-${subtabName}`);
-  if (activeSection) activeSection.style.display = 'block';
-
-  if (typeof fetchAdminClients === 'function' && subtabName === 'users') fetchAdminClients();
-  if (typeof fetchAdminRequests === 'function' && subtabName === 'requests') fetchAdminRequests();
-  if (typeof fetchAdminTransactions === 'function' && subtabName === 'logs') fetchAdminTransactions();
-};
-
-window.switchApiDocTab = function(lang) {
-  if (typeof currentApiDocTab !== 'undefined') currentApiDocTab = lang;
-  document.querySelectorAll('#tab-api-sharing .tab-btn').forEach(btn => btn.classList.remove('active'));
-  const activeTab = document.getElementById(`api-tab-${lang}`);
-  if (activeTab) activeTab.classList.add('active');
-  if (typeof updateApiCodeSnippet === 'function') updateApiCodeSnippet();
-};
-
 // --- DOM References ---
 const elApiKey = document.getElementById('api-key');
 const elModelName = document.getElementById('model-name');
@@ -110,17 +86,17 @@ window.campaignLeads = {};
 
 // Load API key from localStorage if it exists
 if (localStorage.getItem('gemini_api_key')) {
-  if (elApiKey) elApiKey.value = localStorage.getItem('gemini_api_key');
+  elApiKey.value = localStorage.getItem('gemini_api_key');
 }
 
 // Load System Instruction from localStorage if it exists
 if (localStorage.getItem('gemini_system_instruction')) {
-  if (elSystemInstruction) elSystemInstruction.value = localStorage.getItem('gemini_system_instruction');
+  elSystemInstruction.value = localStorage.getItem('gemini_system_instruction');
 }
 
 // Load Agent Voice from localStorage if it exists
 if (localStorage.getItem('gemini_agent_voice')) {
-  if (elVoiceName) elVoiceName.value = localStorage.getItem('gemini_agent_voice');
+  elVoiceName.value = localStorage.getItem('gemini_agent_voice');
 }
 
 // --- Navbar Main Tab Navigation ---
@@ -135,8 +111,7 @@ document.querySelectorAll('.glass-navbar .nav-btn').forEach(btn => {
     btn.classList.add('active');
     // Show target tab pane
     const targetId = btn.getAttribute('data-tab');
-    const targetPane = document.getElementById(targetId);
-    if (targetPane) targetPane.classList.add('active');
+    document.getElementById(targetId).classList.add('active');
 
     // Save active tab to localStorage
     localStorage.setItem('activeTab', targetId);
@@ -174,31 +149,31 @@ document.querySelectorAll('.glass-navbar .nav-btn').forEach(btn => {
 });
 
 // --- Tab Navigation (Logs/Transcript) ---
-elTabTranscript?.addEventListener('click', () => {
-  elTabTranscript?.classList.add('active');
-  elTabLogs?.classList.remove('active');
-  elTabSummary?.classList.remove('active');
-  elTranscriptContainer?.classList.add('active');
-  elLogsContainer?.classList.remove('active');
-  elSummaryContainer?.classList.remove('active');
+elTabTranscript.addEventListener('click', () => {
+  elTabTranscript.classList.add('active');
+  elTabLogs.classList.remove('active');
+  elTabSummary.classList.remove('active');
+  elTranscriptContainer.classList.add('active');
+  elLogsContainer.classList.remove('active');
+  elSummaryContainer.classList.remove('active');
 });
 
-elTabLogs?.addEventListener('click', () => {
-  elTabLogs?.classList.add('active');
-  elTabTranscript?.classList.remove('active');
-  elTabSummary?.classList.remove('active');
-  elLogsContainer?.classList.add('active');
-  elTranscriptContainer?.classList.remove('active');
-  elSummaryContainer?.classList.remove('active');
+elTabLogs.addEventListener('click', () => {
+  elTabLogs.classList.add('active');
+  elTabTranscript.classList.remove('active');
+  elTabSummary.classList.remove('active');
+  elLogsContainer.classList.add('active');
+  elTranscriptContainer.classList.remove('active');
+  elSummaryContainer.classList.remove('active');
 });
 
-elTabSummary?.addEventListener('click', () => {
-  elTabSummary?.classList.add('active');
-  elTabTranscript?.classList.remove('active');
-  elTabLogs?.classList.remove('active');
-  elSummaryContainer?.classList.add('active');
-  elTranscriptContainer?.classList.remove('active');
-  elLogsContainer?.classList.remove('active');
+elTabSummary.addEventListener('click', () => {
+  elTabSummary.classList.add('active');
+  elTabTranscript.classList.remove('active');
+  elTabLogs.classList.remove('active');
+  elSummaryContainer.classList.add('active');
+  elTranscriptContainer.classList.remove('active');
+  elLogsContainer.classList.remove('active');
   if (!selectedCallSid) {
     showListView();
   } else {
@@ -1571,83 +1546,81 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
 async function playVoiceSample(voiceName, buttonEl) {
+  const apiKey = elApiKey.value.trim();
+  if (!apiKey) {
+    alert("Please enter your Gemini API Key in the Settings drawer first to test voices.");
+    document.getElementById('settings-drawer')?.classList.add('active');
+    return;
+  }
+  
   const originalText = buttonEl.innerText;
   buttonEl.innerText = "⏳...";
   buttonEl.disabled = true;
-
-  const sampleText = `Namaste! Main aapka AI calling agent hoon. Yeh mera ${voiceName || 'standard'} voice sample hai.`;
-
-  try {
-    const apiKey = typeof elApiKey !== 'undefined' && elApiKey ? elApiKey.value.trim() : '';
-    if (apiKey) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-        const payload = {
-          contents: [{ role: "user", parts: [{ text: sampleText }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: voiceName || "Aoede" }
-              }
-            }
-          }
-        };
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const candidate = data.candidates?.[0];
-          const part = candidate?.content?.parts?.[0];
-
-          if (part?.inlineData?.data) {
-            const base64Audio = part.inlineData.data;
-            const arrayBuffer = base64ToArrayBuffer(base64Audio);
-            const float32Data = pcmToFloat32(arrayBuffer);
-
-            const sampleCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const audioBuffer = sampleCtx.createBuffer(1, float32Data.length, 24000);
-            audioBuffer.getChannelData(0).set(float32Data);
-
-            const source = sampleCtx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(sampleCtx.destination);
-            source.start(0);
-
-            source.onended = () => {
-              setTimeout(() => sampleCtx.close(), 1000);
-            };
-            return;
+  
+  const prompt = "Hello! Main ready hoon.";
+  
+  const payload = {
+    contents: [{
+      role: "user",
+      parts: [{ text: prompt }]
+    }],
+    generationConfig: {
+      responseModalities: ["AUDIO"],
+      speechConfig: {
+        "voiceConfig": {
+          "prebuiltVoiceConfig": {
+            "voiceName": voiceName
           }
         }
-      } catch (geminiErr) {
-        console.warn('[Voice Sample] Gemini REST API preview skipped, using Web Speech API fallback:', geminiErr);
       }
     }
-
-    // High Quality Web Speech Synthesis Fallback
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(sampleText);
-      utterance.rate = 0.95;
-      utterance.pitch = voiceName === 'Charon' ? 0.8 : (voiceName === 'Puck' ? 1.2 : 1.0);
-      utterance.lang = 'hi-IN';
-
-      const voices = window.speechSynthesis.getVoices();
-      const hindiVoice = voices.find(v => v.lang && (v.lang.includes('hi') || v.name.includes('Hindi') || v.name.includes('India')));
-      if (hindiVoice) utterance.voice = hindiVoice;
-
-      window.speechSynthesis.speak(utterance);
+  };
+  
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${apiKey}`;
+  
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+    
+    const data = await res.json();
+    const candidate = data.candidates?.[0];
+    const part = candidate?.content?.parts?.[0];
+    
+    if (part?.inlineData?.data) {
+      const base64Audio = part.inlineData.data;
+      const arrayBuffer = base64ToArrayBuffer(base64Audio);
+      const float32Data = pcmToFloat32(arrayBuffer);
+      
+      const sampleCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const audioBuffer = sampleCtx.createBuffer(1, float32Data.length, 24000);
+      audioBuffer.getChannelData(0).set(float32Data);
+      
+      const source = sampleCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(sampleCtx.destination);
+      source.start(0);
+      
+      source.onended = () => {
+        setTimeout(() => sampleCtx.close(), 1000);
+      };
     } else {
-      alert("Audio preview unavailable on this browser.");
+      throw new Error("No audio data returned in the response.");
     }
   } catch (err) {
+    if (err.message.includes("quota") || err.message.includes("Quota") || err.message.includes("rate-limit") || err.message.includes("429") || err.message.includes("limit")) {
+      alert("⚠️ Gemini API Rate Limit Exceeded!\n\nAapki API Key Free Tier par chal rahi hai, jiske karan 1 minute me max 10 voice test requests hi allowed hain. Kripya 1 minute baad firse try karein.");
+    } else {
+      alert(`Failed to play voice sample: ${err.message}`);
+    }
     console.error(err);
-    alert(`Voice sample playback error: ${err.message}`);
   } finally {
     buttonEl.innerText = originalText;
     buttonEl.disabled = false;
@@ -2246,31 +2219,20 @@ window.editAgent = function(id) {
   const saveBtn = document.getElementById('btn-save-agent');
   if (saveBtn) {
     saveBtn.innerText = 'Update Agent';
-    saveBtn.style.flex = '1';
-    saveBtn.style.marginTop = '0';
-
-    let parent = saveBtn.parentNode;
-    if (!parent.classList.contains('agent-btn-flex-wrapper')) {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'agent-btn-flex-wrapper';
-      wrapper.style.cssText = 'display: flex; gap: 10px; margin-top: 0.75rem; width: 100%; box-sizing: border-box;';
-      parent.insertBefore(wrapper, saveBtn);
-      wrapper.appendChild(saveBtn);
-      parent = wrapper;
-    }
-
+    
+    // Create/toggle Cancel button if it doesn't exist
     let cancelBtn = document.getElementById('btn-cancel-agent-edit');
     if (!cancelBtn) {
       cancelBtn = document.createElement('button');
       cancelBtn.id = 'btn-cancel-agent-edit';
       cancelBtn.className = 'btn btn-secondary';
       cancelBtn.innerText = 'Cancel';
-      cancelBtn.style.cssText = 'flex: 1; height: 42px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-top: 0;';
+      cancelBtn.style.marginLeft = '8px';
       cancelBtn.addEventListener('click', (e) => {
         e.preventDefault();
         clearAgentForm();
       });
-      parent.appendChild(cancelBtn);
+      saveBtn.parentNode.appendChild(cancelBtn);
     }
   }
 };
@@ -2279,18 +2241,10 @@ window.clearAgentForm = function() {
   editingAgentId = null;
   document.getElementById('agent-name').value = '';
   document.getElementById('agent-prompt').value = '';
-
+  
   const saveBtn = document.getElementById('btn-save-agent');
   if (saveBtn) {
     saveBtn.innerText = 'Save Agent';
-    saveBtn.style.width = '100%';
-    saveBtn.style.marginTop = '0.5rem';
-
-    const wrapper = saveBtn.closest('.agent-btn-flex-wrapper');
-    if (wrapper) {
-      wrapper.parentNode.insertBefore(saveBtn, wrapper);
-      wrapper.remove();
-    }
   }
   const cancelBtn = document.getElementById('btn-cancel-agent-edit');
   if (cancelBtn) {
@@ -2721,35 +2675,6 @@ window.addSingleContactFromSidebar = async function() {
     console.error(e);
     alert("Error adding contact.");
   }
-};
-
-window.exportContactsCSV = function() {
-  if (!localGroupsCache || localGroupsCache.length === 0) {
-    alert("No contacts available to export.");
-    return;
-  }
-  let csvContent = "data:text/csv;charset=utf-8,Group Name,Contact Name,Phone Number,Tag\n";
-  let count = 0;
-  localGroupsCache.forEach(g => {
-    if (g.contacts && g.contacts.length > 0) {
-      g.contacts.forEach(c => {
-        const row = `"${(g.name||'').replace(/"/g, '""')}","${(c.name||'').replace(/"/g, '""')}","${c.phone || ''}","${(c.tag||'').replace(/"/g, '""')}"`;
-        csvContent += row + "\n";
-        count++;
-      });
-    }
-  });
-  if (count === 0) {
-    alert("No contacts found in your groups to export.");
-    return;
-  }
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `contacts_export_${Date.now()}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 };
 
 // Event listener to close modal
@@ -4021,9 +3946,8 @@ function renderCrmLogsTable(logs) {
   if (!tbody) return;
   
   tbody.innerHTML = '';
-  const displayLogs = Array.isArray(logs) ? logs.slice(0, 50) : [];
-  if (displayLogs.length > 0) {
-    displayLogs.forEach(log => {
+  if (logs.length > 0) {
+    logs.forEach(log => {
       const tr = document.createElement('tr');
       const d = new Date(log.timestamp).toLocaleString();
       
@@ -4163,86 +4087,6 @@ document.getElementById('btn-simulate-crm-webhook')?.addEventListener('click', a
 // ================================================================
 // API AUTHORIZATION & DATA SHARING TAB LOGIC
 // ================================================================
-
-let currentApiDocTab = 'curl';
-
-window.switchApiDocTab = function(lang) {
-  currentApiDocTab = lang;
-  document.querySelectorAll('#tab-api-sharing .tab-btn').forEach(btn => btn.classList.remove('active'));
-  const activeTab = document.getElementById(`api-tab-${lang}`);
-  if (activeTab) activeTab.classList.add('active');
-  updateApiCodeSnippet();
-};
-
-function updateApiCodeSnippet() {
-  const codeEl = document.getElementById('api-code-snippet');
-  if (!codeEl) return;
-
-  const origin = window.location.origin;
-  const clientId = loggedInUser ? loggedInUser.id : 'YOUR_CLIENT_AUTH_ID';
-  const apiToken = (elSharedApiKeyInput && elSharedApiKeyInput.value) || 'YOUR_CALLIO_AUTH_TOKEN';
-  const assignedPhone = (loggedInUser && loggedInUser.phone_number) ? loggedInUser.phone_number : '+91XXXXXXXXXX';
-
-  let codeText = '';
-  if (currentApiDocTab === 'curl') {
-    codeText = `curl -X POST "${origin}/make-call" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "to": "+919876543210",
-    "clientId": "${clientId}",
-    "authToken": "${apiToken}",
-    "callerId": "${assignedPhone}"
-  }'`;
-  } else if (currentApiDocTab === 'js') {
-    codeText = `fetch("${origin}/make-call", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    to: "+919876543210",
-    clientId: "${clientId}",
-    authToken: "${apiToken}",
-    callerId: "${assignedPhone}"
-  })
-})
-.then(res => res.json())
-.then(data => console.log(data))
-.catch(err => console.error(err));`;
-  } else if (currentApiDocTab === 'python') {
-    codeText = `import requests
-
-url = "${origin}/make-call"
-payload = {
-    "to": "+919876543210",
-    "clientId": "${clientId}",
-    "authToken": "${apiToken}",
-    "callerId": "${assignedPhone}"
-}
-
-response = requests.post(url, json=payload)
-print(response.json())`;
-  }
-
-  codeEl.textContent = codeText;
-}
-window.updateApiCodeSnippet = updateApiCodeSnippet;
-
-// Super Admin Console Subtab Switcher
-window.switchAdminSubtab = function(subtabName) {
-  document.querySelectorAll('.admin-console-tab-btn').forEach(btn => btn.classList.remove('active'));
-  document.querySelectorAll('div[id^="admin-panel-section-"]').forEach(sec => sec.style.display = 'none');
-
-  const activeBtn = document.getElementById(`admin-subtab-${subtabName}`);
-  if (activeBtn) activeBtn.classList.add('active');
-
-  const activeSection = document.getElementById(`admin-panel-section-${subtabName}`);
-  if (activeSection) activeSection.style.display = 'block';
-
-  if (subtabName === 'users') fetchAdminClients();
-  if (subtabName === 'requests') fetchAdminRequests();
-  if (subtabName === 'logs') fetchAdminTransactions();
-};
 
 async function fetchSharingConfig() {
   try {
@@ -4411,7 +4255,78 @@ document.getElementById('btn-copy-code-snippet')?.addEventListener('click', (e) 
   }
 });
 
+// API Documentation Tab switching logic
+let currentApiDocTab = 'curl';
 
+window.switchApiDocTab = function(tab) {
+  currentApiDocTab = tab;
+  
+  // Highlight active tab button
+  document.querySelectorAll('[id^="api-tab-"]').forEach(btn => {
+    btn.style.color = 'var(--text-muted)';
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.getElementById(`api-tab-${tab}`);
+  if (activeBtn) {
+    activeBtn.style.color = 'var(--text-main)';
+    activeBtn.classList.add('active');
+  }
+
+  updateApiCodeSnippet();
+};
+
+function updateApiCodeSnippet() {
+  const codeEl = document.getElementById('api-code-snippet');
+  if (!codeEl) return;
+
+  const origin = window.location.origin;
+  const clientId = loggedInUser ? loggedInUser.id : 'YOUR_CLIENT_AUTH_ID';
+  const apiToken = elSharedApiKeyInput.value || 'YOUR_CALLIO_AUTH_TOKEN';
+  const assignedPhone = (loggedInUser && loggedInUser.phone_number) ? loggedInUser.phone_number : '+91XXXXXXXXXX';
+
+  let codeText = '';
+  if (currentApiDocTab === 'curl') {
+    codeText = `curl -X POST "${origin}/make-call" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "to": "+919876543210",
+    "clientId": "${clientId}",
+    "authToken": "${apiToken}",
+    "callerId": "${assignedPhone}"
+  }'`;
+  } else if (currentApiDocTab === 'js') {
+    codeText = `fetch("${origin}/make-call", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    to: "+919876543210",
+    clientId: "${clientId}",
+    authToken: "${apiToken}",
+    callerId: "${assignedPhone}"
+  })
+})
+.then(res => res.json())
+.then(data => console.log(data))
+.catch(err => console.error(err));`;
+  } else if (currentApiDocTab === 'python') {
+    codeText = `import requests
+
+url = "${origin}/make-call"
+payload = {
+    "to": "+919876543210",
+    "clientId": "${clientId}",
+    "authToken": "${apiToken}",
+    "callerId": "${assignedPhone}"
+}
+
+response = requests.post(url, json=payload)
+print(response.json())`;
+  }
+
+  codeEl.textContent = codeText;
+}
 
 // Save Sharing Settings
 elBtnSaveSharingSettings?.addEventListener('click', async (e) => {
@@ -4664,13 +4579,31 @@ function applyUserPlanAndLimits(user) {
     const authTokenGroup = document.getElementById('calling-credentials-auth-token-group');
     const accordionTitle = document.getElementById('calling-credentials-accordion-title');
 
-    // Always unlock API & Data Sharing tab for all accounts so credentials & API keys are accessible
-    if (apiOverlay) apiOverlay.style.display = 'none';
-    if (apiContent) apiContent.style.display = 'block';
-    if (authIdGroup) authIdGroup.style.display = 'block';
-    if (authTokenGroup) authTokenGroup.style.display = 'block';
-    if (accordionTitle) accordionTitle.textContent = '⚙️ Telephony Credentials & Number';
-    if (navApi) { const b = navApi.querySelector('.nav-lock-badge'); if (b) b.remove(); }
+    if (!planDetails.api_sharing) {
+      if (apiOverlay) apiOverlay.style.display = 'flex';
+      if (apiContent) apiContent.style.display = 'none';
+      if (authIdGroup) authIdGroup.style.display = 'none';
+      if (authTokenGroup) authTokenGroup.style.display = 'none';
+      if (accordionTitle) accordionTitle.textContent = '⚙️ Your Callio Number';
+      
+      if (navApi && !navApi.querySelector('.nav-lock-badge')) {
+        const apiSpan = navApi.querySelector('span');
+        if (apiSpan && !apiSpan.querySelector('.nav-lock-badge')) {
+          const badge = document.createElement('span');
+          badge.className = 'nav-lock-badge';
+          badge.style.cssText = 'font-size:0.65rem;background:rgba(255,152,0,0.15);color:#f59e0b;border:1px solid rgba(255,152,0,0.3);border-radius:4px;padding:1px 5px;margin-left:5px;font-weight:700;vertical-align:middle;letter-spacing:0;';
+          badge.textContent = '🔒';
+          apiSpan.appendChild(badge);
+        }
+      }
+    } else {
+      if (apiOverlay) apiOverlay.style.display = 'none';
+      if (apiContent) apiContent.style.display = 'block';
+      if (authIdGroup) authIdGroup.style.display = 'block';
+      if (authTokenGroup) authTokenGroup.style.display = 'block';
+      if (accordionTitle) accordionTitle.textContent = '⚙️ Telephony Credentials & Number';
+      if (navApi) { const b = navApi.querySelector('.nav-lock-badge'); if (b) b.remove(); }
+    }
 
     // Mood selector lock
     if (planDetails.id === 'basic') {
@@ -4780,17 +4713,18 @@ function applyUserRole(user) {
   
   if (user.role === 'admin') {
     // Admin has access to all standard tabs + admin tab + billing + settings
-    ['nav-dashboard', 'nav-agents', 'nav-contacts', 'nav-broadcast', 'nav-quick-call', 'nav-crm-automation', 'nav-api-sharing', 'nav-admin-panel'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'inline-flex';
-    });
+    document.getElementById('nav-dashboard').style.display = 'block';
+    document.getElementById('nav-agents').style.display = 'block';
+    document.getElementById('nav-contacts').style.display = 'block';
+    document.getElementById('nav-broadcast').style.display = 'block';
+    document.getElementById('nav-quick-call').style.display = 'block';
+    document.getElementById('nav-crm-automation').style.display = 'block';
+    document.getElementById('nav-api-sharing').style.display = 'block';
+    document.getElementById('nav-admin-panel').style.display = 'block';
     
     // Populate branding settings form
-    if (typeof window.loadBrandingToForm === 'function') {
-      window.loadBrandingToForm();
-    }
-    const navBilling = document.getElementById('nav-billing');
-    if (navBilling) navBilling.style.display = 'none';
+    window.loadBrandingToForm();
+    document.getElementById('nav-billing').style.display = 'none';
     
     // Show settings and provider selection for admin
     const settingsBtn = document.getElementById('btn-toggle-settings');
@@ -4830,12 +4764,14 @@ function applyUserRole(user) {
     fetchClientDashboardData();
   } else {
     // Client has access to all standard tabs except Admin Panel
-    ['nav-dashboard', 'nav-agents', 'nav-contacts', 'nav-broadcast', 'nav-quick-call', 'nav-crm-automation', 'nav-api-sharing', 'nav-billing'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'inline-flex';
-    });
-    const navAdmin = document.getElementById('nav-admin-panel');
-    if (navAdmin) navAdmin.style.display = 'none';
+    document.getElementById('nav-dashboard').style.display = 'block';
+    document.getElementById('nav-agents').style.display = 'block';
+    document.getElementById('nav-contacts').style.display = 'block';
+    document.getElementById('nav-broadcast').style.display = 'block';
+    document.getElementById('nav-quick-call').style.display = 'block';
+    document.getElementById('nav-crm-automation').style.display = 'block';
+    document.getElementById('nav-api-sharing').style.display = 'block';
+    document.getElementById('nav-billing').style.display = 'block';
     
     // Show settings for client but hide admin-only config panels
     const settingsBtn = document.getElementById('btn-toggle-settings');
