@@ -4139,6 +4139,86 @@ document.getElementById('btn-simulate-crm-webhook')?.addEventListener('click', a
 // API AUTHORIZATION & DATA SHARING TAB LOGIC
 // ================================================================
 
+let currentApiDocTab = 'curl';
+
+window.switchApiDocTab = function(lang) {
+  currentApiDocTab = lang;
+  document.querySelectorAll('#tab-api-sharing .tab-btn').forEach(btn => btn.classList.remove('active'));
+  const activeTab = document.getElementById(`api-tab-${lang}`);
+  if (activeTab) activeTab.classList.add('active');
+  updateApiCodeSnippet();
+};
+
+function updateApiCodeSnippet() {
+  const codeEl = document.getElementById('api-code-snippet');
+  if (!codeEl) return;
+
+  const origin = window.location.origin;
+  const clientId = loggedInUser ? loggedInUser.id : 'YOUR_CLIENT_AUTH_ID';
+  const apiToken = (elSharedApiKeyInput && elSharedApiKeyInput.value) || 'YOUR_CALLIO_AUTH_TOKEN';
+  const assignedPhone = (loggedInUser && loggedInUser.phone_number) ? loggedInUser.phone_number : '+91XXXXXXXXXX';
+
+  let codeText = '';
+  if (currentApiDocTab === 'curl') {
+    codeText = `curl -X POST "${origin}/make-call" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "to": "+919876543210",
+    "clientId": "${clientId}",
+    "authToken": "${apiToken}",
+    "callerId": "${assignedPhone}"
+  }'`;
+  } else if (currentApiDocTab === 'js') {
+    codeText = `fetch("${origin}/make-call", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    to: "+919876543210",
+    clientId: "${clientId}",
+    authToken: "${apiToken}",
+    callerId: "${assignedPhone}"
+  })
+})
+.then(res => res.json())
+.then(data => console.log(data))
+.catch(err => console.error(err));`;
+  } else if (currentApiDocTab === 'python') {
+    codeText = `import requests
+
+url = "${origin}/make-call"
+payload = {
+    "to": "+919876543210",
+    "clientId": "${clientId}",
+    "authToken": "${apiToken}",
+    "callerId": "${assignedPhone}"
+}
+
+response = requests.post(url, json=payload)
+print(response.json())`;
+  }
+
+  codeEl.textContent = codeText;
+}
+window.updateApiCodeSnippet = updateApiCodeSnippet;
+
+// Super Admin Console Subtab Switcher
+window.switchAdminSubtab = function(subtabName) {
+  document.querySelectorAll('.admin-console-tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('div[id^="admin-panel-section-"]').forEach(sec => sec.style.display = 'none');
+
+  const activeBtn = document.getElementById(`admin-subtab-${subtabName}`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const activeSection = document.getElementById(`admin-panel-section-${subtabName}`);
+  if (activeSection) activeSection.style.display = 'block';
+
+  if (subtabName === 'users') fetchAdminClients();
+  if (subtabName === 'requests') fetchAdminRequests();
+  if (subtabName === 'logs') fetchAdminTransactions();
+};
+
 async function fetchSharingConfig() {
   try {
     const clientId = loggedInUser ? loggedInUser.id : '';
@@ -4306,78 +4386,7 @@ document.getElementById('btn-copy-code-snippet')?.addEventListener('click', (e) 
   }
 });
 
-// API Documentation Tab switching logic
-let currentApiDocTab = 'curl';
 
-window.switchApiDocTab = function(tab) {
-  currentApiDocTab = tab;
-  
-  // Highlight active tab button
-  document.querySelectorAll('[id^="api-tab-"]').forEach(btn => {
-    btn.style.color = 'var(--text-muted)';
-    btn.classList.remove('active');
-  });
-  const activeBtn = document.getElementById(`api-tab-${tab}`);
-  if (activeBtn) {
-    activeBtn.style.color = 'var(--text-main)';
-    activeBtn.classList.add('active');
-  }
-
-  updateApiCodeSnippet();
-};
-
-function updateApiCodeSnippet() {
-  const codeEl = document.getElementById('api-code-snippet');
-  if (!codeEl) return;
-
-  const origin = window.location.origin;
-  const clientId = loggedInUser ? loggedInUser.id : 'YOUR_CLIENT_AUTH_ID';
-  const apiToken = elSharedApiKeyInput.value || 'YOUR_CALLIO_AUTH_TOKEN';
-  const assignedPhone = (loggedInUser && loggedInUser.phone_number) ? loggedInUser.phone_number : '+91XXXXXXXXXX';
-
-  let codeText = '';
-  if (currentApiDocTab === 'curl') {
-    codeText = `curl -X POST "${origin}/make-call" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "to": "+919876543210",
-    "clientId": "${clientId}",
-    "authToken": "${apiToken}",
-    "callerId": "${assignedPhone}"
-  }'`;
-  } else if (currentApiDocTab === 'js') {
-    codeText = `fetch("${origin}/make-call", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    to: "+919876543210",
-    clientId: "${clientId}",
-    authToken: "${apiToken}",
-    callerId: "${assignedPhone}"
-  })
-})
-.then(res => res.json())
-.then(data => console.log(data))
-.catch(err => console.error(err));`;
-  } else if (currentApiDocTab === 'python') {
-    codeText = `import requests
-
-url = "${origin}/make-call"
-payload = {
-    "to": "+919876543210",
-    "clientId": "${clientId}",
-    "authToken": "${apiToken}",
-    "callerId": "${assignedPhone}"
-}
-
-response = requests.post(url, json=payload)
-print(response.json())`;
-  }
-
-  codeEl.textContent = codeText;
-}
 
 // Save Sharing Settings
 elBtnSaveSharingSettings?.addEventListener('click', async (e) => {

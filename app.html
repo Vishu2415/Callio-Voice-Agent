@@ -210,22 +210,11 @@
       }
     }
 
-    /* Prevent initial FOUC (Flash of Unstyled Content) or tab flickering */
-    html[data-active-tab] .tab-pane {
+    /* Ensure tab pane visibility is 100% reliable */
+    .tab-pane {
       display: none !important;
     }
-    html[data-active-tab="tab-dashboard"] #tab-dashboard,
-    html[data-active-tab="tab-recordings"] #tab-recordings,
-    html[data-active-tab="tab-agents"] #tab-agents,
-    html[data-active-tab="tab-contacts"] #tab-contacts,
-    html[data-active-tab="tab-broadcast"] #tab-broadcast,
-    html[data-active-tab="tab-quick-call"] #tab-quick-call,
-    html[data-active-tab="tab-crm-automation"] #tab-crm-automation,
-    html[data-active-tab="tab-api-sharing"] #tab-api-sharing,
-    html[data-active-tab="tab-billing"] #tab-billing,
-    html[data-active-tab="tab-admin-panel"] #tab-admin-panel,
-    html[data-active-tab="tab-call-history"] #tab-call-history,
-    html[data-active-tab="tab-settings"] #tab-settings {
+    .tab-pane.active {
       display: block !important;
     }
 
