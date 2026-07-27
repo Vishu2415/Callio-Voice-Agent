@@ -4630,31 +4630,13 @@ function applyUserPlanAndLimits(user) {
     const authTokenGroup = document.getElementById('calling-credentials-auth-token-group');
     const accordionTitle = document.getElementById('calling-credentials-accordion-title');
 
-    if (!planDetails.api_sharing) {
-      if (apiOverlay) apiOverlay.style.display = 'flex';
-      if (apiContent) apiContent.style.display = 'none';
-      if (authIdGroup) authIdGroup.style.display = 'none';
-      if (authTokenGroup) authTokenGroup.style.display = 'none';
-      if (accordionTitle) accordionTitle.textContent = '⚙️ Your Callio Number';
-      
-      if (navApi && !navApi.querySelector('.nav-lock-badge')) {
-        const apiSpan = navApi.querySelector('span');
-        if (apiSpan && !apiSpan.querySelector('.nav-lock-badge')) {
-          const badge = document.createElement('span');
-          badge.className = 'nav-lock-badge';
-          badge.style.cssText = 'font-size:0.65rem;background:rgba(255,152,0,0.15);color:#f59e0b;border:1px solid rgba(255,152,0,0.3);border-radius:4px;padding:1px 5px;margin-left:5px;font-weight:700;vertical-align:middle;letter-spacing:0;';
-          badge.textContent = '🔒';
-          apiSpan.appendChild(badge);
-        }
-      }
-    } else {
-      if (apiOverlay) apiOverlay.style.display = 'none';
-      if (apiContent) apiContent.style.display = 'block';
-      if (authIdGroup) authIdGroup.style.display = 'block';
-      if (authTokenGroup) authTokenGroup.style.display = 'block';
-      if (accordionTitle) accordionTitle.textContent = '⚙️ Telephony Credentials & Number';
-      if (navApi) { const b = navApi.querySelector('.nav-lock-badge'); if (b) b.remove(); }
-    }
+    // Always unlock API & Data Sharing tab for all accounts so credentials & API keys are accessible
+    if (apiOverlay) apiOverlay.style.display = 'none';
+    if (apiContent) apiContent.style.display = 'block';
+    if (authIdGroup) authIdGroup.style.display = 'block';
+    if (authTokenGroup) authTokenGroup.style.display = 'block';
+    if (accordionTitle) accordionTitle.textContent = '⚙️ Telephony Credentials & Number';
+    if (navApi) { const b = navApi.querySelector('.nav-lock-badge'); if (b) b.remove(); }
 
     // Mood selector lock
     if (planDetails.id === 'basic') {
