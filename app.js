@@ -4368,11 +4368,30 @@ elLinkGotoLogin?.addEventListener('click', (e) => {
 });
 
 // Initial Auth Check
-function checkAuth() {
+async function checkAuth() {
   const session = localStorage.getItem('user_session');
   if (session) {
-    loggedInUser = JSON.parse(session);
-    applyUserRole(loggedInUser);
+    try {
+      const user = JSON.parse(session);
+      // Validate session with server for portal domain isolation
+      const verifyRes = await fetch('/api/auth/verify-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, role: user.role })
+      });
+      const verifyData = await verifyRes.json();
+      if (verifyData.success) {
+        loggedInUser = user;
+        applyUserRole(loggedInUser);
+        return;
+      }
+    } catch (e) {
+      console.warn('Session verification failed:', e);
+    }
+    // Session is invalid for this portal domain! Clear and show auth modal
+    localStorage.removeItem('user_session');
+    loggedInUser = null;
+    showAuthModal();
   } else {
     showAuthModal();
   }

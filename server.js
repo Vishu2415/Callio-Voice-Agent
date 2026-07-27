@@ -137,20 +137,27 @@ function saveBranding() {
   saveDatabase(BRANDING_DB_FILE, brandingDb);
 }
 
+function getRealHostFromRequest(req) {
+  if (!req) return '';
+  let host = req.headers['x-forwarded-host'] || req.headers.origin || req.headers.referer || req.headers.host || '';
+  if (Array.isArray(host)) host = host[0];
+  host = String(host).replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase().trim();
+  if (host.startsWith('www.')) host = host.substring(4);
+  return host;
+}
+
 function isMainPlatformHost(host) {
   if (!host) return true;
-  let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+  let cleanHost = String(host).replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase().trim();
   if (cleanHost.startsWith('www.')) cleanHost = cleanHost.substring(4);
 
   const mainDomains = [
-    'callio.in', 'localhost', '127.0.0.1', '0.0.0.0',
-    'callingagent.com', 'vobiz.in', 'diginext360.com'
+    'callio.in', 'callingagent.com', 'vobiz.in', 'diginext360.com'
   ];
   if (mainDomains.includes(cleanHost)) return true;
 
-  // IPv4 or local hostname check (e.g. 192.168.x.x, 10.x.x.x, 172.16.x.x, ::1, .local)
-  const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (ipv4Pattern.test(cleanHost) || cleanHost === '::1' || cleanHost.endsWith('.local') || cleanHost.endsWith('.localhost')) {
+  // Local development host check (only when explicitly localhost/127.0.0.1)
+  if (cleanHost === 'localhost' || cleanHost === '127.0.0.1' || cleanHost === '0.0.0.0' || cleanHost.endsWith('.local') || cleanHost.endsWith('.localhost')) {
     return true;
   }
 
@@ -164,7 +171,7 @@ function getResellerFromHost(host) {
     return null;
   }
 
-  let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+  let cleanHost = String(host).replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase().trim();
   const domainWithoutWww = cleanHost.startsWith('www.') ? cleanHost.substring(4) : cleanHost;
 
   for (const reseller of resellersDb.values()) {
@@ -3420,9 +3427,9 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(400).json({ success: false, error: 'Email and password are required.' });
   }
 
-  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
-  const isMainPlatform = isMainPlatformHost(host);
-  const currentReseller = getResellerFromHost(host);
+  const realHost = getRealHostFromRequest(req);
+  const isMainPlatform = isMainPlatformHost(realHost);
+  const currentReseller = getResellerFromHost(realHost);
 
   const hashedPassword = hashPassword(password);
 
@@ -3449,7 +3456,6 @@ app.post('/api/auth/login', (req, res) => {
       }
 
       // Reseller admin MUST log in ONLY on their specific reseller domain/subdomain
-      // They cannot log in on main Callio platform or another reseller domain
       if (isMainPlatform || !currentReseller || currentReseller.id !== reseller.id) {
         return res.status(401).json({ success: false, error: 'Invalid email or password.' });
       }
@@ -3478,8 +3484,8 @@ app.post('/api/auth/login', (req, res) => {
 
       if (!isMainPlatform) {
         // Logging in on a white-label / reseller portal (e.g. Growvo / growwo.in)
-        // Client MUST belong to this specific reseller portal
-        if (!currentReseller || !client.reseller_id || client.reseller_id !== currentReseller.id) {
+        // If client does not have reseller_id OR client.reseller_id !== currentReseller?.id -> REJECT!
+        if (!client.reseller_id || (currentReseller && client.reseller_id !== currentReseller.id)) {
           return res.status(401).json({ success: false, error: 'Invalid email or password.' });
         }
       } else {
@@ -3515,6 +3521,52 @@ app.post('/api/auth/login', (req, res) => {
 
   // Standard secure error message for ALL invalid attempts
   return res.status(401).json({ success: false, error: 'Invalid email or password.' });
+});
+
+// Verification endpoint to validate existing user_session against current domain
+app.post('/api/auth/verify-session', (req, res) => {
+  const { userId, role } = req.body;
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'User ID is required' });
+  }
+
+  const realHost = getRealHostFromRequest(req);
+  const isMainPlatform = isMainPlatformHost(realHost);
+  const currentReseller = getResellerFromHost(realHost);
+
+  if (role === 'admin') {
+    if (!isMainPlatform) {
+      return res.status(403).json({ success: false, error: 'Invalid session for this portal' });
+    }
+    return res.json({ success: true });
+  }
+
+  if (role === 'reseller') {
+    if (isMainPlatform || !currentReseller || currentReseller.id !== userId) {
+      return res.status(403).json({ success: false, error: 'Invalid session for this portal' });
+    }
+    return res.json({ success: true });
+  }
+
+  // Client role
+  const client = clientsDb.get(userId);
+  if (!client) {
+    return res.status(404).json({ success: false, error: 'User not found' });
+  }
+
+  if (!isMainPlatform) {
+    // White-label portal
+    if (!client.reseller_id || (currentReseller && client.reseller_id !== currentReseller.id)) {
+      return res.status(403).json({ success: false, error: 'Invalid session for this portal' });
+    }
+  } else {
+    // Main platform
+    if (client.reseller_id) {
+      return res.status(403).json({ success: false, error: 'Invalid session for this portal' });
+    }
+  }
+
+  return res.json({ success: true, user: client });
 });
 
 
