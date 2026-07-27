@@ -535,24 +535,16 @@ function parseCallSummary(summaryRaw) {
     actionToTake = actionMatch[1].trim().replace(/\*\*/g, '');
   }
 
-  let keyPoints = [];
-  const keyPointsMatch = raw.match(/\*\*(?:Key Points|Key Details):\*\*\s*([\s\S]*?)(?=\*\*(?:Next Action|Action to Take|VERDICT|Verdict):|$)/i);
-  if (keyPointsMatch && keyPointsMatch[1]) {
-    keyPoints = keyPointsMatch[1]
-      .split('\n')
-      .map(line => line.replace(/^[\-\*\s\•]+/, '').replace(/\*\*/g, '').trim())
-      .filter(Boolean);
-  }
-
   let cleanSummary = raw;
   cleanSummary = cleanSummary.replace(/\*\*(?:VERDICT|Verdict):\*\*\s*[^\n]*/gi, '');
   cleanSummary = cleanSummary.replace(/\*\*(?:Next Action|Action to Take|Key Action|Next Steps):\*\*\s*[^\n]*/gi, '');
   cleanSummary = cleanSummary.replace(/\*\*(?:Key Points|Key Details):\*\*/gi, '');
   cleanSummary = cleanSummary.replace(/\*\*/g, '');
-  cleanSummary = cleanSummary.replace(/^[-\s\n]+/, '').trim();
-  cleanSummary = cleanSummary.replace(/\n+/g, ' • ');
+  cleanSummary = cleanSummary.replace(/[\-\•]/g, ' ');
+  cleanSummary = cleanSummary.replace(/[\r\n]+/g, ' ');
+  cleanSummary = cleanSummary.replace(/\s+/g, ' ').trim();
 
-  return { cleanSummary, verdict, actionToTake, keyPoints };
+  return { cleanSummary, verdict, actionToTake };
 }
 
 function createActionCardElement(card, isModal = false) {
@@ -561,12 +553,12 @@ function createActionCardElement(card, isModal = false) {
   cardEl.dataset.id = card.id;
 
   const flexBasis = isModal ? '100%' : '315px';
-  cardEl.style.cssText = `flex: 0 0 ${flexBasis}; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; transition: all 0.25s ease; position: relative; backdrop-filter: blur(10px); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); cursor: pointer;`;
+  cardEl.style.cssText = `flex: 0 0 ${flexBasis}; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; transition: all 0.25s ease; position: relative; backdrop-filter: blur(10px); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); cursor: pointer; user-select: none;`;
 
   cardEl.onclick = (e) => {
     // If user clicks on button or inside a button, don't trigger modal
     if (e.target.closest('button')) return;
-    window.openLeadDetailModal(card.id);
+    window.openLeadDetailModal(card.id, card);
   };
 
   cardEl.onmouseover = () => {
@@ -619,9 +611,9 @@ function createActionCardElement(card, isModal = false) {
   return cardEl;
 }
 
-window.openLeadDetailModal = function(cardId) {
-  const cards = window.allActiveActionCards || [];
-  const card = cards.find(c => c && c.id === cardId);
+window.openLeadDetailModal = function(cardId, cardFallback = null) {
+  let card = (window.allActiveActionCards || []).find(c => c && String(c.id) === String(cardId));
+  if (!card && cardFallback) card = cardFallback;
   if (!card) return;
 
   const modal = document.getElementById('lead-card-detail-modal');
@@ -639,9 +631,9 @@ window.openLeadDetailModal = function(cardId) {
 
   if (sentimentEl) {
     sentimentEl.innerText = card.sentiment;
-    sentimentEl.style.background = card.sentimentBg;
-    sentimentEl.style.color = card.color;
-    sentimentEl.style.border = `1px solid ${card.sentimentBorder}`;
+    sentimentEl.style.background = card.sentimentBg || 'rgba(16, 185, 129, 0.12)';
+    sentimentEl.style.color = card.color || '#10b981';
+    sentimentEl.style.border = `1px solid ${card.sentimentBorder || 'rgba(16, 185, 129, 0.3)'}`;
   }
 
   if (urgencyEl) {

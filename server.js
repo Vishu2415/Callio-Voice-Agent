@@ -3430,7 +3430,7 @@ app.post('/api/auth/login', (req, res) => {
 
   if (email.toLowerCase() === adminEmail.toLowerCase() && password === adminPassword) {
     if (currentReseller) {
-      return res.status(403).json({ success: false, error: 'Super Admin login is not permitted on reseller portals.' });
+      return res.status(401).json({ success: false, error: 'Invalid email or password.' });
     }
     return res.json({
       success: true,
@@ -3440,12 +3440,18 @@ app.post('/api/auth/login', (req, res) => {
 
   const hashedPassword = hashPassword(password);
 
-  // 2. Reseller Admin login check
+  // 2. Reseller Admin login check (Strict Domain Isolation)
   for (const reseller of resellersDb.values()) {
     if (reseller.email.toLowerCase() === email.toLowerCase() && reseller.password === hashedPassword) {
       if (reseller.status === 'suspended') {
-        return res.status(403).json({ success: false, error: 'Your reseller account is suspended.' });
+        return res.status(401).json({ success: false, error: 'Invalid email or password.' });
       }
+
+      // Reseller admin MUST log in on their specific reseller domain/subdomain or main platform
+      if (currentReseller && currentReseller.id !== reseller.id) {
+        return res.status(401).json({ success: false, error: 'Invalid email or password.' });
+      }
+
       return res.json({
         success: true,
         user: {
@@ -3461,31 +3467,24 @@ app.post('/api/auth/login', (req, res) => {
     }
   }
 
-  // 3. Client login check
-  const tenantId = req.headers['x-tenant-id'] || req.body.tenantId || '';
+  // 3. Client login check (Strict Portal Domain Isolation)
   for (const client of clientsDb.values()) {
     if (client.email.toLowerCase() === email.toLowerCase() && client.password === hashedPassword) {
-      // Strict Portal Domain Isolation Check
+      if (client.status === 'suspended') {
+        return res.status(401).json({ success: false, error: 'Invalid email or password.' });
+      }
+
+      // Domain Isolation
       if (currentReseller) {
         // Logging in on a reseller portal (e.g. Growvo / growvo.in)
         if (client.reseller_id !== currentReseller.id) {
-          return res.status(403).json({ 
-            success: false, 
-            error: 'This account does not belong to this reseller portal. Please log in on your respective portal website.' 
-          });
+          return res.status(401).json({ success: false, error: 'Invalid email or password.' });
         }
       } else {
         // Logging in on Main Callio Portal (callio.in)
         if (client.reseller_id) {
-          return res.status(403).json({ 
-            success: false, 
-            error: 'This account belongs to a reseller portal. Please log in through your white-label portal URL.' 
-          });
+          return res.status(401).json({ success: false, error: 'Invalid email or password.' });
         }
-      }
-
-      if (client.status === 'suspended') {
-        return res.status(403).json({ success: false, error: 'Your account is suspended.' });
       }
 
       return res.json({
@@ -3502,13 +3501,17 @@ app.post('/api/auth/login', (req, res) => {
           plan: client.plan || 'basic',
           used_minutes: client.used_minutes !== undefined ? client.used_minutes : 0.00,
           pricing: client.pricing || { rate_per_minute: 2.00, rate_recording_per_minute: 1.00, rate_per_session: 0.00 },
-          billing_history: client.billing_history || []
+          billing_history: client.billing_history || [],
+          reseller_id: client.reseller_id || null,
+          tenantId: client.tenantId || null,
+          created_at: client.created_at
         }
       });
     }
   }
 
-  res.status(401).json({ success: false, error: 'Invalid email or password.' });
+  // Standard secure error message for ALL invalid attempts
+  return res.status(401).json({ success: false, error: 'Invalid email or password.' });
 });
 
 
