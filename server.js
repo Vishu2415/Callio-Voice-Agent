@@ -3447,8 +3447,9 @@ app.post('/api/auth/login', (req, res) => {
         return res.status(401).json({ success: false, error: 'Invalid email or password.' });
       }
 
-      // Reseller admin MUST log in on their specific reseller domain/subdomain or main platform
-      if (currentReseller && currentReseller.id !== reseller.id) {
+      // Reseller Admin MUST log in ONLY on their specific reseller portal domain/subdomain!
+      // They are NOT permitted to log in on main Callio portal (currentReseller is null) OR on another reseller domain.
+      if (!currentReseller || currentReseller.id !== reseller.id) {
         return res.status(401).json({ success: false, error: 'Invalid email or password.' });
       }
 
