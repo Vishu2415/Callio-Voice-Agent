@@ -819,24 +819,49 @@ window.renderMetricDetailsModalContent = function() {
     calls = window.callsCache;
   } else if (Array.isArray(callsCache) && callsCache.length > 0) {
     calls = callsCache;
+  } else {
+    try {
+      const stored = localStorage.getItem('callio_calls_cache');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          calls = parsed;
+          window.lastDashboardCalls = parsed;
+          window.callsCache = parsed;
+          callsCache = parsed;
+        }
+      }
+    } catch(e) {}
   }
 
-  // Auto-fetch fallback if still empty
-  if (calls.length === 0 && !window._fetchingModalCalls) {
-    window._fetchingModalCalls = true;
-    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.id : '';
-    fetch(`/calls?clientId=${clientId}`)
-      .then(res => res.json())
-      .then(data => {
-        window._fetchingModalCalls = false;
-        if (data.success && Array.isArray(data.calls)) {
-          window.callsCache = data.calls;
-          window.lastDashboardCalls = data.calls;
-          callsCache = data.calls;
-          window.renderMetricDetailsModalContent();
-        }
-      })
-      .catch(e => { window._fetchingModalCalls = false; });
+  // If data is currently empty, display loading state and auto-fetch from server
+  if (calls.length === 0) {
+    bodyEl.innerHTML = `
+      <div style="text-align: center; padding: 50px 20px; color: var(--text-muted);">
+        <div style="font-size: 2rem; margin-bottom: 12px; display: inline-block;">⏳</div>
+        <div style="font-weight: 700; color: var(--text-main, #ffffff); font-size: 1.05rem; margin-bottom: 4px;">Loading Call Records...</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted, #a1a1aa);">Fetching recent call history from server, please wait.</div>
+      </div>
+    `;
+
+    if (!window._fetchingModalCalls) {
+      window._fetchingModalCalls = true;
+      const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.id : '';
+      fetch(`/calls?clientId=${clientId}`)
+        .then(res => res.json())
+        .then(data => {
+          window._fetchingModalCalls = false;
+          if (data.success && Array.isArray(data.calls)) {
+            window.callsCache = data.calls;
+            window.lastDashboardCalls = data.calls;
+            callsCache = data.calls;
+            try { localStorage.setItem('callio_calls_cache', JSON.stringify(data.calls)); } catch(e){}
+            window.renderMetricDetailsModalContent();
+          }
+        })
+        .catch(e => { window._fetchingModalCalls = false; });
+    }
+    return;
   }
 
   let filteredCalls = [];
@@ -5725,8 +5750,18 @@ function updateDashboardWithClientCalls(calls) {
 }
 
 function populateDashboardBoxes(calls) {
-  // Cache the calls globally for the modal to use
+  if (!Array.isArray(calls)) return;
+  // Cache the calls globally for the modal to use across all tabs
   window.lastDashboardCalls = calls;
+  window.callsCache = calls;
+  callsCache = calls;
+  try { localStorage.setItem('callio_calls_cache', JSON.stringify(calls.slice(0, 100))); } catch(e){}
+
+  // Re-render modal automatically if currently open
+  const modal = document.getElementById('dashboard-metric-detail-modal');
+  if (modal && modal.style.display !== 'none' && modal.style.visibility !== 'hidden') {
+    window.renderMetricDetailsModalContent();
+  }
 
   // 1. Recent Call Connections (up to 4 calls)
   const lastCallBox = document.getElementById('dashboard-last-call-box');
