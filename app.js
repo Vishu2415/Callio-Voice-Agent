@@ -4962,6 +4962,7 @@ function applyUserRole(user) {
     document.getElementById('nav-contacts').style.display = 'block';
     document.getElementById('nav-broadcast').style.display = 'block';
     document.getElementById('nav-quick-call').style.display = 'block';
+    if (document.getElementById('nav-callbacks')) document.getElementById('nav-callbacks').style.display = 'block';
     document.getElementById('nav-crm-automation').style.display = 'block';
     document.getElementById('nav-api-sharing').style.display = 'block';
     document.getElementById('nav-admin-panel').style.display = 'block';
@@ -5013,6 +5014,7 @@ function applyUserRole(user) {
     document.getElementById('nav-contacts').style.display = 'block';
     document.getElementById('nav-broadcast').style.display = 'block';
     document.getElementById('nav-quick-call').style.display = 'block';
+    if (document.getElementById('nav-callbacks')) document.getElementById('nav-callbacks').style.display = 'block';
     document.getElementById('nav-crm-automation').style.display = 'block';
     document.getElementById('nav-api-sharing').style.display = 'block';
     document.getElementById('nav-billing').style.display = 'block';
@@ -5450,10 +5452,13 @@ async function refreshCallbacksList() {
           clientAgentIds.includes(cb.agentId)
         );
       }
-      // Save globally for modal
+      // Save globally
       window.lastDashboardCallbacks = callbacks;
       renderDashboardCallbacks(callbacks);
       
+      // Auto-refresh full page tab
+      window.renderScheduledCallbacksPageTable();
+
       // Auto-refresh the modal if it's currently open
       const modal = document.getElementById('callbacks-modal');
       if (modal && modal.style.display === 'flex') {
@@ -5465,26 +5470,37 @@ async function refreshCallbacksList() {
   }
 }
 
+window.fetchCallbacksList = refreshCallbacksList;
+
+window.navigateToCallbacksPage = function() {
+  const btn = document.getElementById('nav-callbacks');
+  if (btn) {
+    btn.click();
+  } else {
+    document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
+    const target = document.getElementById('tab-callbacks');
+    if (target) target.style.display = 'block';
+  }
+  refreshCallbacksList();
+};
+
 function renderDashboardCallbacks(callbacks) {
   const callbacksList = document.getElementById('dashboard-callbacks-list');
   if (!callbacksList) return;
 
-  // Filter only pending/dialing callbacks
-  const pendingCallbacks = callbacks.filter(cb => cb.status === 'pending' || cb.status === 'dialing');
-
-  if (pendingCallbacks.length > 0) {
+  if (callbacks.length > 0) {
     callbacksList.innerHTML = '';
-    // Show next scheduled first
-    pendingCallbacks.slice(0, 4).forEach(cb => {
+    // Show top 5 callbacks
+    callbacks.slice(0, 5).forEach(cb => {
       const div = document.createElement('div');
       div.className = 'callback-item';
       div.style.display = 'flex';
       div.style.alignItems = 'center';
       div.style.justifyContent = 'space-between';
-      div.style.padding = '8px';
-      div.style.background = 'rgba(255,255,255,0.01)';
-      div.style.border = '1px solid rgba(255,255,255,0.03)';
-      div.style.borderRadius = '8px';
+      div.style.padding = '8px 12px';
+      div.style.background = 'rgba(255,255,255,0.02)';
+      div.style.border = '1px solid var(--border-color)';
+      div.style.borderRadius = '10px';
 
       const cbDate = new Date(cb.scheduledAt);
       const timeText = isNaN(cbDate.getTime()) 
@@ -5492,19 +5508,31 @@ function renderDashboardCallbacks(callbacks) {
         : cbDate.toLocaleString([], { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 
       const nameOrPhone = cb.name || cb.phone || 'Unknown';
-      const statusBadgeColor = cb.status === 'dialing' ? 'var(--color-cyan)' : 'var(--color-orange)';
+      let statusBadgeColor = 'var(--color-orange)';
+      let statusText = String(cb.status || 'pending').toUpperCase();
+
+      if (cb.status === 'dialed' || cb.status === 'completed') {
+        statusBadgeColor = 'var(--color-green)';
+      } else if (cb.status === 'dialing' || cb.status === 'in-progress') {
+        statusBadgeColor = 'var(--color-cyan)';
+      } else if (cb.status === 'failed') {
+        statusBadgeColor = 'var(--color-red)';
+      }
 
       div.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; color: ${statusBadgeColor};"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
           <div style="display: flex; flex-direction: column;">
-            <span style="font-size: 0.82rem; color: var(--text-main); font-weight: 500;">${nameOrPhone}</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 0.82rem; color: var(--text-main); font-weight: 600;">${nameOrPhone}</span>
+              <span style="font-size: 0.6rem; padding: 1px 5px; border-radius: 4px; color: ${statusBadgeColor}; border: 1px solid ${statusBadgeColor}; font-weight: 700;">${statusText}</span>
+            </div>
             <span style="font-size: 0.7rem; color: var(--text-muted);">${timeText} (${cb.requestedTime})</span>
           </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <button onclick="window.triggerCallbackCallDirect('${cb.id}')" class="btn btn-primary" style="padding: 2px 8px; font-size: 0.65rem; background: var(--color-cyan); border: none; border-radius: 4px; color: #000; font-weight: 600; cursor: pointer;">Call Now</button>
-          <button onclick="window.deleteCallbackDirect('${cb.id}')" style="background: transparent; border: none; color: var(--color-red); cursor: pointer; padding: 2px; display: flex; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <button onclick="window.triggerCallbackCallDirect('${cb.id}')" class="btn btn-primary" style="padding: 3px 8px; font-size: 0.68rem; background: var(--color-cyan); border: none; border-radius: 6px; color: #000; font-weight: 800; cursor: pointer;">Call Now</button>
+          <button onclick="window.deleteCallbackDirect('${cb.id}')" style="background: transparent; border: none; color: var(--color-red); cursor: pointer; padding: 2px; display: flex; align-items: center;" title="Cancel callback">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
           </button>
         </div>
@@ -5516,12 +5544,132 @@ function renderDashboardCallbacks(callbacks) {
   }
 }
 
+window.callbacksPageFilter = 'all';
+
+window.filterCallbacksPage = function(filter, btnEl) {
+  window.callbacksPageFilter = filter;
+  const buttons = document.querySelectorAll('#page-cb-filter-buttons .btn-filter-cb');
+  buttons.forEach(btn => {
+    btn.style.borderColor = 'var(--border-color)';
+    btn.style.background = 'var(--bg-surface)';
+    btn.style.color = 'var(--text-muted)';
+    btn.style.fontWeight = '600';
+  });
+  if (btnEl) {
+    btnEl.style.borderColor = 'var(--color-cyan)';
+    btnEl.style.background = 'rgba(6, 182, 212, 0.15)';
+    btnEl.style.color = 'var(--color-cyan)';
+    btnEl.style.fontWeight = '700';
+  }
+  window.renderScheduledCallbacksPageTable();
+};
+
+window.renderScheduledCallbacksPageTable = function() {
+  const container = document.getElementById('page-callbacks-list-container');
+  if (!container) return;
+
+  const callbacks = Array.isArray(window.lastDashboardCallbacks) ? window.lastDashboardCallbacks : [];
+
+  // Update summary counters
+  const totalCount = callbacks.length;
+  const pendingCount = callbacks.filter(c => c.status === 'pending' || c.status === 'dialing').length;
+  const dialedCount = callbacks.filter(c => c.status === 'dialed' || c.status === 'completed').length;
+  const failedCount = callbacks.filter(c => c.status === 'failed').length;
+
+  const elTotal = document.getElementById('page-cb-total-count');
+  const elPending = document.getElementById('page-cb-pending-count');
+  const elDialed = document.getElementById('page-cb-dialed-count');
+  const elFailed = document.getElementById('page-cb-failed-count');
+
+  if (elTotal) elTotal.innerText = totalCount;
+  if (elPending) elPending.innerText = pendingCount;
+  if (elDialed) elDialed.innerText = dialedCount;
+  if (elFailed) elFailed.innerText = failedCount;
+
+  // Filtering
+  const filter = window.callbacksPageFilter || 'all';
+  const searchInput = document.getElementById('page-cb-search-input');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+  let list = callbacks;
+  if (filter === 'pending') {
+    list = list.filter(c => c.status === 'pending' || c.status === 'dialing');
+  } else if (filter === 'dialed') {
+    list = list.filter(c => c.status === 'dialed' || c.status === 'completed');
+  } else if (filter === 'failed') {
+    list = list.filter(c => c.status === 'failed');
+  }
+
+  if (query) {
+    list = list.filter(c => {
+      const name = String(c.name || '').toLowerCase();
+      const phone = String(c.phone || '').toLowerCase();
+      const notes = String(c.notes || '').toLowerCase();
+      return name.includes(query) || phone.includes(query) || notes.includes(query);
+    });
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 50px 20px; color: var(--text-muted); font-size: 0.95rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 10px;">📅</div>
+        No scheduled callbacks match the selected criteria.
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  list.forEach(cb => {
+    const cbDate = new Date(cb.scheduledAt);
+    const timeText = isNaN(cbDate.getTime()) 
+      ? cb.requestedTime 
+      : cbDate.toLocaleString([], { weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+    let statusStyle = 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);';
+    if (cb.status === 'dialed' || cb.status === 'completed') {
+      statusStyle = 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);';
+    } else if (cb.status === 'dialing') {
+      statusStyle = 'background: rgba(6, 182, 212, 0.15); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.3);';
+    } else if (cb.status === 'failed') {
+      statusStyle = 'background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);';
+    }
+
+    html += `
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; transition: border-color 0.2s;">
+        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 240px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <strong style="font-size: 1.05rem; color: var(--text-main); font-family: var(--font-mono);">${cb.name || cb.phone || 'Unknown'}</strong>
+            <span style="padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; ${statusStyle}">${cb.status}</span>
+          </div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+            <span>🕒 ${timeText}</span>
+            <span style="opacity: 0.6;">• Offset: ${cb.requestedTime}</span>
+          </div>
+          ${cb.notes ? `<div style="font-size: 0.8rem; color: #a78bfa; font-style: italic; margin-top: 2px;">💬 Note: ${cb.notes}</div>` : ''}
+          ${cb.error ? `<div style="font-size: 0.78rem; color: #ef4444; margin-top: 2px;">❌ Error: ${cb.error}</div>` : ''}
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center;">
+          ${cb.status !== 'dialed' && cb.status !== 'dialing' ? `
+            <button onclick="window.triggerCallbackCallDirect('${cb.id}')" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.8rem; background: var(--color-cyan); border: none; border-radius: 8px; color: #000; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 14px; height: 14px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              ⚡ Call Now
+            </button>
+            <button onclick="window.rescheduleCallbackDirect('${cb.id}')" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.8rem; border-radius: 8px; cursor: pointer; color: var(--text-main); background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); font-weight: 600;">Reschedule</button>
+          ` : ''}
+          <button onclick="window.deleteCallbackDirect('${cb.id}')" class="btn btn-danger" style="padding: 8px 14px; font-size: 0.8rem; border-radius: 8px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-weight: 700; cursor: pointer;">Cancel</button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+};
+
 window.openCallbacksModal = function(event) {
   if (event) event.preventDefault();
-  const modal = document.getElementById('callbacks-modal');
-  if (!modal) return;
-  modal.style.display = 'flex';
-  renderCallbacksModalContent();
+  window.navigateToCallbacksPage();
 };
 
 window.closeCallbacksModal = function() {

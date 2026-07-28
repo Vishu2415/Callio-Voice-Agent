@@ -330,6 +330,10 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
             <span>Callings</span>
           </button>
+          <button class="nav-btn" id="nav-callbacks" data-tab="tab-callbacks">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span>Callbacks</span>
+          </button>
           <button class="nav-btn" id="nav-crm-automation" data-tab="tab-crm-automation">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
             <span>CRM Integration</span>
@@ -603,7 +607,7 @@
               <div id="dashboard-callbacks-list" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-grow: 1; padding-right: 4px;">
                 <div style="color: var(--text-muted); text-align: center; padding-top: 30px; font-size: 0.85rem;">No callbacks scheduled</div>
               </div>
-              <a href="#" onclick="window.openCallbacksModal(event)" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">Manage Callbacks</a>
+              <a href="#" onclick="event.preventDefault(); window.navigateToCallbacksPage();" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">Manage Callbacks ➔</a>
             </div>
 
             <!-- Box 3: Today's Traffic -->
@@ -680,6 +684,61 @@
             </div>        
           </div>
         </section>
+      </div>
+
+      <!-- TAB: Scheduled Callbacks (Full Page) -->
+      <div id="tab-callbacks" class="tab-pane" style="display: none;">
+        <div class="premium-tab-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2 class="tab-title" style="margin: 0;">📅 Scheduled Callbacks Management</h2>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Manage all automated future callbacks, track execution status, and re-dial or reschedule directly.</p>
+            </div>
+            <button onclick="window.fetchCallbacksList()" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.82rem; border-radius: 10px; cursor: pointer; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 15px; height: 15px;"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              Refresh Callbacks
+            </button>
+          </div>
+
+          <!-- Summary Metric Cards Bar -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+            <div class="vb-card" style="padding: 16px; border-radius: 14px;">
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Total Callbacks</div>
+              <div id="page-cb-total-count" style="font-size: 1.8rem; font-weight: 900; color: var(--color-cyan); margin-top: 6px;">0</div>
+            </div>
+            <div class="vb-card" style="padding: 16px; border-radius: 14px;">
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Pending / Upcoming</div>
+              <div id="page-cb-pending-count" style="font-size: 1.8rem; font-weight: 900; color: #f59e0b; margin-top: 6px;">0</div>
+            </div>
+            <div class="vb-card" style="padding: 16px; border-radius: 14px;">
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Dialed / Executed</div>
+              <div id="page-cb-dialed-count" style="font-size: 1.8rem; font-weight: 900; color: #10b981; margin-top: 6px;">0</div>
+            </div>
+            <div class="vb-card" style="padding: 16px; border-radius: 14px;">
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Failed / Errored</div>
+              <div id="page-cb-failed-count" style="font-size: 1.8rem; font-weight: 900; color: #ef4444; margin-top: 6px;">0</div>
+            </div>
+          </div>
+
+          <!-- Controls: Search & Status Filter Tabs -->
+          <div class="vb-card" style="padding: 16px; margin-bottom: 20px; border-radius: 14px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+            <input type="text" id="page-cb-search-input" placeholder="Search by name, phone number, or notes..." oninput="window.renderScheduledCallbacksPageTable()" style="flex: 1; min-width: 250px; padding: 10px 16px; font-size: 0.88rem; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
+            
+            <div style="display: flex; gap: 8px;" id="page-cb-filter-buttons">
+              <button class="btn-filter-cb active" onclick="window.filterCallbacksPage('all', this)" style="padding: 8px 16px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--color-cyan); background: rgba(6, 182, 212, 0.15); color: var(--color-cyan); font-weight: 700; cursor: pointer;">All</button>
+              <button class="btn-filter-cb" onclick="window.filterCallbacksPage('pending', this)" style="padding: 8px 16px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); font-weight: 600; cursor: pointer;">Pending</button>
+              <button class="btn-filter-cb" onclick="window.filterCallbacksPage('dialed', this)" style="padding: 8px 16px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); font-weight: 600; cursor: pointer;">Dialed</button>
+              <button class="btn-filter-cb" onclick="window.filterCallbacksPage('failed', this)" style="padding: 8px 16px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); font-weight: 600; cursor: pointer;">Failed</button>
+            </div>
+          </div>
+
+          <!-- Callbacks List Grid / Table -->
+          <div class="vb-card" style="padding: 20px; border-radius: 16px;">
+            <div id="page-callbacks-list-container" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Dynamically populated table/cards -->
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- TAB 2: Agents -->
