@@ -5397,6 +5397,59 @@ function populateDashboardBoxes(calls) {
   }
 
   // 3. Recent AI Summaries
+function formatParsedSummaryHTML(summaryRaw, compact = false) {
+  if (!summaryRaw) return '<span style="color: var(--text-muted); font-size: 0.8rem;">No AI analysis available</span>';
+  
+  const parsed = parseCallSummary(summaryRaw);
+  
+  let verdictText = parsed.verdict || '';
+  if (!verdictText) {
+    const isInt = summaryRaw.toLowerCase().includes('interested') && !summaryRaw.toLowerCase().includes('not interested');
+    verdictText = isInt ? 'INTERESTED' : 'NOT INTERESTED / UNREACHABLE';
+  }
+
+  const isInterested = verdictText.toLowerCase().includes('interested') && !verdictText.toLowerCase().includes('not');
+  const vBg = isInterested ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)';
+  const vColor = isInterested ? '#10b981' : '#ef4444';
+  const vBorder = isInterested ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)';
+  const verdictBadge = `<span style="padding: 3px 10px; border-radius: 6px; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; background: ${vBg}; color: ${vColor}; border: 1px solid ${vBorder}; letter-spacing: 0.5px; display: inline-block;">VERDICT: ${escapeHtml(verdictText.toUpperCase())}</span>`;
+
+  const cleanText = parsed.cleanSummary || summaryRaw.replace(/\*\*/g, '').trim();
+
+  if (compact) {
+    return `
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div>${verdictBadge}</div>
+        <div style="color: var(--text-muted); font-size: 0.76rem; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">${escapeHtml(cleanText)}</div>
+      </div>
+    `;
+  }
+
+  const summaryBody = cleanText ? `<div style="font-size: 0.82rem; color: var(--text-main); line-height: 1.5; margin-top: 6px; background: rgba(0,0,0,0.15); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">${escapeHtml(cleanText)}</div>` : '';
+
+  let actionBox = '';
+  if (parsed.actionToTake) {
+    actionBox = `
+      <div style="margin-top: 8px; padding: 8px 12px; background: rgba(6, 182, 212, 0.08); border: 1px dashed rgba(6, 182, 212, 0.3); border-radius: 8px; font-size: 0.78rem; color: var(--color-cyan); font-weight: 600; display: flex; align-items: center; gap: 6px;">
+        <span>⚡ <strong>Recommended Action:</strong> ${escapeHtml(parsed.actionToTake)}</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+      <div style="display: flex; align-items: center; gap: 6px;">${verdictBadge}</div>
+      ${summaryBody}
+      ${actionBox}
+    </div>
+  `;
+}
+
+window.navigateToCallingsPage = function() {
+  const btn = document.getElementById('nav-quick-call');
+  if (btn) btn.click();
+};
+
   const summariesList = document.getElementById('dashboard-summaries-list');
   if (summariesList) {
     if (calls && calls.length > 0) {
@@ -5408,24 +5461,19 @@ function populateDashboardBoxes(calls) {
         summariesList.innerHTML = '';
         callsWithSummary.slice(0, 3).forEach(c => {
           const div = document.createElement('div');
-          div.style.padding = '8px';
-          div.style.background = 'rgba(255,255,255,0.01)';
-          div.style.border = '1px solid rgba(255,255,255,0.03)';
-          div.style.borderRadius = '8px';
+          div.style.padding = '10px 12px';
+          div.style.background = 'rgba(255,255,255,0.02)';
+          div.style.border = '1px solid var(--border-color)';
+          div.style.borderRadius = '10px';
+          div.style.marginBottom = '6px';
           
           const isIncoming = c.direction ? (c.direction === 'incoming') : (loggedInUser && (c.to === loggedInUser.phone_number || (loggedInUser.phone_number && loggedInUser.phone_number.includes(c.to))));
-          const isInterested = c.summary.toLowerCase().includes('interested') && !c.summary.toLowerCase().includes('not interested');
-          const dotColor = isInterested ? 'var(--color-green)' : 'var(--color-red)';
           
           div.innerHTML = `
-            <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 4px; font-size: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 6px; font-size: 0.78rem; color: var(--text-main);">
               <span>${isIncoming ? 'Incoming ➔ You' : `You ➔ ${c.to || 'Unknown'}`}</span>
-              <span style="display: flex; align-items: center; gap: 4px;">
-                <span style="width: 6px; height: 6px; border-radius: 50%; background: ${dotColor}; display: inline-block;"></span>
-                ${isInterested ? 'Interested' : 'No Interest'}
-              </span>
             </div>
-            <div style="color: var(--text-muted); font-size: 0.72rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(c.summary)}</div>
+            ${formatParsedSummaryHTML(c.summary, true)}
           `;
           summariesList.appendChild(div);
         });
@@ -7812,18 +7860,21 @@ window.stopImpersonating = function() {
 window.openTodayCallsModal = function(e) {
   if (e) e.preventDefault();
   
+  // Navigate directly to full page Callings tab instead of modal
+  window.navigateToCallingsPage();
+
   const modal = document.getElementById('today-calls-modal');
   const dateEl = document.getElementById('today-modal-date');
   const listEl = document.getElementById('today-modal-calls-list');
   
-  if (!modal || !listEl) return;
+  if (!listEl) return;
   
   if (dateEl) {
     dateEl.innerText = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   }
   
   const today = new Date().toDateString();
-  const calls = window.lastDashboardCalls || [];
+  const calls = window.lastDashboardCallbacks || window.callsCache || [];
   const todayCalls = calls.filter(c => c.createdAt && new Date(c.createdAt).toDateString() === today);
   
   listEl.innerHTML = '';
@@ -7842,7 +7893,7 @@ window.openTodayCallsModal = function(e) {
     sorted.forEach(c => {
       const card = document.createElement('div');
       card.style.background = 'rgba(255, 255, 255, 0.02)';
-      card.style.border = '1px solid rgba(255, 255, 255, 0.06)';
+      card.style.border = '1px solid var(--border-color)';
       card.style.borderRadius = '12px';
       card.style.padding = '15px';
       card.style.marginBottom = '10px';
@@ -7869,30 +7920,7 @@ window.openTodayCallsModal = function(e) {
       const durationSecs = end && start ? Math.round((new Date(end) - new Date(start)) / 1000) : null;
       const durationText = durationSecs !== null && durationSecs >= 0 ? durationSecs + 's' : '-';
       
-      let verdictHtml = '';
-      if (c.summary) {
-        const isInterested = c.summary.toLowerCase().includes('interested') && !c.summary.toLowerCase().includes('not interested');
-        const verdictText = isInterested ? 'Interested Lead' : 'No Interest / Unreachable';
-        const verdictColor = isInterested ? 'var(--color-green)' : 'var(--color-red)';
-        const verdictBg = isInterested ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)';
-        const verdictBorder = isInterested ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
-        
-        verdictHtml = `
-          <div style="margin-top: 12px; padding: 10px; background: ${verdictBg}; border: 1px solid ${verdictBorder}; border-radius: 8px;">
-            <div style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.8rem; color: ${verdictColor}; margin-bottom: 4px;">
-              <span style="width: 6px; height: 6px; border-radius: 50%; background: ${verdictColor};"></span>
-              ${verdictText}
-            </div>
-            <p style="margin: 0; font-size: 0.8rem; color: #ddd; line-height: 1.4;">${escapeHtml(c.summary)}</p>
-          </div>
-        `;
-      } else {
-        verdictHtml = `
-          <div style="margin-top: 12px; padding: 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.8rem; color: var(--text-muted); text-align: center;">
-            No AI analysis available for this call.
-          </div>
-        `;
-      }
+      const verdictHtml = formatParsedSummaryHTML(c.summary, false);
       
       card.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 8px; margin-bottom: 8px;">
@@ -7913,8 +7941,6 @@ window.openTodayCallsModal = function(e) {
       listEl.appendChild(card);
     });
   }
-  
-  modal.style.display = 'flex';
 };
 
 window.closeTodayCallsModal = function() {

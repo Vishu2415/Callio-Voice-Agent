@@ -595,7 +595,7 @@
               <div id="dashboard-last-call-box" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-grow: 1; padding-right: 4px;">
                 <div style="color: var(--text-muted); text-align: center; padding-top: 30px; font-size: 0.85rem;">No calls yet</div>
               </div>
-              <a href="#" onclick="window.openTodayCallsModal(event)" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">See All Today's Calls</a>
+              <a href="#" onclick="event.preventDefault(); window.navigateToCallingsPage();" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">See All Today's Calls ➔</a>
             </div>
 
             <!-- Box 2: Scheduled Callbacks (NEW) -->
@@ -649,7 +649,7 @@
               <div id="dashboard-summaries-list" style="overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
                 <div style="color: var(--text-muted); text-align: center; padding-top: 30px; font-size: 0.85rem;">No summaries available</div>
               </div>
-              <a href="#" onclick="window.openTodayCallsModal(event)" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">See All Today's Summaries</a>
+              <a href="#" onclick="event.preventDefault(); window.navigateToCallingsPage();" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">See All Today's Summaries ➔</a>
             </div>
 
             <div class="vb-card vb-chart-panel">
