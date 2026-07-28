@@ -810,8 +810,18 @@ window.renderMetricDetailsModalContent = function() {
   if (!bodyEl) return;
 
   const searchQuery = (searchInput ? searchInput.value.toLowerCase().trim() : '');
-  let calls = Array.isArray(window.callsCache) && window.callsCache.length > 0 ? window.callsCache : (Array.isArray(callsCache) && callsCache.length > 0 ? callsCache : []);
+  
+  // Resolve calls array from all possible global cache sources
+  let calls = [];
+  if (Array.isArray(window.lastDashboardCalls) && window.lastDashboardCalls.length > 0) {
+    calls = window.lastDashboardCalls;
+  } else if (Array.isArray(window.callsCache) && window.callsCache.length > 0) {
+    calls = window.callsCache;
+  } else if (Array.isArray(callsCache) && callsCache.length > 0) {
+    calls = callsCache;
+  }
 
+  // Auto-fetch fallback if still empty
   if (calls.length === 0 && !window._fetchingModalCalls) {
     window._fetchingModalCalls = true;
     const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.id : '';
@@ -821,6 +831,7 @@ window.renderMetricDetailsModalContent = function() {
         window._fetchingModalCalls = false;
         if (data.success && Array.isArray(data.calls)) {
           window.callsCache = data.calls;
+          window.lastDashboardCalls = data.calls;
           callsCache = data.calls;
           window.renderMetricDetailsModalContent();
         }
@@ -843,7 +854,8 @@ window.renderMetricDetailsModalContent = function() {
     headerSubtitle = 'Detailed list of missed or failed calls. See failure reasons and re-dial directly with 1 click.';
     filteredCalls = calls.filter(c => {
       const st = String(c.status || '').toLowerCase();
-      return st === 'failed' || st === 'busy' || st === 'no-answer' || st === 'voicemail' || st === 'canceled' || st === 'rejected';
+      const err = String(c.error || c.failureReason || '').toLowerCase();
+      return st === 'failed' || st === 'busy' || st === 'no-answer' || st === 'voicemail' || st === 'canceled' || st === 'rejected' || err.length > 0;
     });
   } else if (type === 'completed') {
     headerIcon = '✅';
@@ -851,7 +863,10 @@ window.renderMetricDetailsModalContent = function() {
     headerColor = '#06b6d4';
     headerTitle = 'Completed Calls Log';
     headerSubtitle = 'Successfully finished calls with AI conversation summaries and call duration.';
-    filteredCalls = calls.filter(c => String(c.status || '').toLowerCase() === 'completed');
+    filteredCalls = calls.filter(c => {
+      const st = String(c.status || '').toLowerCase();
+      return st === 'completed' || st === 'answered' || st === 'ended' || st === 'finished';
+    });
   } else if (type === 'active') {
     headerIcon = '⚡';
     headerBg = 'rgba(245, 158, 11, 0.15)';
@@ -876,8 +891,8 @@ window.renderMetricDetailsModalContent = function() {
     headerTitle = 'AI-Identified Interested Leads';
     headerSubtitle = 'High intent prospects identified by AI during conversation calls.';
     filteredCalls = calls.filter(c => {
-      const sum = String(c.summary || '').toLowerCase();
-      return sum.includes('verdict:** interested') || sum.includes('interested');
+      const sum = String(c.summary || c.ai_verdict || '').toLowerCase();
+      return (sum.includes('interested') && !sum.includes('not interested') && !sum.includes('not_interested')) || sum.includes('verdict:** interested');
     });
   } else {
     // Total calls
