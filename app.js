@@ -584,7 +584,7 @@ function createActionCardElement(card, isModal = false) {
   cardEl.dataset.id = card.id;
 
   const flexBasis = isModal ? '100%' : '315px';
-  cardEl.style.cssText = `flex: 0 0 ${flexBasis}; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; transition: all 0.25s ease; position: relative; backdrop-filter: blur(10px); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); cursor: pointer; user-select: none;`;
+  cardEl.style.cssText = `flex: 0 0 ${flexBasis}; background: var(--bg-surface, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 18px; padding: 15px 16px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; min-height: 245px; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; backdrop-filter: blur(12px); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05); cursor: pointer; user-select: none; overflow: hidden;`;
 
   cardEl.onclick = (e) => {
     // If user clicks on button or inside a button, don't trigger modal
@@ -593,47 +593,50 @@ function createActionCardElement(card, isModal = false) {
   };
 
   cardEl.onmouseover = () => {
-    cardEl.style.borderColor = 'rgba(6, 182, 212, 0.5)';
-    cardEl.style.transform = 'translateY(-3px)';
-    cardEl.style.boxShadow = '0 12px 35px 0 rgba(6, 182, 212, 0.18)';
+    cardEl.style.borderColor = 'rgba(6, 182, 212, 0.6)';
+    cardEl.style.transform = 'translateY(-4px)';
+    cardEl.style.boxShadow = '0 14px 35px 0 rgba(6, 182, 212, 0.2)';
   };
   cardEl.onmouseout = () => {
-    cardEl.style.borderColor = 'var(--border-color)';
+    cardEl.style.borderColor = 'var(--border-color, #e2e8f0)';
     cardEl.style.transform = 'none';
-    cardEl.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.08)';
+    cardEl.style.boxShadow = '0 4px 18px rgba(0, 0, 0, 0.05)';
   };
 
   const actionToTakeHtml = card.actionToTake ? `
-    <div style="background: rgba(6, 182, 212, 0.08); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 8px; padding: 5px 8px; font-size: 0.72rem; color: var(--color-cyan); font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 5px; line-height: 1.3;" title="Action to Take">
-      <span style="font-size: 0.8rem; line-height: 1;">⚡</span>
+    <div style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.02)); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 10px; padding: 6px 10px; font-size: 0.73rem; color: var(--color-cyan, #06b6d4); font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;" title="Action to Take">
+      <span style="font-size: 0.85rem; line-height: 1;">⚡</span>
       <span style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;"><strong>Action:</strong> ${card.actionToTake}</span>
     </div>
   ` : '';
 
   cardEl.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0; gap: 6px;">
-      <span style="font-size: 0.9rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono); letter-spacing: -0.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${card.phone}</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0; gap: 6px;">
+      <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+        <span style="color: var(--color-cyan, #06b6d4); font-size: 0.85rem;">📞</span>
+        <span style="font-size: 0.92rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace); letter-spacing: -0.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${card.phone}</span>
+      </div>
       <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
-        <span style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; background: ${card.sentimentBg}; color: ${card.color}; border: 1px solid ${card.sentimentBorder}; letter-spacing: 0.3px; white-space: nowrap;">
+        <span style="font-size: 0.64rem; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 20px; background: ${card.sentimentBg}; color: ${card.color}; border: 1px solid ${card.sentimentBorder}; letter-spacing: 0.3px; white-space: nowrap;">
           ${card.sentiment}
         </span>
-        <span style="font-size: 0.6rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.3px; white-space: nowrap;">${card.urgency}</span>
+        <span style="font-size: 0.6rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 20px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.3px; white-space: nowrap;">${card.urgency}</span>
       </div>
     </div>
     
-    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; text-align: left; overflow: hidden;">
-      <div style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; text-align: left; overflow: hidden;">
+      <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
         ${card.summary}
       </div>
       ${actionToTakeHtml}
     </div>
     
     <div style="display: flex; gap: 8px; margin-top: auto; flex-shrink: 0;">
-      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}'); event.stopPropagation();" style="flex: 1; padding: 4px 8px; font-size: 0.74rem; border-radius: 8px; background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 6px; height: 32px; cursor: pointer; border: none; transition: background 0.2s;">
+      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}'); event.stopPropagation();" style="flex: 1; height: 34px; border-radius: 10px; background: linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); border: none; color: #ffffff; font-weight: 800; font-size: 0.78rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25); transition: all 0.2s;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         ${card.actionText}
       </button>
-      <button class="btn btn-secondary" onclick="window.dismissLeadCard(this); event.stopPropagation();" style="padding: 4px 14px; font-size: 0.74rem; border-radius: 8px; font-weight: 600; height: 32px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: background 0.2s;">
+      <button class="btn btn-secondary" onclick="window.dismissLeadCard(this); event.stopPropagation();" style="height: 34px; padding: 0 14px; border-radius: 10px; font-weight: 600; font-size: 0.76rem; background: rgba(0,0,0,0.04); border: 1px solid var(--border-color, #e2e8f0); color: var(--text-muted); cursor: pointer; transition: all 0.2s;">
         Done
       </button>
     </div>
@@ -646,8 +649,60 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
   if (!card && cardFallback) card = cardFallback;
   if (!card) return;
 
-  const modal = document.getElementById('lead-card-detail-modal');
-  if (!modal) return;
+  let modal = document.getElementById('lead-card-detail-modal');
+  if (modal && modal.parentElement !== document.body) {
+    document.body.appendChild(modal);
+  }
+
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'lead-card-detail-modal';
+    modal.style.cssText = 'display:none; position:fixed !important; top:0 !important; left:0 !important; width:100vw !important; height:100vh !important; background:rgba(0,0,0,0.85) !important; z-index:99999999 !important; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(8px);';
+    modal.onclick = function(e) { if (e.target === modal) window.closeLeadDetailModal(); };
+    modal.innerHTML = `
+      <div style="background:var(--bg-surface, #18181b); border:1px solid var(--border-color, #27272a); border-radius:24px; width:600px; max-width:92vw; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.7); overflow:hidden; position:relative;">
+        <div style="padding:22px 26px 18px 26px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border-color, #27272a); flex-shrink:0; background:rgba(255,255,255,0.02);">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:42px; height:42px; border-radius:12px; background:rgba(6,182,212,0.15); color:var(--color-cyan, #06b6d4); display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">🎯</div>
+            <div>
+              <div id="lead-detail-phone" style="font-size:1.2rem; font-weight:800; color:var(--text-main, #ffffff); font-family:var(--font-mono, monospace);">+91 XXXXXXXXXX</div>
+              <div style="font-size:0.78rem; color:var(--text-muted, #a1a1aa); margin-top:2px;">AI Lead Insight & Recommended Action</div>
+            </div>
+          </div>
+          <button onclick="event.preventDefault(); event.stopPropagation(); window.closeLeadDetailModal();" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color, #27272a); color:var(--text-muted, #a1a1aa); width:34px; height:34px; border-radius:10px; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center;">✕</button>
+        </div>
+
+        <div style="padding:22px 26px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:16px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span id="lead-detail-sentiment" style="padding:4px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">INTERESTED</span>
+            <span id="lead-detail-urgency" style="padding:4px 10px; border-radius:8px; font-weight:800; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.5px;">URGENT</span>
+          </div>
+
+          <div style="background:linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.02)); border:1px dashed rgba(6, 182, 212, 0.35); border-radius:14px; padding:14px 16px;">
+            <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--color-cyan, #06b6d4); letter-spacing:0.5px; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+              <span>⚡</span> Recommended Action
+            </div>
+            <div id="lead-detail-action-text" style="font-size:0.92rem; font-weight:700; color:var(--text-main, #ffffff); line-height:1.4;">Follow up with lead</div>
+          </div>
+
+          <div>
+            <div style="font-size:0.78rem; font-weight:700; text-transform:uppercase; color:var(--text-muted, #a1a1aa); letter-spacing:0.5px; margin-bottom:8px;">Call Conversation Summary</div>
+            <div id="lead-detail-summary" style="font-size:0.86rem; color:var(--text-main, #ffffff); line-height:1.6; background:rgba(0,0,0,0.2); border:1px solid var(--border-color, #27272a); border-radius:12px; padding:14px 16px;">
+              Call details loading...
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:16px 26px; border-top:1px solid var(--border-color, #27272a); display:flex; gap:12px; justify-content:flex-end; flex-shrink:0; background:rgba(0,0,0,0.2);">
+          <button id="btn-lead-detail-done" style="padding:10px 20px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.85rem; background:rgba(255,255,255,0.06); border:1px solid var(--border-color, #27272a); color:var(--text-muted, #a1a1aa);">Mark Done</button>
+          <button id="btn-lead-detail-call" style="padding:10px 24px; border-radius:10px; font-weight:800; cursor:pointer; font-size:0.85rem; background:linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); border:none; color:white; display:flex; align-items:center; gap:8px; box-shadow:0 4px 15px rgba(234,88,12,0.3);">
+            <span>📞</span> Call Back Now
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
 
   const phoneEl = document.getElementById('lead-detail-phone');
   const sentimentEl = document.getElementById('lead-detail-sentiment');
@@ -699,26 +754,87 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
     };
   }
 
-  modal.style.display = 'flex';
+  modal.style.setProperty('position', 'fixed', 'important');
+  modal.style.setProperty('top', '0px', 'important');
+  modal.style.setProperty('left', '0px', 'important');
+  modal.style.setProperty('width', '100vw', 'important');
+  modal.style.setProperty('height', '100vh', 'important');
+  modal.style.setProperty('z-index', '99999999', 'important');
+  modal.style.setProperty('display', 'flex', 'important');
+  modal.style.setProperty('visibility', 'visible', 'important');
+  modal.style.setProperty('opacity', '1', 'important');
 };
 
 window.closeLeadDetailModal = function() {
-  const modal = document.getElementById('lead-card-detail-modal');
-  if (modal) modal.style.display = 'none';
+  const modals = document.querySelectorAll('#lead-card-detail-modal');
+  modals.forEach(modal => {
+    modal.style.display = 'none';
+  });
 };
 
 window.actionCardsFilter = 'all';
 
 window.openAllActionCardsModal = function() {
-  const modal = document.getElementById('all-action-cards-modal');
-  if (!modal) return;
-  modal.style.display = 'flex';
+  let modal = document.getElementById('all-action-cards-modal');
+  if (modal && modal.parentElement !== document.body) {
+    document.body.appendChild(modal);
+  }
+
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'all-action-cards-modal';
+    modal.style.cssText = 'display:none; position:fixed !important; top:0 !important; left:0 !important; width:100vw !important; height:100vh !important; background:rgba(0,0,0,0.85) !important; z-index:99999999 !important; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(8px);';
+    modal.onclick = function(e) { if (e.target === modal) window.closeAllActionCardsModal(); };
+    modal.innerHTML = `
+      <div style="background:var(--bg-surface, #18181b); border:1px solid var(--border-color, #27272a); border-radius:24px; width:900px; max-width:95vw; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.7); overflow:hidden;">
+        <div style="padding:20px 26px 16px 26px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border-color, #27272a); flex-shrink:0;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:40px; height:40px; border-radius:12px; background:rgba(6,182,212,0.15); color:var(--color-cyan, #06b6d4); display:flex; align-items:center; justify-content:center; font-size:1.2rem;">📋</div>
+            <div>
+              <div style="font-size:1.15rem; font-weight:800; color:var(--text-main, #ffffff);">All AI Lead Scout Action Cards</div>
+              <div style="font-size:0.78rem; color:var(--text-muted, #a1a1aa);">Filter & explore all prioritized follow-up leads</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span id="all-action-cards-count" style="font-size:0.78rem; font-weight:800; color:var(--color-cyan, #06b6d4); background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.3); padding:4px 12px; border-radius:100px;">0 Leads</span>
+            <button onclick="event.preventDefault(); event.stopPropagation(); window.closeAllActionCardsModal();" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color, #27272a); color:var(--text-muted, #a1a1aa); width:34px; height:34px; border-radius:10px; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center;">✕</button>
+          </div>
+        </div>
+
+        <div style="padding:14px 26px; border-bottom:1px solid var(--border-color, #27272a); flex-shrink:0; display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+          <input id="action-cards-search-input" type="text" placeholder="🔍 Search leads by phone or notes..." oninput="window.renderAllActionCardsModalGrid()" style="background:rgba(255,255,255,0.04); border:1px solid var(--border-color, #27272a); color:var(--text-main, #ffffff); border-radius:10px; padding:8px 14px; font-size:0.85rem; width:260px; outline:none;" />
+          <div id="action-cards-filter-buttons" style="display:flex; gap:8px;">
+            <button onclick="window.filterActionCards('all', this)" class="btn-filter-action active" style="padding:6px 14px; border-radius:8px; font-size:0.78rem; font-weight:700; background:rgba(6,182,212,0.15); border:1px solid var(--color-cyan, #06b6d4); color:var(--color-cyan, #06b6d4); cursor:pointer;">All Leads</button>
+            <button onclick="window.filterActionCards('interested', this)" class="btn-filter-action" style="padding:6px 14px; border-radius:8px; font-size:0.78rem; font-weight:600; background:rgba(255,255,255,0.03); border:1px solid var(--border-color, #27272a); color:var(--text-muted, #a1a1aa); cursor:pointer;">Interested</button>
+            <button onclick="window.filterActionCards('not-interested', this)" class="btn-filter-action" style="padding:6px 14px; border-radius:8px; font-size:0.78rem; font-weight:600; background:rgba(255,255,255,0.03); border:1px solid var(--border-color, #27272a); color:var(--text-muted, #a1a1aa); cursor:pointer;">Not Interested</button>
+          </div>
+        </div>
+
+        <div id="all-action-cards-grid" style="padding:20px 26px; overflow-y:auto; flex:1; display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:16px;">
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  modal.style.setProperty('position', 'fixed', 'important');
+  modal.style.setProperty('top', '0px', 'important');
+  modal.style.setProperty('left', '0px', 'important');
+  modal.style.setProperty('width', '100vw', 'important');
+  modal.style.setProperty('height', '100vh', 'important');
+  modal.style.setProperty('z-index', '99999999', 'important');
+  modal.style.setProperty('display', 'flex', 'important');
+  modal.style.setProperty('visibility', 'visible', 'important');
+  modal.style.setProperty('opacity', '1', 'important');
+
   window.renderAllActionCardsModalGrid();
 };
 
 window.closeAllActionCardsModal = function() {
-  const modal = document.getElementById('all-action-cards-modal');
-  if (modal) modal.style.display = 'none';
+  const modals = document.querySelectorAll('#all-action-cards-modal');
+  modals.forEach(modal => {
+    modal.style.display = 'none';
+  });
 };
 
 window.currentMetricModalType = 'failed';
