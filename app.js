@@ -5328,7 +5328,7 @@ function applyUserRole(user) {
     document.getElementById('nav-contacts').style.display = 'block';
     document.getElementById('nav-broadcast').style.display = 'block';
     document.getElementById('nav-quick-call').style.display = 'block';
-    if (document.getElementById('nav-callbacks')) document.getElementById('nav-callbacks').style.display = 'block';
+    // nav-callbacks intentionally hidden — no dedicated tab page exists
     document.getElementById('nav-crm-automation').style.display = 'block';
     document.getElementById('nav-api-sharing').style.display = 'block';
     document.getElementById('nav-admin-panel').style.display = 'block';
@@ -5380,7 +5380,7 @@ function applyUserRole(user) {
     document.getElementById('nav-contacts').style.display = 'block';
     document.getElementById('nav-broadcast').style.display = 'block';
     document.getElementById('nav-quick-call').style.display = 'block';
-    if (document.getElementById('nav-callbacks')) document.getElementById('nav-callbacks').style.display = 'block';
+    // nav-callbacks intentionally hidden — no dedicated tab page exists
     document.getElementById('nav-crm-automation').style.display = 'block';
     document.getElementById('nav-api-sharing').style.display = 'block';
     document.getElementById('nav-billing').style.display = 'block';
