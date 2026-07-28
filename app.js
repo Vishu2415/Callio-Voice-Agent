@@ -5347,52 +5347,38 @@ function populateDashboardBoxes(calls) {
   const outEl = document.getElementById('traffic-outgoing-count');
   const totalEl = document.getElementById('traffic-total-count');
   const ratioEl = document.getElementById('traffic-ratio-text');
-  const incCircle = document.getElementById('traffic-incoming-circle');
-  const outCircle = document.getElementById('traffic-outgoing-circle');
+  const incBar = document.getElementById('traffic-incoming-bar');
+  const outBar = document.getElementById('traffic-outgoing-bar');
   
   if (incEl) incEl.innerText = incomingCount;
   if (outEl) outEl.innerText = outgoingCount;
   if (totalEl) totalEl.innerText = totalToday;
   
-  if (ratioEl) {
-    if (totalToday > 0) {
-      const outPct = Math.round((outgoingCount / totalToday) * 100);
-      const incPct = 100 - outPct;
+  if (totalToday > 0) {
+    const incPct = Math.round((incomingCount / totalToday) * 100);
+    const outPct = 100 - incPct;
+
+    if (incBar) incBar.style.width = `${incPct}%`;
+    if (outBar) outBar.style.width = `${outPct}%`;
+
+    if (ratioEl) {
       if (outPct > incPct) {
-        ratioEl.innerText = `${outPct}% Outbound`;
+        ratioEl.innerText = `${outPct}% Outbound Dialing Ratio`;
         ratioEl.style.color = 'var(--color-cyan)';
       } else if (incPct > outPct) {
-        ratioEl.innerText = `${incPct}% Inbound`;
+        ratioEl.innerText = `${incPct}% Inbound Dialing Ratio`;
         ratioEl.style.color = 'var(--color-green)';
       } else {
-        ratioEl.innerText = 'Balanced Ratio';
+        ratioEl.innerText = '50% Inbound / 50% Outbound (Balanced)';
         ratioEl.style.color = '#f59e0b';
       }
-    } else {
-      ratioEl.innerText = 'No Traffic';
-      ratioEl.style.color = 'var(--text-muted)';
     }
-  }
-  
-  if (incCircle && outCircle) {
-    const circumference = 314.16; // 2 * Math.PI * 50
-    if (totalToday > 0) {
-      const incPct = incomingCount / totalToday;
-      const outPct = outgoingCount / totalToday;
-      
-      const incStroke = circumference * incPct;
-      const outStroke = circumference * outPct;
-      
-      incCircle.style.strokeDasharray = `${circumference}`;
-      incCircle.style.strokeDashoffset = `${circumference - incStroke}`;
-      
-      outCircle.style.strokeDasharray = `${circumference}`;
-      outCircle.style.strokeDashoffset = `${circumference - outStroke}`;
-      outCircle.style.transform = `rotate(${incPct * 360}deg)`;
-      outCircle.style.transformOrigin = '60px 60px';
-    } else {
-      incCircle.style.strokeDashoffset = `${circumference}`;
-      outCircle.style.strokeDashoffset = `${circumference}`;
+  } else {
+    if (incBar) incBar.style.width = '50%';
+    if (outBar) outBar.style.width = '50%';
+    if (ratioEl) {
+      ratioEl.innerText = 'No Traffic Today';
+      ratioEl.style.color = 'var(--text-muted)';
     }
   }
 
