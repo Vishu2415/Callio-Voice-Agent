@@ -2081,33 +2081,39 @@ async function playVoiceSample(voiceName, buttonEl) {
   buttonEl.disabled = true;
 
   try {
-    // 1. Try server backend endpoint first (uses server GEMINI_API_KEY)
     let base64Audio = null;
     let sampleRate = 24000;
+    const userApiKey = document.getElementById('api-key')?.value.trim() || document.getElementById('gemini-api-key')?.value.trim() || '';
 
+    let backendErr = null;
     try {
       const backendRes = await fetch('/api/voice-sample', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voiceName: voiceName, text: "Hello! Main ready hoon aapki help karne ke liye." })
+        body: JSON.stringify({
+          voiceName: voiceName,
+          text: "Hello! Main ready hoon aapki help karne ke liye.",
+          apiKey: userApiKey
+        })
       });
 
-      if (backendRes.ok) {
-        const data = await backendRes.json();
-        if (data.success && data.audioBase64) {
-          base64Audio = data.audioBase64;
-          if (data.sampleRate) sampleRate = data.sampleRate;
-        }
+      const data = await backendRes.json().catch(() => ({}));
+      if (backendRes.ok && data.success && data.audioBase64) {
+        base64Audio = data.audioBase64;
+        if (data.sampleRate) sampleRate = data.sampleRate;
+      } else {
+        backendErr = data.error || `HTTP ${backendRes.status}`;
       }
     } catch (e) {
-      console.warn("Backend voice sample proxy error, attempting fallback:", e);
+      console.warn("Backend voice sample proxy error:", e);
+      backendErr = e.message;
     }
 
-    // 2. Fallback: Direct Google API fetch using valid gemini-2.0-flash model
+    // 2. Fallback: Direct Google API fetch using valid client apiKey if backend failed but user provided apiKey
     if (!base64Audio) {
-      const apiKey = elApiKey ? elApiKey.value.trim() : '';
-      if (!apiKey) {
-        throw new Error("Voice sample service is initializing. Please try again in a moment.");
+      const apiKey = userApiKey || (typeof elApiKey !== 'undefined' && elApiKey ? elApiKey.value.trim() : '');
+      if (!apiKey || apiKey.startsWith('AQ.')) {
+        throw new Error(backendErr || "Gemini API key is not configured. Please enter a valid Gemini API key in Settings.");
       }
 
       const prompt = "Hello! Main ready hoon.";
@@ -2131,7 +2137,7 @@ async function playVoiceSample(voiceName, buttonEl) {
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.error?.message || `HTTP ${res.status}`);
       }
 

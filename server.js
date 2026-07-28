@@ -2050,14 +2050,14 @@ app.post('/incoming-call', (req, res) => {
 // Voice Sample Preview Endpoint
 app.post('/api/voice-sample', async (req, res) => {
   try {
-    const { voiceName, text } = req.body || {};
+    const { voiceName, text, apiKey: clientApiKey } = req.body || {};
     const voice = voiceName || 'Charon';
     const samplePrompt = text || 'Hello! Main ready hoon aapki help karne ke liye.';
 
-    const apiKey = (defaultCallConfig && defaultCallConfig.apiKey) || GEMINI_API_KEY;
+    let apiKey = (clientApiKey && clientApiKey.trim()) || (defaultCallConfig && defaultCallConfig.apiKey) || process.env.GEMINI_API_KEY || GEMINI_API_KEY;
 
-    if (!apiKey) {
-      return res.status(400).json({ success: false, error: 'Gemini API Key is not configured on server.' });
+    if (!apiKey || apiKey.startsWith('AQ.')) {
+      return res.status(400).json({ success: false, error: 'Gemini API Key is invalid or not configured on server. Please configure your Gemini API Key in Settings.' });
     }
 
     const payload = {
