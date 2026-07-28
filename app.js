@@ -109,9 +109,10 @@ document.querySelectorAll('.glass-navbar .nav-btn').forEach(btn => {
     
     // Add active class to clicked button
     btn.classList.add('active');
-    // Show target tab pane
+    // Show target tab pane (with null guard in case tab pane doesn't exist)
     const targetId = btn.getAttribute('data-tab');
-    document.getElementById(targetId).classList.add('active');
+    const targetPane = document.getElementById(targetId);
+    if (targetPane) targetPane.classList.add('active');
 
     // Save active tab to localStorage
     localStorage.setItem('activeTab', targetId);
@@ -147,6 +148,36 @@ document.querySelectorAll('.glass-navbar .nav-btn').forEach(btn => {
     }
   });
 });
+
+// --- Dashboard Navigation Helpers ---
+
+// Navigate to Callings (Quick Call) tab
+window.navigateToCallingsPage = function() {
+  const btn = document.querySelector('.glass-navbar .nav-btn[data-tab="tab-quick-call"]');
+  if (btn) { btn.click(); return; }
+  // Fallback: manually switch
+  document.querySelectorAll('.glass-navbar .nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const pane = document.getElementById('tab-quick-call');
+  if (pane) pane.classList.add('active');
+  localStorage.setItem('activeTab', 'tab-quick-call');
+  document.documentElement.setAttribute('data-active-tab', 'tab-quick-call');
+};
+
+// Navigate to AI Summaries (Callings tab has summaries section)
+window.navigateToSummariesPage = function() {
+  const btn = document.querySelector('.glass-navbar .nav-btn[data-tab="tab-quick-call"]');
+  if (btn) { btn.click(); return; }
+  const pane = document.getElementById('tab-quick-call');
+  if (pane) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    pane.classList.add('active');
+    localStorage.setItem('activeTab', 'tab-quick-call');
+    document.documentElement.setAttribute('data-active-tab', 'tab-quick-call');
+  }
+};
+
+// openMetricDetailsModal is defined further below (see renderMetricDetailsModalContent section)
 
 // --- Tab Navigation (Logs/Transcript) ---
 elTabTranscript.addEventListener('click', () => {
