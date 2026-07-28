@@ -726,8 +726,37 @@ window.currentMetricModalType = 'failed';
 
 window.openMetricDetailsModal = function(type) {
   window.currentMetricModalType = type || 'total';
-  const modal = document.getElementById('dashboard-metric-detail-modal');
-  if (!modal) return;
+  let modal = document.getElementById('dashboard-metric-detail-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'dashboard-metric-detail-modal';
+    modal.style.cssText = 'display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:999999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(6px);';
+    modal.onclick = function(e) { if (e.target === modal) window.closeMetricDetailsModal(); };
+    modal.innerHTML = `
+      <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:20px; width:760px; max-width:95vw; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.5); overflow:hidden;">
+        <div style="padding:20px 24px 16px 24px; display:flex; align-items:center; gap:14px; flex-shrink:0; border-bottom:1px solid var(--border-color);">
+          <div id="metric-modal-icon" style="width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; background:rgba(6,182,212,0.15); color:var(--color-cyan); flex-shrink:0;">📞</div>
+          <div style="flex:1; min-width:0;">
+            <div id="metric-modal-title" style="font-size:1.15rem; font-weight:800; color:var(--text-main); margin-bottom:2px;">Call Details</div>
+            <div id="metric-modal-subtitle" style="font-size:0.78rem; color:var(--text-muted); line-height:1.4;">Detailed call breakdown</div>
+          </div>
+          <span id="metric-modal-badge" style="background:rgba(6,182,212,0.1); color:var(--color-cyan); border:1px solid rgba(6,182,212,0.3); padding:4px 12px; border-radius:100px; font-size:0.75rem; font-weight:700; white-space:nowrap;">Count: 0</span>
+          <button onclick="window.closeMetricDetailsModal()" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-muted); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; flex-shrink:0;">✕</button>
+        </div>
+        <div style="padding:14px 24px 0 24px; flex-shrink:0;">
+          <input id="metric-modal-search" type="text" placeholder="🔍 Search by phone number or summary..." oninput="window.renderMetricDetailsModalContent()" style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border-color); color:var(--text-main); border-radius:10px; padding:10px 14px; font-size:0.85rem; box-sizing:border-box; outline:none;" />
+        </div>
+        <div id="metric-modal-body" style="flex:1; overflow-y:auto; padding:14px 24px 20px 24px; display:flex; flex-direction:column; gap:10px; min-height:200px;">
+          <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading...</div>
+        </div>
+        <div style="padding:14px 24px; border-top:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; background:rgba(0,0,0,0.1);">
+          <span style="font-size:0.78rem; color:var(--text-muted);">Click "Re-call Now" to quickly start a call</span>
+          <button onclick="window.closeMetricDetailsModal()" style="background:linear-gradient(135deg,var(--color-primary),#ae3115); color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.85rem;">Close</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
   
   const searchInput = document.getElementById('metric-modal-search');
   if (searchInput) searchInput.value = '';
