@@ -2063,6 +2063,13 @@ if (elBtnSavePrompt) {
 // --- Call Logging, Summarization, and Rec tab handlers ---
 let selectedCallSid = null;
 let callsCache = [];
+try {
+  const localCachedCalls = localStorage.getItem('callio_calls_cache');
+  if (localCachedCalls) {
+    callsCache = JSON.parse(localCachedCalls);
+    window.callsCache = callsCache;
+  }
+} catch (e) {}
 
 function showListView() {
   const elListView = document.getElementById('summary-list-view');
@@ -2098,9 +2105,12 @@ async function refreshCallsList() {
     const clientId = loggedInUser ? loggedInUser.id : '';
     const res = await fetch(`/calls?clientId=${clientId}`);
     const data = await res.json();
-    if (data.success) {
+    if (data.success && Array.isArray(data.calls)) {
       callsCache = data.calls;
       window.callsCache = callsCache; // expose globally for metric modals
+      try {
+        localStorage.setItem('callio_calls_cache', JSON.stringify(callsCache.slice(0, 100)));
+      } catch (e) {}
       
       if (typeof updateDashboardWithClientCalls === 'function') {
         updateDashboardWithClientCalls(callsCache);
@@ -5611,27 +5621,29 @@ document.getElementById('btn-login-submit')?.addEventListener('click', async () 
 async function fetchClientDashboardData() {
   if (!loggedInUser) return;
   
+  // Instant render from local cache if available (0ms delay)
+  if (Array.isArray(callsCache) && callsCache.length > 0) {
+    if (typeof updateDashboardWithClientCalls === 'function') updateDashboardWithClientCalls(callsCache);
+    if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof updateVobizMetrics === 'function') updateVobizMetrics();
+  }
+  
   try {
-    await fetchPlans();
-    const res = await fetch(`/api/client/dashboard-data?clientId=${loggedInUser.id}`);
-    const data = await res.json();
-    if (data.success) {
-      loggedInUser = { ...loggedInUser, ...data.client };
+    const [plansRes, dashDataRes] = await Promise.all([
+      fetchPlans().catch(() => {}),
+      fetch(`/api/client/dashboard-data?clientId=${loggedInUser.id}`).then(r => r.json()).catch(() => null),
+      refreshCallsListForDashboard().catch(() => {})
+    ]);
+
+    if (dashDataRes && dashDataRes.success) {
+      loggedInUser = { ...loggedInUser, ...dashDataRes.client };
       localStorage.setItem('user_session', JSON.stringify(loggedInUser));
       applyUserPlanAndLimits(loggedInUser);
-      if (typeof renderClientNumberStatus === 'function') renderClientNumberStatus(data.client);
-      if (typeof renderClientAgentConfig === 'function') renderClientAgentConfig(data.client.agent_config);
+      if (typeof renderClientNumberStatus === 'function') renderClientNumberStatus(dashDataRes.client);
+      if (typeof renderClientAgentConfig === 'function') renderClientAgentConfig(dashDataRes.client.agent_config);
       
-      // First pass: store live active calls map/array from server snapshot
-      const activeSnapshot = data.calls || [];
-      
-      // Second pass: fetch full persistent call history
-      await refreshCallsListForDashboard();
-      
-      // Merge activeSnapshot calls into callsCache if activeSnapshot has more up-to-date active status
+      const activeSnapshot = dashDataRes.calls || [];
       if (activeSnapshot.length > 0 && Array.isArray(callsCache)) {
-        const activeMap = new Map(activeSnapshot.map(c => [c.callSid || c.sid, c]));
-        // Ensure any active call in activeSnapshot is present or updated in callsCache
         activeSnapshot.forEach(activeCall => {
           const sid = activeCall.callSid || activeCall.sid;
           const idx = callsCache.findIndex(c => (c.callSid || c.sid) === sid);
