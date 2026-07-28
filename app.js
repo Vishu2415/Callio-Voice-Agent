@@ -6479,12 +6479,29 @@ window.renderScheduledCallbacksPageTable = function() {
 
 window.openCallbacksModal = function(event) {
   if (event) event.preventDefault();
-  window.navigateToCallbacksPage();
+  let modal = document.getElementById('callbacks-modal');
+  if (modal) {
+    if (modal.parentElement !== document.body) document.body.appendChild(modal);
+    modal.style.setProperty('position', 'fixed', 'important');
+    modal.style.setProperty('top', '0px', 'important');
+    modal.style.setProperty('left', '0px', 'important');
+    modal.style.setProperty('width', '100vw', 'important');
+    modal.style.setProperty('height', '100vh', 'important');
+    modal.style.setProperty('z-index', '99999999', 'important');
+    modal.style.setProperty('display', 'flex', 'important');
+    modal.style.setProperty('visibility', 'visible', 'important');
+    modal.style.setProperty('opacity', '1', 'important');
+    renderCallbacksModalContent();
+  } else {
+    window.navigateToCallbacksPage();
+  }
 };
 
 window.closeCallbacksModal = function() {
-  const modal = document.getElementById('callbacks-modal');
-  if (modal) modal.style.display = 'none';
+  const modals = document.querySelectorAll('#callbacks-modal');
+  modals.forEach(modal => {
+    modal.style.display = 'none';
+  });
 };
 
 function renderCallbacksModalContent() {
