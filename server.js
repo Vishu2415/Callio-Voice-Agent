@@ -3087,7 +3087,7 @@ app.get('/api/crm-logs', authMiddleware('calls'), (req, res) => {
     logs = logs.filter(l => !l.clientId || l.clientId === 'admin');
   }
   logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  res.json({ success: true, logs: logs.slice(0, 100) });
+  res.json({ success: true, logs: logs.slice(0, 50) });
 });
 
 app.post('/api/webhooks/crm-lead-stage-change', express.json(), async (req, res) => {

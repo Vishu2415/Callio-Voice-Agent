@@ -804,7 +804,8 @@ window.renderMetricDetailsModalContent = function() {
   }
 
   if (badgeEl) {
-    badgeEl.innerText = `Count: ${filteredCalls.length}`;
+    const showCount = Math.min(filteredCalls.length, 50);
+    badgeEl.innerText = `Count: ${showCount} (of ${filteredCalls.length})`;
     badgeEl.style.background = headerBg;
     badgeEl.style.color = headerColor;
     badgeEl.style.borderColor = headerColor;
@@ -858,7 +859,7 @@ window.renderMetricDetailsModalContent = function() {
   }
 
   let html = '';
-  filteredCalls.forEach(c => {
+  filteredCalls.slice(0, 50).forEach(c => {
     const phone = c.phone || c.to || c.from || 'Unknown Number';
     const dateStr = c.startedAt || c.createdAt ? new Date(c.startedAt || c.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Recent';
     const durationSec = c.duration || c.duration_seconds || 0;
@@ -4522,8 +4523,9 @@ function renderCrmLogsTable(logs) {
   if (!tbody) return;
   
   tbody.innerHTML = '';
-  if (logs.length > 0) {
-    logs.forEach(log => {
+  const displayLogs = (logs || []).slice(0, 50);
+  if (displayLogs.length > 0) {
+    displayLogs.forEach(log => {
       const tr = document.createElement('tr');
       const d = new Date(log.timestamp).toLocaleString();
       
