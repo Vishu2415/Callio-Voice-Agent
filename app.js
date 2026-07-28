@@ -691,6 +691,250 @@ window.closeAllActionCardsModal = function() {
   if (modal) modal.style.display = 'none';
 };
 
+window.currentMetricModalType = 'failed';
+
+window.openMetricDetailsModal = function(type) {
+  window.currentMetricModalType = type || 'total';
+  const modal = document.getElementById('dashboard-metric-detail-modal');
+  if (!modal) return;
+  
+  const searchInput = document.getElementById('metric-modal-search');
+  if (searchInput) searchInput.value = '';
+  
+  modal.style.display = 'flex';
+  window.renderMetricDetailsModalContent();
+};
+
+window.closeMetricDetailsModal = function() {
+  const modal = document.getElementById('dashboard-metric-detail-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.renderMetricDetailsModalContent = function() {
+  const type = window.currentMetricModalType;
+  const iconEl = document.getElementById('metric-modal-icon');
+  const titleEl = document.getElementById('metric-modal-title');
+  const subtitleEl = document.getElementById('metric-modal-subtitle');
+  const badgeEl = document.getElementById('metric-modal-badge');
+  const bodyEl = document.getElementById('metric-modal-body');
+  const searchInput = document.getElementById('metric-modal-search');
+
+  if (!bodyEl) return;
+
+  const searchQuery = (searchInput ? searchInput.value.toLowerCase().trim() : '');
+  const calls = Array.isArray(window.callsCache) ? window.callsCache : [];
+
+  let filteredCalls = [];
+  let headerTitle = '';
+  let headerSubtitle = '';
+  let headerIcon = '📞';
+  let headerBg = 'rgba(6, 182, 212, 0.15)';
+  let headerColor = 'var(--color-cyan)';
+
+  if (type === 'failed') {
+    headerIcon = '❌';
+    headerBg = 'rgba(239, 68, 68, 0.15)';
+    headerColor = '#ef4444';
+    headerTitle = 'Failed & Rejected Calls Overview';
+    headerSubtitle = 'Detailed list of missed or failed calls. See failure reasons and re-dial directly with 1 click.';
+    filteredCalls = calls.filter(c => {
+      const st = String(c.status || '').toLowerCase();
+      return st === 'failed' || st === 'busy' || st === 'no-answer' || st === 'voicemail' || st === 'canceled' || st === 'rejected';
+    });
+  } else if (type === 'completed') {
+    headerIcon = '✅';
+    headerBg = 'rgba(6, 182, 212, 0.15)';
+    headerColor = '#06b6d4';
+    headerTitle = 'Completed Calls Log';
+    headerSubtitle = 'Successfully finished calls with AI conversation summaries and call duration.';
+    filteredCalls = calls.filter(c => String(c.status || '').toLowerCase() === 'completed');
+  } else if (type === 'active') {
+    headerIcon = '⚡';
+    headerBg = 'rgba(245, 158, 11, 0.15)';
+    headerColor = '#f59e0b';
+    headerTitle = 'Active & Ongoing Call Sessions';
+    headerSubtitle = 'Live calls currently ringing or in active voice conversation.';
+    filteredCalls = calls.filter(c => {
+      const st = String(c.status || '').toLowerCase();
+      return st === 'active' || st === 'calling' || st === 'in-progress' || st === 'ringing' || st === 'queued' || st === 'initiated';
+    });
+  } else if (type === 'pickup') {
+    headerIcon = '📈';
+    headerBg = 'rgba(16, 185, 129, 0.15)';
+    headerColor = '#10b981';
+    headerTitle = 'Call Pickup & Success Analytics';
+    headerSubtitle = 'Pickup rate statistics and call outcome distributions.';
+    filteredCalls = calls;
+  } else if (type === 'interested') {
+    headerIcon = '🔥';
+    headerBg = 'rgba(236, 72, 153, 0.15)';
+    headerColor = '#ec4899';
+    headerTitle = 'AI-Identified Interested Leads';
+    headerSubtitle = 'High intent prospects identified by AI during conversation calls.';
+    filteredCalls = calls.filter(c => {
+      const sum = String(c.summary || '').toLowerCase();
+      return sum.includes('verdict:** interested') || sum.includes('interested');
+    });
+  } else {
+    // Total calls
+    headerIcon = '📞';
+    headerBg = 'rgba(167, 139, 250, 0.15)';
+    headerColor = '#a78bfa';
+    headerTitle = 'All Calls Made Log';
+    headerSubtitle = 'Complete log of all tracked calls across all statuses.';
+    filteredCalls = calls;
+  }
+
+  // Update header text & badges
+  if (iconEl) {
+    iconEl.innerText = headerIcon;
+    iconEl.style.background = headerBg;
+    iconEl.style.color = headerColor;
+  }
+  if (titleEl) titleEl.innerText = headerTitle;
+  if (subtitleEl) subtitleEl.innerText = headerSubtitle;
+
+  // Filter by search query if any
+  if (searchQuery) {
+    filteredCalls = filteredCalls.filter(c => {
+      const phone = String(c.phone || c.to || c.from || '').toLowerCase();
+      const sum = String(c.summary || c.error || c.failureReason || '').toLowerCase();
+      return phone.includes(searchQuery) || sum.includes(searchQuery);
+    });
+  }
+
+  if (badgeEl) {
+    badgeEl.innerText = `Count: ${filteredCalls.length}`;
+    badgeEl.style.background = headerBg;
+    badgeEl.style.color = headerColor;
+    badgeEl.style.borderColor = headerColor;
+  }
+
+  // Handle Pickup Rate Analytics Special View
+  if (type === 'pickup') {
+    const total = calls.length;
+    const completed = calls.filter(c => String(c.status).toLowerCase() === 'completed').length;
+    const active = calls.filter(c => ['active', 'calling', 'in-progress', 'ringing', 'queued'].includes(String(c.status).toLowerCase())).length;
+    const failed = calls.filter(c => ['failed', 'busy', 'no-answer', 'voicemail', 'canceled', 'rejected'].includes(String(c.status).toLowerCase())).length;
+    const rate = total > 0 ? Math.round(((completed + active) / total) * 100) : 0;
+
+    bodyEl.innerHTML = `
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 12px;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Overall Pickup & Success Rate</div>
+        <div style="font-size: 3rem; font-weight: 900; color: #10b981; font-family: var(--font-mono);">${rate}%</div>
+        <div style="width: 100%; background: rgba(255,255,255,0.08); height: 10px; border-radius: 10px; margin: 14px 0 8px 0; overflow: hidden;">
+          <div style="width: ${rate}%; background: linear-gradient(90deg, #10b981, #06b6d4); height: 100%; border-radius: 10px; transition: width 0.5s ease;"></div>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-muted);">${completed + active} Answered / Active calls out of ${total} total call attempts</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+        <div style="background: var(--bg-surface); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 14px; text-align: center;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">ANSWERED & COMPLETED</div>
+          <div style="font-size: 1.6rem; font-weight: 800; color: #10b981; margin-top: 4px;">${completed}</div>
+        </div>
+        <div style="background: var(--bg-surface); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 14px; text-align: center;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">LIVE / ONGOING</div>
+          <div style="font-size: 1.6rem; font-weight: 800; color: #f59e0b; margin-top: 4px;">${active}</div>
+        </div>
+        <div style="background: var(--bg-surface); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 14px; text-align: center;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">MISSED / FAILED</div>
+          <div style="font-size: 1.6rem; font-weight: 800; color: #ef4444; margin-top: 4px;">${failed}</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  // Render list of calls for other types
+  if (filteredCalls.length === 0) {
+    bodyEl.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 0.9rem;">
+        <div style="font-size: 2.2rem; margin-bottom: 8px;">📭</div>
+        No ${headerTitle.toLowerCase()} found.
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  filteredCalls.forEach(c => {
+    const phone = c.phone || c.to || c.from || 'Unknown Number';
+    const dateStr = c.startedAt || c.createdAt ? new Date(c.startedAt || c.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Recent';
+    const durationSec = c.duration || c.duration_seconds || 0;
+    const durFormatted = durationSec > 0 ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s` : (c.status === 'completed' ? '1m 00s' : '0s');
+
+    // Failure reason determination
+    let failureReasonText = '';
+    let statusPillBg = 'rgba(239, 68, 68, 0.15)';
+    let statusPillColor = '#ef4444';
+    let statusPillBorder = 'rgba(239, 68, 68, 0.3)';
+    let statusPillLabel = String(c.status || 'failed').toUpperCase();
+
+    if (c.status === 'busy') {
+      failureReasonText = 'User Busy / Declined Call';
+      statusPillLabel = 'BUSY';
+    } else if (c.status === 'no-answer') {
+      failureReasonText = 'No Answer / Ring Timeout';
+      statusPillLabel = 'NO ANSWER';
+    } else if (c.status === 'voicemail') {
+      failureReasonText = 'Answered by Voicemail';
+      statusPillLabel = 'VOICEMAIL';
+    } else if (c.status === 'canceled') {
+      failureReasonText = 'Call Cancelled by User';
+      statusPillLabel = 'CANCELLED';
+    } else if (c.status === 'completed') {
+      statusPillBg = 'rgba(6, 182, 212, 0.15)';
+      statusPillColor = '#06b6d4';
+      statusPillBorder = 'rgba(6, 182, 212, 0.3)';
+      statusPillLabel = 'COMPLETED';
+    } else if (['active', 'calling', 'in-progress', 'ringing', 'queued'].includes(String(c.status).toLowerCase())) {
+      statusPillBg = 'rgba(245, 158, 11, 0.15)';
+      statusPillColor = '#f59e0b';
+      statusPillBorder = 'rgba(245, 158, 11, 0.3)';
+      statusPillLabel = String(c.status).toUpperCase();
+    } else {
+      failureReasonText = c.failureReason || c.error || 'Network Error / Carrier Failure';
+      statusPillLabel = 'FAILED';
+    }
+
+    const cleanSummaryText = c.summary ? c.summary.replace(/\*\*(?:VERDICT|Verdict):\*\*\s*[^\n]*/gi, '').replace(/\*\*/g, '').trim() : '';
+
+    html += `
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; transition: border-color 0.2s;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono);">${phone}</span>
+            <span style="font-size: 0.65rem; font-weight: 800; padding: 3px 8px; border-radius: 4px; background: ${statusPillBg}; color: ${statusPillColor}; border: 1px solid ${statusPillBorder}; letter-spacing: 0.5px;">${statusPillLabel}</span>
+          </div>
+          <span style="font-size: 0.74rem; color: var(--text-muted);">${dateStr} • ⏱️ ${durFormatted}</span>
+        </div>
+
+        ${failureReasonText ? `
+          <div style="background: rgba(239, 68, 68, 0.08); border: 1px dashed rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 6px 10px; font-size: 0.78rem; color: #ef4444; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+            <span>❌ <strong>Failure Reason:</strong> ${failureReasonText}</span>
+          </div>
+        ` : ''}
+
+        ${cleanSummaryText ? `
+          <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; max-height: 50px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+            💬 ${cleanSummaryText}
+          </div>
+        ` : ''}
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
+          <button onclick="window.closeMetricDetailsModal(); window.triggerLeadCall('${phone}');" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: var(--color-cyan); border: none; color: #000; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            ⚡ Re-call Now
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  bodyEl.innerHTML = html;
+};
+
 window.filterActionCardsModal = function(filter, btnEl) {
   window.actionCardsFilter = filter;
   const buttons = document.querySelectorAll('#action-cards-filter-buttons .btn-filter-card');

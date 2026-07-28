@@ -514,8 +514,8 @@
 
 
           <div class="vb-grid">
-            <!-- Top Metrics -->
-            <div class="vb-card vb-metric">
+            <!-- Top Metrics (Clickable) -->
+            <div class="vb-card vb-metric" onclick="window.openMetricDetailsModal('total')" style="cursor: pointer; position: relative; transition: all 0.2s ease;" onmouseover="this.style.borderColor='rgba(167, 139, 250, 0.5)'; this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(167, 139, 250, 0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='none'; this.style.boxShadow='none'" title="Click to view all calls made">
               <div class="vb-metric-header">
                 <span>Calls Made</span>
                 <span class="icon">
@@ -523,9 +523,10 @@
                 </span>
               </div>
               <div class="vb-metric-val" id="vb-calls-made">0</div>
-              <div class="vb-metric-sub"><span class="pos">Real-time</span> tracked calls</div>
+              <div class="vb-metric-sub"><span class="pos">Real-time</span> tracked calls <span style="font-size: 0.75rem; color: #a78bfa; margin-left: 4px;">➔</span></div>
             </div>
-            <div class="vb-card vb-metric">
+
+            <div class="vb-card vb-metric" onclick="window.openMetricDetailsModal('active')" style="cursor: pointer; position: relative; transition: all 0.2s ease;" onmouseover="this.style.borderColor='rgba(245, 158, 11, 0.5)'; this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(245, 158, 11, 0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='none'; this.style.boxShadow='none'" title="Click to view ongoing active calls">
               <div class="vb-metric-header">
                 <span>Active / Ongoing</span>
                 <span class="icon">
@@ -533,9 +534,10 @@
                 </span>
               </div>
               <div class="vb-metric-val" id="vb-active-calls">0</div>
-              <div class="vb-metric-sub"><span class="neu">Currently active</span></div>
+              <div class="vb-metric-sub"><span class="neu">Currently active</span> <span style="font-size: 0.75rem; color: #f59e0b; margin-left: 4px;">➔</span></div>
             </div>
-            <div class="vb-card vb-metric">
+
+            <div class="vb-card vb-metric" onclick="window.openMetricDetailsModal('pickup')" style="cursor: pointer; position: relative; transition: all 0.2s ease;" onmouseover="this.style.borderColor='rgba(16, 185, 129, 0.5)'; this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(16, 185, 129, 0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='none'; this.style.boxShadow='none'" title="Click to view call pickup rate analytics">
               <div class="vb-metric-header">
                 <span>Call Pickup Rate</span>
                 <span class="icon">
@@ -543,9 +545,10 @@
                 </span>
               </div>
               <div class="vb-metric-val" id="vb-pickup-rate">0%</div>
-              <div class="vb-metric-sub"><span class="pos">Real-time</span> success rate</div>
+              <div class="vb-metric-sub"><span class="pos">Real-time</span> success rate <span style="font-size: 0.75rem; color: #10b981; margin-left: 4px;">➔</span></div>
             </div>
-            <div class="vb-card vb-metric">
+
+            <div class="vb-card vb-metric" onclick="window.openMetricDetailsModal('completed')" style="cursor: pointer; position: relative; transition: all 0.2s ease;" onmouseover="this.style.borderColor='rgba(6, 182, 212, 0.5)'; this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(6, 182, 212, 0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='none'; this.style.boxShadow='none'" title="Click to view completed calls">
               <div class="vb-metric-header">
                 <span>Completed</span>
                 <span class="icon">
@@ -553,9 +556,10 @@
                 </span>
               </div>
               <div class="vb-metric-val" id="vb-completed-calls">0</div>
-              <div class="vb-metric-sub"><span class="pos">Finished successfully</span></div>
+              <div class="vb-metric-sub"><span class="pos">Finished successfully</span> <span style="font-size: 0.75rem; color: #06b6d4; margin-left: 4px;">➔</span></div>
             </div>
-            <div class="vb-card vb-metric">
+
+            <div class="vb-card vb-metric" onclick="window.openMetricDetailsModal('failed')" style="cursor: pointer; position: relative; transition: all 0.2s ease;" onmouseover="this.style.borderColor='rgba(239, 68, 68, 0.5)'; this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(239, 68, 68, 0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='none'; this.style.boxShadow='none'" title="Click to view failed calls & re-call">
               <div class="vb-metric-header">
                 <span>Failed / Rejected</span>
                 <span class="icon">
@@ -563,9 +567,10 @@
                 </span>
               </div>
               <div class="vb-metric-val" id="vb-failed-calls">0</div>
-              <div class="vb-metric-sub"><span class="neg">Missed or blocked</span></div>
+              <div class="vb-metric-sub"><span class="neg">Missed or blocked</span> <span style="font-size: 0.75rem; color: #ef4444; margin-left: 4px;">➔</span></div>
             </div>
-            <div class="vb-card vb-metric">
+
+            <div class="vb-card vb-metric" onclick="window.openMetricDetailsModal('interested')" style="cursor: pointer; position: relative; transition: all 0.2s ease;" onmouseover="this.style.borderColor='rgba(236, 72, 153, 0.5)'; this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(236, 72, 153, 0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='none'; this.style.boxShadow='none'" title="Click to view interested leads">
               <div class="vb-metric-header">
                 <span>Total Leads (Interested)</span>
                 <span class="icon">
@@ -573,7 +578,7 @@
                 </span>
               </div>
               <div class="vb-metric-val" id="vb-interested-calls">0</div>
-              <div class="vb-metric-sub"><span class="pos">Identified by AI</span></div>
+              <div class="vb-metric-sub"><span class="pos">Identified by AI</span> <span style="font-size: 0.75rem; color: #ec4899; margin-left: 4px;">➔</span></div>
             </div>
 
             <!-- 3 Columns Row: Above Graphs, below metrics -->
@@ -2771,6 +2776,44 @@
         <button id="btn-lead-detail-done" class="btn btn-secondary" style="padding: 10px 20px; font-size: 0.88rem; border-radius: 10px; font-weight: 600; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer;">
           Mark Done
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Metrics Detail Modal (Opens when metric cards are clicked) -->
+  <div id="dashboard-metric-detail-modal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); z-index: 999999; align-items: center; justify-content: center;">
+    <div class="modal-content" style="max-width: 800px; width: 92%; max-height: 88vh; display: flex; flex-direction: column; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 20px; padding: 24px; box-shadow: 0 24px 70px rgba(0,0,0,0.7); box-sizing: border-box; position: relative;">
+      
+      <!-- Modal Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div id="metric-modal-icon" style="width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.15); color: #ef4444; font-size: 1.3rem; flex-shrink: 0;">
+            ⚠️
+          </div>
+          <div>
+            <h3 id="metric-modal-title" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.3px;">Failed & Rejected Calls</h3>
+            <p id="metric-modal-subtitle" style="margin: 4px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Detailed view of all failed or missed call attempts.</p>
+          </div>
+        </div>
+        <button onclick="window.closeMetricDetailsModal()" class="btn-icon-close" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Quick Filter & Search Header -->
+      <div style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;">
+        <input type="text" id="metric-modal-search" placeholder="Search by phone number, reason or notes..." oninput="window.renderMetricDetailsModalContent()" style="flex: 1; min-width: 200px; padding: 8px 14px; font-size: 0.82rem; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
+        <div id="metric-modal-badge" style="padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 800; background: rgba(6,182,212,0.12); color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.3);">
+          Total: 0
+        </div>
+      </div>
+
+      <!-- Content Container -->
+      <div id="metric-modal-body" style="overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; max-height: 60vh;">
+        <!-- Dynamic call list or analytical breakdown inserted here -->
       </div>
     </div>
   </div>
