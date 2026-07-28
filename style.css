@@ -3945,8 +3945,7 @@ body.light-theme .input-action-btn:hover,
   position: relative;
   background: linear-gradient(135deg, rgba(20, 20, 35, 0.8), rgba(35, 20, 55, 0.8));
   padding: 1.2rem;
-  height: 245px;
-  min-height: 245px;
+  height: 205px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;

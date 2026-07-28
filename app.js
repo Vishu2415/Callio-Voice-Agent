@@ -584,7 +584,7 @@ function createActionCardElement(card, isModal = false) {
   cardEl.dataset.id = card.id;
 
   const flexBasis = isModal ? '100%' : '315px';
-  cardEl.style.cssText = `flex: 0 0 ${flexBasis}; background: var(--bg-surface, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 18px; padding: 15px 16px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; min-height: 245px; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; backdrop-filter: blur(12px); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05); cursor: pointer; user-select: none; overflow: hidden;`;
+  cardEl.style.cssText = `flex: 0 0 ${flexBasis}; background: var(--bg-surface, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 205px; max-height: 205px; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; backdrop-filter: blur(12px); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05); cursor: pointer; user-select: none; overflow: hidden;`;
 
   cardEl.onclick = (e) => {
     // If user clicks on button or inside a button, don't trigger modal
@@ -594,8 +594,8 @@ function createActionCardElement(card, isModal = false) {
 
   cardEl.onmouseover = () => {
     cardEl.style.borderColor = 'rgba(6, 182, 212, 0.6)';
-    cardEl.style.transform = 'translateY(-4px)';
-    cardEl.style.boxShadow = '0 14px 35px 0 rgba(6, 182, 212, 0.2)';
+    cardEl.style.transform = 'translateY(-3px)';
+    cardEl.style.boxShadow = '0 12px 30px 0 rgba(6, 182, 212, 0.2)';
   };
   cardEl.onmouseout = () => {
     cardEl.style.borderColor = 'var(--border-color, #e2e8f0)';
@@ -604,39 +604,39 @@ function createActionCardElement(card, isModal = false) {
   };
 
   const actionToTakeHtml = card.actionToTake ? `
-    <div style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.02)); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 10px; padding: 6px 10px; font-size: 0.73rem; color: var(--color-cyan, #06b6d4); font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;" title="Action to Take">
-      <span style="font-size: 0.85rem; line-height: 1;">⚡</span>
+    <div style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.02)); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 8px; padding: 4px 8px; font-size: 0.71rem; color: var(--color-cyan, #06b6d4); font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 5px; line-height: 1.25;" title="Action to Take">
+      <span style="font-size: 0.8rem; line-height: 1;">⚡</span>
       <span style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;"><strong>Action:</strong> ${card.actionToTake}</span>
     </div>
   ` : '';
 
   cardEl.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0; gap: 6px;">
-      <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-        <span style="color: var(--color-cyan, #06b6d4); font-size: 0.85rem;">📞</span>
-        <span style="font-size: 0.92rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace); letter-spacing: -0.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${card.phone}</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0; gap: 6px;">
+      <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
+        <span style="color: var(--color-cyan, #06b6d4); font-size: 0.82rem;">📞</span>
+        <span style="font-size: 0.9rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace); letter-spacing: -0.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${card.phone}</span>
       </div>
-      <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
-        <span style="font-size: 0.64rem; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 20px; background: ${card.sentimentBg}; color: ${card.color}; border: 1px solid ${card.sentimentBorder}; letter-spacing: 0.3px; white-space: nowrap;">
+      <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+        <span style="font-size: 0.62rem; font-weight: 800; text-transform: uppercase; padding: 2px 7px; border-radius: 20px; background: ${card.sentimentBg}; color: ${card.color}; border: 1px solid ${card.sentimentBorder}; letter-spacing: 0.3px; white-space: nowrap;">
           ${card.sentiment}
         </span>
-        <span style="font-size: 0.6rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 20px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.3px; white-space: nowrap;">${card.urgency}</span>
+        <span style="font-size: 0.58rem; font-weight: 800; text-transform: uppercase; padding: 2px 5px; border-radius: 20px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.3px; white-space: nowrap;">${card.urgency}</span>
       </div>
     </div>
     
-    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; text-align: left; overflow: hidden;">
-      <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; text-align: left; overflow: hidden;">
+      <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
         ${card.summary}
       </div>
       ${actionToTakeHtml}
     </div>
     
     <div style="display: flex; gap: 8px; margin-top: auto; flex-shrink: 0;">
-      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}'); event.stopPropagation();" style="flex: 1; height: 34px; border-radius: 10px; background: linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); border: none; color: #ffffff; font-weight: 800; font-size: 0.78rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25); transition: all 0.2s;">
+      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}'); event.stopPropagation();" style="flex: 1; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); border: none; color: #ffffff; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25); transition: all 0.2s;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         ${card.actionText}
       </button>
-      <button class="btn btn-secondary" onclick="window.dismissLeadCard(this); event.stopPropagation();" style="height: 34px; padding: 0 14px; border-radius: 10px; font-weight: 600; font-size: 0.76rem; background: rgba(0,0,0,0.04); border: 1px solid var(--border-color, #e2e8f0); color: var(--text-muted); cursor: pointer; transition: all 0.2s;">
+      <button class="btn btn-secondary" onclick="window.dismissLeadCard(this); event.stopPropagation();" style="height: 32px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 0.74rem; background: rgba(0,0,0,0.04); border: 1px solid var(--border-color, #e2e8f0); color: var(--text-muted); cursor: pointer; transition: all 0.2s;">
         Done
       </button>
     </div>
