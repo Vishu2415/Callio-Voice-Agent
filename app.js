@@ -6283,15 +6283,27 @@ async function refreshCallbacksList() {
 window.fetchCallbacksList = refreshCallbacksList;
 
 window.navigateToCallbacksPage = function() {
-  const btn = document.getElementById('nav-callbacks');
-  if (btn) {
-    btn.click();
-  } else {
-    document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
-    const target = document.getElementById('tab-callbacks');
-    if (target) target.style.display = 'block';
-  }
+  document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
+  const target = document.getElementById('tab-callbacks');
+  if (target) target.style.display = 'block';
+  localStorage.setItem('activeTab', 'tab-callbacks');
   refreshCallbacksList();
+};
+
+window.navigateToTodayCallsPage = function() {
+  document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
+  const target = document.getElementById('tab-today-calls');
+  if (target) target.style.display = 'block';
+  localStorage.setItem('activeTab', 'tab-today-calls');
+  window.renderTodayCallsPageTable();
+};
+
+window.navigateToAISummariesPage = function() {
+  document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
+  const target = document.getElementById('tab-ai-summaries');
+  if (target) target.style.display = 'block';
+  localStorage.setItem('activeTab', 'tab-ai-summaries');
+  window.renderAISummariesPageTable();
 };
 
 function renderDashboardCallbacks(callbacks) {
@@ -6354,10 +6366,156 @@ function renderDashboardCallbacks(callbacks) {
   }
 }
 
+// 1. TODAY'S CALLS HISTORY PAGE (Full Page with 50-item Pagination & Search)
+window.todayCallsPageFilter = 'all';
+window.todayCallsPageNumber = 1;
+
+window.filterTodayCallsPage = function(filter, btnEl) {
+  window.todayCallsPageFilter = filter;
+  window.todayCallsPageNumber = 1;
+  const buttons = document.querySelectorAll('#page-calls-filter-buttons .btn-filter-calls');
+  buttons.forEach(btn => {
+    btn.style.borderColor = 'var(--border-color)';
+    btn.style.background = 'var(--bg-surface)';
+    btn.style.color = 'var(--text-muted)';
+    btn.style.fontWeight = '600';
+  });
+  if (btnEl) {
+    btnEl.style.borderColor = 'var(--color-cyan)';
+    btnEl.style.background = 'rgba(6, 182, 212, 0.15)';
+    btnEl.style.color = 'var(--color-cyan)';
+    btnEl.style.fontWeight = '700';
+  }
+  window.renderTodayCallsPageTable();
+};
+
+window.renderTodayCallsPageTable = function() {
+  const container = document.getElementById('page-today-calls-list-container');
+  if (!container) return;
+
+  const calls = Array.isArray(window.callsCache) ? window.callsCache : [];
+
+  const totalCount = calls.length;
+  const completedCount = calls.filter(c => c.status === 'completed').length;
+  const failedCount = calls.filter(c => c.status === 'failed' || c.status === 'no-answer' || c.status === 'busy').length;
+
+  const elTotal = document.getElementById('page-calls-total-count');
+  const elCompleted = document.getElementById('page-calls-completed-count');
+  const elFailed = document.getElementById('page-calls-failed-count');
+
+  if (elTotal) elTotal.innerText = totalCount;
+  if (elCompleted) elCompleted.innerText = completedCount;
+  if (elFailed) elFailed.innerText = failedCount;
+
+  const filter = window.todayCallsPageFilter || 'all';
+  const searchInput = document.getElementById('page-calls-search-input');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+  let list = calls;
+  if (filter === 'completed') {
+    list = list.filter(c => c.status === 'completed');
+  } else if (filter === 'failed') {
+    list = list.filter(c => c.status === 'failed' || c.status === 'no-answer' || c.status === 'busy');
+  }
+
+  if (query) {
+    list = list.filter(c => {
+      const phone = String(c.to || c.from || c.phone || '').toLowerCase();
+      const status = String(c.status || '').toLowerCase();
+      const direction = String(c.direction || '').toLowerCase();
+      return phone.includes(query) || status.includes(query) || direction.includes(query);
+    });
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 50px 20px; color: var(--text-muted); font-size: 0.95rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 10px;">📞</div>
+        No call records match the selected criteria.
+      </div>
+    `;
+    const pagContainer = document.getElementById('page-today-calls-pagination');
+    if (pagContainer) pagContainer.innerHTML = '';
+    return;
+  }
+
+  const itemsPerPage = 50;
+  const totalPages = Math.ceil(list.length / itemsPerPage);
+  if (window.todayCallsPageNumber < 1) window.todayCallsPageNumber = 1;
+  if (window.todayCallsPageNumber > totalPages) window.todayCallsPageNumber = totalPages;
+
+  const startIndex = (window.todayCallsPageNumber - 1) * itemsPerPage;
+  const pageItems = list.slice(startIndex, startIndex + itemsPerPage);
+
+  let html = '';
+  pageItems.forEach(call => {
+    const isOut = call.direction === 'outgoing' || call.direction === 'outbound';
+    const arrow = isOut ? '⬆ Outgoing' : '⬇ Incoming';
+    const arrowColor = isOut ? 'var(--color-cyan)' : 'var(--color-green)';
+    const phone = call.to || call.from || call.phone || 'Unknown Number';
+    const duration = call.duration ? `${call.duration}s` : 'N/A';
+    const timeText = call.timestamp || call.createdAt ? new Date(call.timestamp || call.createdAt).toLocaleString() : 'Recent';
+
+    let statusStyle = 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);';
+    if (call.status === 'failed' || call.status === 'no-answer' || call.status === 'busy') {
+      statusStyle = 'background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);';
+    } else if (call.status === 'active' || call.status === 'in-progress' || call.status === 'calling') {
+      statusStyle = 'background: rgba(6, 182, 212, 0.15); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.3);';
+    }
+
+    html += `
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 14px; flex: 1; min-width: 220px;">
+          <div style="font-size: 1.1rem; color: ${arrowColor}; font-weight: 800;">${arrow.startsWith('⬆') ? '⬆' : '⬇'}</div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <strong style="font-size: 1.05rem; color: var(--text-main); font-family: var(--font-mono);">${phone}</strong>
+              <span style="padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; ${statusStyle}">${call.status || 'completed'}</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+              ${timeText} • Duration: <strong>${duration}</strong> • Direction: <span style="color:${arrowColor}; font-weight:700;">${arrow}</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <button onclick="window.triggerLeadCall('${phone}')" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); border: none; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            📞 Redial
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  const pagContainer = document.getElementById('page-today-calls-pagination');
+  if (pagContainer) {
+    const endIndex = Math.min(startIndex + itemsPerPage, list.length);
+    pagContainer.innerHTML = `
+      <div style="font-size: 0.82rem; color: var(--text-muted);">
+        Showing <strong>${startIndex + 1}–${endIndex}</strong> of <strong>${list.length}</strong> calls
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button onclick="window.changeTodayCallsPage(-1)" ${window.todayCallsPageNumber <= 1 ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : ''} style="padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer;">Prev</button>
+        <span style="font-size: 0.82rem; color: var(--text-main); font-weight: 700;">Page ${window.todayCallsPageNumber} of ${totalPages}</span>
+        <button onclick="window.changeTodayCallsPage(1)" ${window.todayCallsPageNumber >= totalPages ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : ''} style="padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer;">Next</button>
+      </div>
+    `;
+  }
+};
+
+window.changeTodayCallsPage = function(delta) {
+  window.todayCallsPageNumber = (window.todayCallsPageNumber || 1) + delta;
+  window.renderTodayCallsPageTable();
+};
+
+// 2. SCHEDULED CALLBACKS PAGE (Full Page with 50-item Pagination & Search)
 window.callbacksPageFilter = 'all';
+window.callbacksPageNumber = 1;
 
 window.filterCallbacksPage = function(filter, btnEl) {
   window.callbacksPageFilter = filter;
+  window.callbacksPageNumber = 1;
   const buttons = document.querySelectorAll('#page-cb-filter-buttons .btn-filter-cb');
   buttons.forEach(btn => {
     btn.style.borderColor = 'var(--border-color)';
@@ -6380,7 +6538,6 @@ window.renderScheduledCallbacksPageTable = function() {
 
   const callbacks = Array.isArray(window.lastDashboardCallbacks) ? window.lastDashboardCallbacks : [];
 
-  // Update summary counters
   const totalCount = callbacks.length;
   const pendingCount = callbacks.filter(c => c.status === 'pending' || c.status === 'dialing').length;
   const dialedCount = callbacks.filter(c => c.status === 'dialed' || c.status === 'completed').length;
@@ -6396,7 +6553,6 @@ window.renderScheduledCallbacksPageTable = function() {
   if (elDialed) elDialed.innerText = dialedCount;
   if (elFailed) elFailed.innerText = failedCount;
 
-  // Filtering
   const filter = window.callbacksPageFilter || 'all';
   const searchInput = document.getElementById('page-cb-search-input');
   const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
@@ -6426,11 +6582,21 @@ window.renderScheduledCallbacksPageTable = function() {
         No scheduled callbacks match the selected criteria.
       </div>
     `;
+    const pagContainer = document.getElementById('page-callbacks-pagination');
+    if (pagContainer) pagContainer.innerHTML = '';
     return;
   }
 
+  const itemsPerPage = 50;
+  const totalPages = Math.ceil(list.length / itemsPerPage);
+  if (window.callbacksPageNumber < 1) window.callbacksPageNumber = 1;
+  if (window.callbacksPageNumber > totalPages) window.callbacksPageNumber = totalPages;
+
+  const startIndex = (window.callbacksPageNumber - 1) * itemsPerPage;
+  const pageItems = list.slice(startIndex, startIndex + itemsPerPage);
+
   let html = '';
-  list.forEach(cb => {
+  pageItems.forEach(cb => {
     const cbDate = new Date(cb.scheduledAt);
     const timeText = isNaN(cbDate.getTime()) 
       ? cb.requestedTime 
@@ -6475,6 +6641,171 @@ window.renderScheduledCallbacksPageTable = function() {
   });
 
   container.innerHTML = html;
+
+  const pagContainer = document.getElementById('page-callbacks-pagination');
+  if (pagContainer) {
+    const endIndex = Math.min(startIndex + itemsPerPage, list.length);
+    pagContainer.innerHTML = `
+      <div style="font-size: 0.82rem; color: var(--text-muted);">
+        Showing <strong>${startIndex + 1}–${endIndex}</strong> of <strong>${list.length}</strong> callbacks
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button onclick="window.changeCallbacksPage(-1)" ${window.callbacksPageNumber <= 1 ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : ''} style="padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer;">Prev</button>
+        <span style="font-size: 0.82rem; color: var(--text-main); font-weight: 700;">Page ${window.callbacksPageNumber} of ${totalPages}</span>
+        <button onclick="window.changeCallbacksPage(1)" ${window.callbacksPageNumber >= totalPages ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : ''} style="padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer;">Next</button>
+      </div>
+    `;
+  }
+};
+
+window.changeCallbacksPage = function(delta) {
+  window.callbacksPageNumber = (window.callbacksPageNumber || 1) + delta;
+  window.renderScheduledCallbacksPageTable();
+};
+
+// 3. AI SUMMARIES PAGE (Full Page with 50-item Pagination & Search)
+window.summariesPageFilter = 'all';
+window.summariesPageNumber = 1;
+
+window.filterSummariesPage = function(filter, btnEl) {
+  window.summariesPageFilter = filter;
+  window.summariesPageNumber = 1;
+  const buttons = document.querySelectorAll('#page-sum-filter-buttons .btn-filter-sum');
+  buttons.forEach(btn => {
+    btn.style.borderColor = 'var(--border-color)';
+    btn.style.background = 'var(--bg-surface)';
+    btn.style.color = 'var(--text-muted)';
+    btn.style.fontWeight = '600';
+  });
+  if (btnEl) {
+    btnEl.style.borderColor = 'var(--color-cyan)';
+    btnEl.style.background = 'rgba(6, 182, 212, 0.15)';
+    btnEl.style.color = 'var(--color-cyan)';
+    btnEl.style.fontWeight = '700';
+  }
+  window.renderAISummariesPageTable();
+};
+
+window.renderAISummariesPageTable = function() {
+  const container = document.getElementById('page-summaries-list-container');
+  if (!container) return;
+
+  const calls = Array.isArray(window.callsCache) ? window.callsCache : [];
+  const callsWithSummary = calls.filter(c => c.summary || c.insights);
+
+  const totalCount = callsWithSummary.length;
+  const interestedCount = callsWithSummary.filter(c => String(c.summary || '').toLowerCase().includes('interested') && !String(c.summary || '').toLowerCase().includes('not interested')).length;
+  const notInterestedCount = totalCount - interestedCount;
+
+  const elTotal = document.getElementById('page-sum-total-count');
+  const elInterested = document.getElementById('page-sum-interested-count');
+  const elNotInterested = document.getElementById('page-sum-notinterested-count');
+
+  if (elTotal) elTotal.innerText = totalCount;
+  if (elInterested) elInterested.innerText = interestedCount;
+  if (elNotInterested) elNotInterested.innerText = notInterestedCount;
+
+  const filter = window.summariesPageFilter || 'all';
+  const searchInput = document.getElementById('page-sum-search-input');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+  let list = callsWithSummary;
+  if (filter === 'interested') {
+    list = list.filter(c => String(c.summary || '').toLowerCase().includes('interested') && !String(c.summary || '').toLowerCase().includes('not interested'));
+  } else if (filter === 'not_interested') {
+    list = list.filter(c => String(c.summary || '').toLowerCase().includes('not interested') || !String(c.summary || '').toLowerCase().includes('interested'));
+  }
+
+  if (query) {
+    list = list.filter(c => {
+      const phone = String(c.to || c.from || c.phone || '').toLowerCase();
+      const summary = String(c.summary || '').toLowerCase();
+      const action = String(c.actionToTake || '').toLowerCase();
+      return phone.includes(query) || summary.includes(query) || action.includes(query);
+    });
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 50px 20px; color: var(--text-muted); font-size: 0.95rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 10px;">🤖</div>
+        No AI summaries match the selected criteria.
+      </div>
+    `;
+    const pagContainer = document.getElementById('page-summaries-pagination');
+    if (pagContainer) pagContainer.innerHTML = '';
+    return;
+  }
+
+  const itemsPerPage = 50;
+  const totalPages = Math.ceil(list.length / itemsPerPage);
+  if (window.summariesPageNumber < 1) window.summariesPageNumber = 1;
+  if (window.summariesPageNumber > totalPages) window.summariesPageNumber = totalPages;
+
+  const startIndex = (window.summariesPageNumber - 1) * itemsPerPage;
+  const pageItems = list.slice(startIndex, startIndex + itemsPerPage);
+
+  let html = '';
+  pageItems.forEach(call => {
+    const phone = call.to || call.from || call.phone || 'Unknown';
+    const summary = call.summary || 'No summary text available.';
+    const action = call.actionToTake || 'Follow up with lead';
+    const timeText = call.timestamp || call.createdAt ? new Date(call.timestamp || call.createdAt).toLocaleString() : 'Recent';
+    const isInterested = String(summary).toLowerCase().includes('interested') && !String(summary).toLowerCase().includes('not interested');
+
+    const badgeBg = isInterested ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+    const badgeColor = isInterested ? '#10b981' : '#ef4444';
+    const badgeBorder = isInterested ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)';
+    const verdictText = isInterested ? 'INTERESTED' : 'NEUTRAL / UNREACHABLE';
+
+    html += `
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.1rem; color: var(--color-cyan);">📞</span>
+            <strong style="font-size: 1.05rem; color: var(--text-main); font-family: var(--font-mono);">${phone}</strong>
+            <span style="padding: 2px 10px; border-radius: 20px; font-size: 0.68rem; font-weight: 800; background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder};">${verdictText}</span>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">🕒 ${timeText}</div>
+        </div>
+
+        <div style="font-size: 0.85rem; color: var(--text-main); line-height: 1.5; background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px;">
+          ${summary}
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div style="font-size: 0.78rem; color: var(--color-cyan); font-weight: 700; display: flex; align-items: center; gap: 6px;">
+            <span>⚡ Recommended Action:</span> ${action}
+          </div>
+          <button onclick="window.triggerLeadCall('${phone}')" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); border: none; color: #fff; font-weight: 700; cursor: pointer;">
+            Call Back Lead
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  const pagContainer = document.getElementById('page-summaries-pagination');
+  if (pagContainer) {
+    const endIndex = Math.min(startIndex + itemsPerPage, list.length);
+    pagContainer.innerHTML = `
+      <div style="font-size: 0.82rem; color: var(--text-muted);">
+        Showing <strong>${startIndex + 1}–${endIndex}</strong> of <strong>${list.length}</strong> summaries
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button onclick="window.changeSummariesPage(-1)" ${window.summariesPageNumber <= 1 ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : ''} style="padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer;">Prev</button>
+        <span style="font-size: 0.82rem; color: var(--text-main); font-weight: 700;">Page ${window.summariesPageNumber} of ${totalPages}</span>
+        <button onclick="window.changeSummariesPage(1)" ${window.summariesPageNumber >= totalPages ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : ''} style="padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer;">Next</button>
+      </div>
+    `;
+  }
+};
+
+window.changeSummariesPage = function(delta) {
+  window.summariesPageNumber = (window.summariesPageNumber || 1) + delta;
+  window.renderAISummariesPageTable();
 };
 
 window.openCallbacksModal = function(event) {

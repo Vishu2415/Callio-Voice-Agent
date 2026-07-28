@@ -590,20 +590,19 @@
               </div>
               <div id="dashboard-last-call-box" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-grow: 1; padding-right: 4px;">
                 <div style="color: var(--text-muted); text-align: center; padding-top: 30px; font-size: 0.85rem;">No calls yet</div>
-              </div>
-              <a href="#" onclick="event.preventDefault(); window.navigateToCallingsPage();" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">See All Today's Calls ➔</a>
+                      <a href="#" onclick="event.preventDefault(); window.navigateToTodayCallsPage();" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">See All Today's Calls ➔</a>
             </div>
 
             <!-- Box 2: Scheduled Callbacks (NEW) -->
             <div class="vb-card" style="grid-column: span 3; padding: 1.25rem; display: flex; flex-direction: column; height: 280px; box-sizing: border-box;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 6px;">
                 <span style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Scheduled Callbacks</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; color: #f59e0b;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; color: #f59e0b;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 16 14"/></svg>
               </div>
               <div id="dashboard-callbacks-list" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-grow: 1; padding-right: 4px;">
                 <div style="color: var(--text-muted); text-align: center; padding-top: 30px; font-size: 0.85rem;">No callbacks scheduled</div>
               </div>
-              <a href="#" onclick="event.preventDefault(); window.openCallbacksModal(event);" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">Manage Callbacks ➔</a>
+              <a href="#" onclick="event.preventDefault(); window.navigateToCallbacksPage();" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">Manage Callbacks ➔</a>
             </div>
 
             <!-- Box 3: Today's Traffic -->
@@ -645,7 +644,7 @@
               <div id="dashboard-summaries-list" style="overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
                 <div style="color: var(--text-muted); text-align: center; padding-top: 30px; font-size: 0.85rem;">No summaries available</div>
               </div>
-              <a href="#" onclick="event.preventDefault(); window.navigateToSummariesPage();" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">See All Today's Summaries ➔</a>
+              <a href="#" onclick="event.preventDefault(); window.navigateToAISummariesPage();" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">See All Today's Summaries ➔</a>
             </div>
 
             <div class="vb-card vb-chart-panel">
@@ -680,6 +679,59 @@
             </div>        
           </div>
         </section>
+      </div>
+
+      <!-- TAB: Today's Calls History (Full Page) -->
+      <div id="tab-today-calls" class="tab-pane" style="display: none;">
+        <div class="premium-tab-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2 class="tab-title" style="margin: 0;">📞 Today's Calls & Connection History</h2>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Complete real-time record of all incoming & outgoing call connections, durations, and call statuses.</p>
+            </div>
+            <button onclick="if (window.fetchClientDashboardData) window.fetchClientDashboardData();" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.82rem; border-radius: 10px; cursor: pointer; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 15px; height: 15px;"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              Refresh Calls
+            </button>
+          </div>
+
+          <!-- Summary Metric Cards Bar -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+            <div class="vb-card" style="padding: 16px; border-radius: 14px;">
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Total Calls</div>
+              <div id="page-calls-total-count" style="font-size: 1.8rem; font-weight: 900; color: var(--color-cyan); margin-top: 6px;">0</div>
+            </div>
+            <div class="vb-card" style="padding: 16px; border-radius: 14px;">
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Completed Calls</div>
+              <div id="page-calls-completed-count" style="font-size: 1.8rem; font-weight: 900; color: #10b981; margin-top: 6px;">0</div>
+            </div>
+            <div class="vb-card" style="padding: 16px; border-radius: 14px;">
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Failed / Unanswered</div>
+              <div id="page-calls-failed-count" style="font-size: 1.8rem; font-weight: 900; color: #ef4444; margin-top: 6px;">0</div>
+            </div>
+          </div>
+
+          <!-- Controls: Search & Status Filter Tabs -->
+          <div class="vb-card" style="padding: 16px; margin-bottom: 20px; border-radius: 14px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+            <input type="text" id="page-calls-search-input" placeholder="Search by phone number, direction or status..." oninput="window.renderTodayCallsPageTable()" style="flex: 1; min-width: 250px; padding: 10px 16px; font-size: 0.88rem; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
+            
+            <div style="display: flex; gap: 8px;" id="page-calls-filter-buttons">
+              <button class="btn-filter-calls active" onclick="window.filterTodayCallsPage('all', this)" style="padding: 8px 16px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--color-cyan); background: rgba(6, 182, 212, 0.15); color: var(--color-cyan); font-weight: 700; cursor: pointer;">All Calls</button>
+              <button class="btn-filter-calls" onclick="window.filterTodayCallsPage('completed', this)" style="padding: 8px 16px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); font-weight: 600; cursor: pointer;">Completed</button>
+              <button class="btn-filter-calls" onclick="window.filterTodayCallsPage('failed', this)" style="padding: 8px 16px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); font-weight: 600; cursor: pointer;">Failed</button>
+            </div>
+          </div>
+
+          <!-- Calls List Grid / Table -->
+          <div class="vb-card" style="padding: 20px; border-radius: 16px;">
+            <div id="page-today-calls-list-container" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Dynamically populated table/cards -->
+            </div>
+            <!-- Pagination Footer -->
+            <div id="page-today-calls-pagination" style="margin-top: 20px; display: flex; align-items: center; justify-content: space-between; padding-top: 15px; border-top: 1px solid var(--border-color);">
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- TAB: Scheduled Callbacks (Full Page) -->
@@ -733,6 +785,9 @@
             <div id="page-callbacks-list-container" style="display: flex; flex-direction: column; gap: 12px;">
               <!-- Dynamically populated table/cards -->
             </div>
+            <!-- Pagination Footer -->
+            <div id="page-callbacks-pagination" style="margin-top: 20px; display: flex; align-items: center; justify-content: space-between; padding-top: 15px; border-top: 1px solid var(--border-color);">
+            </div>
           </div>
         </div>
       </div>
@@ -782,6 +837,9 @@
           <div class="vb-card" style="padding: 20px; border-radius: 16px;">
             <div id="page-summaries-list-container" style="display: flex; flex-direction: column; gap: 14px;">
               <!-- Dynamically populated cards -->
+            </div>
+            <!-- Pagination Footer -->
+            <div id="page-summaries-pagination" style="margin-top: 20px; display: flex; align-items: center; justify-content: space-between; padding-top: 15px; border-top: 1px solid var(--border-color);">
             </div>
           </div>
         </div>
@@ -2555,7 +2613,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=20260728_v15"></script>
+  <script type="module" src="app.js?v=20260728_v16"></script>
   <!-- Today's Calls & Summaries Modal -->
   <div id="today-calls-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="width: 90%; max-width: 700px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 25px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh;">
