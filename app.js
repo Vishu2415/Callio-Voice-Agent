@@ -997,10 +997,36 @@ window.renderMetricDetailsModalContent = function() {
 
   // Render list of calls for other types
   if (filteredCalls.length === 0) {
+    let emptyIcon = '📭';
+    let emptyTitle = `No ${headerTitle} Found`;
+    let emptyDesc = 'All call sessions and real-time status updates are tracked automatically in your account dashboard.';
+    let actionBtn = '';
+
+    if (type === 'active') {
+      emptyIcon = '⚡';
+      emptyTitle = 'No Live Calls Active Right Now';
+      emptyDesc = 'There are currently 0 active voice call sessions ringing or in progress.';
+      actionBtn = `
+        <button onclick="window.closeMetricDetailsModal(); window.navigateToCallingsPage();" style="margin-top: 16px; background: linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); color: white; border: none; padding: 10px 24px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.88rem; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(234, 88, 12, 0.3);">
+          <span>📞</span> Start a Call Now
+        </button>
+      `;
+    } else if (type === 'failed') {
+      emptyIcon = '🎉';
+      emptyTitle = 'Zero Failed Calls';
+      emptyDesc = 'Great news! All attempted calls were processed successfully with no rejections.';
+    } else if (type === 'interested') {
+      emptyIcon = '🎯';
+      emptyTitle = 'No Interested Leads Identified Yet';
+      emptyDesc = 'Complete more calls to let AI identify high-intent prospects automatically.';
+    }
+
     bodyEl.innerHTML = `
-      <div style="text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 0.9rem;">
-        <div style="font-size: 2.2rem; margin-bottom: 8px;">📭</div>
-        No ${headerTitle.toLowerCase()} found.
+      <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color, #27272a); border-radius: 16px; padding: 40px 20px; text-align: center; margin: 10px 0;">
+        <div style="font-size: 2.8rem; margin-bottom: 12px;">${emptyIcon}</div>
+        <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-main, #ffffff); margin-bottom: 6px;">${emptyTitle}</div>
+        <div style="font-size: 0.82rem; color: var(--text-muted, #a1a1aa); max-width: 420px; margin: 0 auto; line-height: 1.5;">${emptyDesc}</div>
+        ${actionBtn}
       </div>
     `;
     return;
