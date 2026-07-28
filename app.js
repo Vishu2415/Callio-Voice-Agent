@@ -1790,61 +1790,75 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
 async function playVoiceSample(voiceName, buttonEl) {
-  const apiKey = elApiKey.value.trim();
-  if (!apiKey) {
-    alert("Please enter your Gemini API Key in the Settings drawer first to test voices.");
-    document.getElementById('settings-drawer')?.classList.add('active');
-    return;
-  }
-  
   const originalText = buttonEl.innerText;
   buttonEl.innerText = "⏳...";
   buttonEl.disabled = true;
-  
-  const prompt = "Hello! Main ready hoon.";
-  
-  const payload = {
-    contents: [{
-      role: "user",
-      parts: [{ text: prompt }]
-    }],
-    generationConfig: {
-      responseModalities: ["AUDIO"],
-      speechConfig: {
-        "voiceConfig": {
-          "prebuiltVoiceConfig": {
-            "voiceName": voiceName
-          }
+
+  try {
+    // 1. Try server backend endpoint first (uses server GEMINI_API_KEY)
+    let base64Audio = null;
+    let sampleRate = 24000;
+
+    try {
+      const backendRes = await fetch('/api/voice-sample', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voiceName: voiceName, text: "Hello! Main ready hoon aapki help karne ke liye." })
+      });
+
+      if (backendRes.ok) {
+        const data = await backendRes.json();
+        if (data.success && data.audioBase64) {
+          base64Audio = data.audioBase64;
+          if (data.sampleRate) sampleRate = data.sampleRate;
         }
       }
+    } catch (e) {
+      console.warn("Backend voice sample proxy error, attempting fallback:", e);
     }
-  };
-  
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${apiKey}`;
-  
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
+
+    // 2. Fallback: Direct Google API fetch using valid gemini-2.0-flash model
+    if (!base64Audio) {
+      const apiKey = elApiKey ? elApiKey.value.trim() : '';
+      if (!apiKey) {
+        throw new Error("Voice sample service is initializing. Please try again in a moment.");
+      }
+
+      const prompt = "Hello! Main ready hoon.";
+      const payload = {
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: voiceName }
+            }
+          }
+        }
+      };
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      base64Audio = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     }
-    
-    const data = await res.json();
-    const candidate = data.candidates?.[0];
-    const part = candidate?.content?.parts?.[0];
-    
-    if (part?.inlineData?.data) {
-      const base64Audio = part.inlineData.data;
+
+    if (base64Audio) {
       const arrayBuffer = base64ToArrayBuffer(base64Audio);
       const float32Data = pcmToFloat32(arrayBuffer);
       
       const sampleCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const audioBuffer = sampleCtx.createBuffer(1, float32Data.length, 24000);
+      const audioBuffer = sampleCtx.createBuffer(1, float32Data.length, sampleRate);
       audioBuffer.getChannelData(0).set(float32Data);
       
       const source = sampleCtx.createBufferSource();

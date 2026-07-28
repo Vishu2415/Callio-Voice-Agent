@@ -2022,6 +2022,66 @@ app.post('/incoming-call', (req, res) => {
   `);
 });
 
+// Voice Sample Preview Endpoint
+app.post('/api/voice-sample', async (req, res) => {
+  try {
+    const { voiceName, text } = req.body || {};
+    const voice = voiceName || 'Charon';
+    const samplePrompt = text || 'Hello! Main ready hoon aapki help karne ke liye.';
+
+    const apiKey = (defaultCallConfig && defaultCallConfig.apiKey) || GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(400).json({ success: false, error: 'Gemini API Key is not configured on server.' });
+    }
+
+    const payload = {
+      contents: [{
+        role: "user",
+        parts: [{ text: samplePrompt }]
+      }],
+      generationConfig: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: voice
+            }
+          }
+        }
+      }
+    };
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+    const googleRes = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!googleRes.ok) {
+      const errText = await googleRes.text();
+      let errJson;
+      try { errJson = JSON.parse(errText); } catch(e) {}
+      const errMsg = errJson?.error?.message || `Google API returned HTTP ${googleRes.status}`;
+      return res.status(googleRes.status).json({ success: false, error: errMsg });
+    }
+
+    const data = await googleRes.json();
+    const base64Audio = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+    if (!base64Audio) {
+      return res.status(500).json({ success: false, error: 'No audio data returned from Gemini API.' });
+    }
+
+    return res.json({ success: true, audioBase64: base64Audio, sampleRate: 24000 });
+  } catch (err) {
+    console.error('[Voice Sample Proxy Error]:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to generate voice sample.' });
+  }
+});
+
 // 2. Exotel Dynamic Voicebot Endpoint for Incoming Exotel Call Webhooks
 app.all('/incoming-call-exotel', (req, res) => {
   const query = req.query || {};
