@@ -2083,7 +2083,7 @@ async function playVoiceSample(voiceName, buttonEl) {
   try {
     let base64Audio = null;
     let sampleRate = 24000;
-    const userApiKey = document.getElementById('api-key')?.value.trim() || document.getElementById('gemini-api-key')?.value.trim() || '';
+    const userApiKey = localStorage.getItem('gemini_api_key') || document.getElementById('api-key')?.value.trim() || document.getElementById('gemini-api-key')?.value.trim() || '';
 
     let backendErr = null;
     try {
