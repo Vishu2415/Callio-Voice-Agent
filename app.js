@@ -157,23 +157,19 @@ window.navigateToCallingsPage = function() {
   if (btn) { btn.click(); return; }
   // Fallback: manually switch
   document.querySelectorAll('.glass-navbar .nav-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
   const pane = document.getElementById('tab-quick-call');
-  if (pane) pane.classList.add('active');
+  if (pane) { pane.classList.add('active'); pane.style.display = 'block'; }
   localStorage.setItem('activeTab', 'tab-quick-call');
   document.documentElement.setAttribute('data-active-tab', 'tab-quick-call');
 };
 
-// Navigate to AI Summaries (Callings tab has summaries section)
+// Navigate to AI Summaries full page view
 window.navigateToSummariesPage = function() {
-  const btn = document.querySelector('.glass-navbar .nav-btn[data-tab="tab-quick-call"]');
-  if (btn) { btn.click(); return; }
-  const pane = document.getElementById('tab-quick-call');
-  if (pane) {
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-    pane.classList.add('active');
-    localStorage.setItem('activeTab', 'tab-quick-call');
-    document.documentElement.setAttribute('data-active-tab', 'tab-quick-call');
+  if (typeof window.navigateToAISummariesPage === 'function') {
+    window.navigateToAISummariesPage();
+  } else {
+    window.switchFullPageTab('tab-ai-summaries');
   }
 };
 
@@ -6282,27 +6278,37 @@ async function refreshCallbacksList() {
 
 window.fetchCallbacksList = refreshCallbacksList;
 
+window.switchFullPageTab = function(targetTabId) {
+  document.querySelectorAll('.glass-navbar .nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => {
+    p.classList.remove('active');
+    p.style.display = 'none';
+  });
+
+  const targetPane = document.getElementById(targetTabId);
+  if (targetPane) {
+    targetPane.classList.add('active');
+    targetPane.style.display = 'block';
+  }
+
+  localStorage.setItem('activeTab', targetTabId);
+  document.documentElement.setAttribute('data-active-tab', targetTabId);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
 window.navigateToCallbacksPage = function() {
-  document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
-  const target = document.getElementById('tab-callbacks');
-  if (target) target.style.display = 'block';
-  localStorage.setItem('activeTab', 'tab-callbacks');
-  refreshCallbacksList();
+  window.switchFullPageTab('tab-callbacks');
+  if (typeof refreshCallbacksList === 'function') refreshCallbacksList();
+  window.renderScheduledCallbacksPageTable();
 };
 
 window.navigateToTodayCallsPage = function() {
-  document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
-  const target = document.getElementById('tab-today-calls');
-  if (target) target.style.display = 'block';
-  localStorage.setItem('activeTab', 'tab-today-calls');
+  window.switchFullPageTab('tab-today-calls');
   window.renderTodayCallsPageTable();
 };
 
 window.navigateToAISummariesPage = function() {
-  document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
-  const target = document.getElementById('tab-ai-summaries');
-  if (target) target.style.display = 'block';
-  localStorage.setItem('activeTab', 'tab-ai-summaries');
+  window.switchFullPageTab('tab-ai-summaries');
   window.renderAISummariesPageTable();
 };
 
