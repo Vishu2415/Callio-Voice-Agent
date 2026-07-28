@@ -5814,10 +5814,11 @@ async function fetchClientDashboardData() {
   }
   
   try {
-    const [plansRes, dashDataRes] = await Promise.all([
+    const [plansRes, dashDataRes, callsDataRes, callbacksDataRes] = await Promise.all([
       fetchPlans().catch(() => {}),
       fetch(`/api/client/dashboard-data?clientId=${loggedInUser.id}`).then(r => r.json()).catch(() => null),
-      refreshCallsListForDashboard().catch(() => {})
+      refreshCallsListForDashboard().catch(() => {}),
+      typeof refreshCallbacksList === 'function' ? refreshCallbacksList().catch(() => {}) : null
     ]);
 
     if (dashDataRes && dashDataRes.success) {
@@ -5861,7 +5862,6 @@ async function refreshCallsListForDashboard() {
       updateDashboardWithClientCalls(callsCache);
       renderCallsSidebar();
       if (typeof window.populateAIActionPlanner === 'function') window.populateAIActionPlanner();
-      if (typeof refreshCallbacksList === 'function') refreshCallbacksList();
     }
   } catch (err) {
     console.error('[refreshCallsListForDashboard] Failed:', err);
