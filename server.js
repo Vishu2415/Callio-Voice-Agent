@@ -4626,6 +4626,7 @@ app.get('/api/admin/resellers', express.json(), (req, res) => {
     created_at: r.created_at,
     quota: r.quota,
     permissions: r.permissions,
+    package_name: r.package_name || 'Standard',
     branding: r.branding,
     client_count: getResellerClients(r.id).length
   }));
@@ -4730,9 +4731,12 @@ app.put('/api/admin/resellers/:id/permissions', express.json(), (req, res) => {
   if (!reseller) return res.status(404).json({ success: false, error: 'Reseller not found.' });
 
   reseller.permissions = { ...reseller.permissions, ...req.body.permissions };
+  if (req.body.package_name !== undefined) {
+    reseller.package_name = req.body.package_name;
+  }
   resellersDb.set(reseller.id, reseller);
   saveResellers();
-  res.json({ success: true, permissions: reseller.permissions });
+  res.json({ success: true, permissions: reseller.permissions, package_name: reseller.package_name });
 });
 
 // PUT update reseller quota & wholesale rate (Super Admin only)

@@ -7036,7 +7036,7 @@ window.switchAdminSubtab = function(tabName) {
 window.fetchAdminResellers = async function() {
   const tbody = document.getElementById('admin-resellers-table-body');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">Loading resellers...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">Loading resellers...</td></tr>';
 
   try {
     const adminPass = localStorage.getItem('adminPassword') || 'admin123';
@@ -7044,42 +7044,221 @@ window.fetchAdminResellers = async function() {
     const data = await res.json();
 
     if (!data.success) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 20px;">${data.error || 'Failed to load resellers.'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 20px;">${data.error || 'Failed to load resellers.'}</td></tr>`;
       return;
     }
 
     const resellers = data.resellers || [];
+    window._cachedResellers = resellers; // cache for permissions lookups
     if (resellers.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">No whitelabel resellers created yet. Click "Add New Reseller" to get started.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">No whitelabel resellers created yet. Click "Add New Reseller" to get started.</td></tr>';
       return;
     }
 
-    tbody.innerHTML = resellers.map(r => `
+    tbody.innerHTML = resellers.map(r => {
+      const packageName = r.package_name || 'Standard';
+      const usedMin = r.quota?.used_minutes || 0;
+      const totalMin = r.quota?.total_minutes || 0;
+      const ratePM = r.quota?.wholesale_rate_per_minute || 2.0;
+      return `
       <tr>
         <td style="font-weight: 600;">${r.name}</td>
         <td style="font-size: 0.85rem; color: var(--text-muted);">${r.email}</td>
         <td style="font-size: 0.85rem; font-family: monospace;">${r.domain || r.subdomain || '—'}</td>
-        <td style="font-size: 0.85rem;">
-          <strong>${r.quota?.used_minutes || 0}</strong> / ${r.quota?.total_minutes || 0} min
+        <td>
+          <span style="background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">${packageName}</span>
         </td>
-        <td style="font-size: 0.85rem; color: var(--color-cyan); font-weight: 600;">
-          ₹${r.quota?.wholesale_rate_per_minute || 2.0}/min
+        <td style="font-size: 0.85rem;">
+          <strong>${usedMin}</strong> / ${totalMin} min
+          <div style="width: 80px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 4px; margin-top: 4px; overflow: hidden;">
+            <div style="width: ${totalMin > 0 ? Math.min(100, Math.round((usedMin/totalMin)*100)) : 0}%; height: 100%; background: linear-gradient(90deg, #06b6d4, #8b5cf6); border-radius: 4px;"></div>
+          </div>
         </td>
         <td style="font-size: 0.85rem;">${r.client_count || 0} clients</td>
         <td>
           <span class="badge ${r.status === 'active' ? 'badge-green' : 'badge-red'}" style="padding: 2px 8px; border-radius: 100px; font-size: 0.75rem; font-weight: 600;">${r.status}</span>
         </td>
         <td style="text-align: right;">
-          <button onclick="window.editResellerQuota('${r.id}', ${r.quota?.total_minutes||1000}, ${r.quota?.wholesale_rate_per_minute||2.0})" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; margin-right: 4px;">Quota &amp; Rate</button>
+          <button onclick="window.openResellerPackageModal('${r.id}', '${r.name}', ${totalMin}, ${ratePM}, '${packageName}', ${r.permissions?.max_clients || 10})" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; margin-right: 4px;">📦 Package</button>
+          <button onclick="window.rechargeResellerWallet('${r.id}', '${r.name}', ${usedMin}, ${totalMin})" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; margin-right: 4px; color: #10b981; border-color: rgba(16,185,129,0.3);">💰 Wallet</button>
           <button onclick="window.toggleResellerStatus('${r.id}', '${r.status}')" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; margin-right: 4px;">${r.status === 'active' ? 'Suspend' : 'Activate'}</button>
           <button onclick="window.deleteReseller('${r.id}', '${r.name}')" class="btn btn-danger" style="padding: 3px 8px; font-size: 0.75rem; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3);">Delete</button>
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
   } catch (err) {
     console.error('Fetch resellers error:', err);
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 20px;">Connection error loading resellers.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 20px;">Connection error loading resellers.</td></tr>';
   }
+};
+
+// Package & Permissions Modal for Reseller
+window.openResellerPackageModal = function(id, name, currentTotal, currentRate, currentPackage, currentMaxClients) {
+  // Create or reuse modal
+  let modal = document.getElementById('reseller-package-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'reseller-package-modal';
+    modal.style.cssText = 'display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;';
+    modal.innerHTML = `
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 28px; width: 500px; max-width: 95vw; max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-main);">📦 Reseller Package Settings</div>
+            <div id="rp-reseller-name" style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;"></div>
+          </div>
+          <button onclick="document.getElementById('reseller-package-modal').style.display='none'" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer;">✕</button>
+        </div>
+
+        <input type="hidden" id="rp-reseller-id">
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px;">
+          <div>
+            <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 5px;">Package Name</label>
+            <input id="rp-package-name" placeholder="e.g. Starter, Pro, Enterprise" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; outline: none; width: 100%;">
+          </div>
+          <div>
+            <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 5px;">Max Clients Allowed</label>
+            <input id="rp-max-clients" type="number" min="1" placeholder="e.g. 10" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; outline: none; width: 100%;">
+          </div>
+          <div>
+            <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 5px;">Total Minute Quota</label>
+            <input id="rp-total-minutes" type="number" min="0" placeholder="e.g. 1000" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; outline: none; width: 100%;">
+          </div>
+          <div>
+            <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 5px;">Wholesale Rate (₹/min)</label>
+            <input id="rp-rate" type="number" step="0.5" min="0" placeholder="e.g. 2.0" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; outline: none; width: 100%;">
+          </div>
+        </div>
+
+        <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin-bottom: 18px;">
+          <div style="font-size: 0.85rem; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">🔒 Feature Permissions</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="rp-perm-crm" style="accent-color: #8b5cf6; width: 14px; height: 14px;"> CRM Integration
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="rp-perm-recording" style="accent-color: #8b5cf6; width: 14px; height: 14px;"> Call Recordings
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="rp-perm-api" style="accent-color: #8b5cf6; width: 14px; height: 14px;"> API Access
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="rp-perm-landing" style="accent-color: #8b5cf6; width: 14px; height: 14px;"> Edit Landing Page
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="rp-perm-custom-domain" style="accent-color: #8b5cf6; width: 14px; height: 14px;"> Custom Domain
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="rp-perm-transcripts" style="accent-color: #8b5cf6; width: 14px; height: 14px;"> View Transcripts
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="rp-perm-pricing" style="accent-color: #8b5cf6; width: 14px; height: 14px;"> Set Client Pricing
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="rp-perm-callio-brand" style="accent-color: #8b5cf6; width: 14px; height: 14px;"> Show Callio Branding
+            </label>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button onclick="window.saveResellerPackage()" style="flex: 2; background: linear-gradient(135deg, #8b5cf6, #06b6d4); color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.9rem;">💾 Save Package Settings</button>
+          <button onclick="document.getElementById('reseller-package-modal').style.display='none'" style="flex: 1; background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-color); padding: 10px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 0.85rem;">Cancel</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  // Populate fields
+  document.getElementById('rp-reseller-id').value = id;
+  document.getElementById('rp-reseller-name').textContent = `Editing: ${name}`;
+  document.getElementById('rp-package-name').value = currentPackage || 'Standard';
+  document.getElementById('rp-max-clients').value = currentMaxClients || 10;
+  document.getElementById('rp-total-minutes').value = currentTotal || 1000;
+  document.getElementById('rp-rate').value = currentRate || 2.0;
+
+  // Load current permissions from fetched reseller data
+  const resellerRow = window._cachedResellers?.find(r => r.id === id);
+  if (resellerRow?.permissions) {
+    const p = resellerRow.permissions;
+    document.getElementById('rp-perm-crm').checked = !!p.can_use_crm;
+    document.getElementById('rp-perm-recording').checked = !!p.can_use_recording;
+    document.getElementById('rp-perm-api').checked = !!p.can_use_api;
+    document.getElementById('rp-perm-landing').checked = !!p.can_edit_landing_page;
+    document.getElementById('rp-perm-custom-domain').checked = !!p.can_use_custom_domain;
+    document.getElementById('rp-perm-transcripts').checked = !!p.can_view_call_transcripts;
+    document.getElementById('rp-perm-pricing').checked = !!p.can_set_pricing;
+    document.getElementById('rp-perm-callio-brand').checked = !!p.show_callio_branding;
+  }
+
+  modal.style.display = 'flex';
+};
+
+window.saveResellerPackage = async function() {
+  const id = document.getElementById('rp-reseller-id').value;
+  const packageName = document.getElementById('rp-package-name').value.trim() || 'Standard';
+  const maxClients = parseInt(document.getElementById('rp-max-clients').value) || 10;
+  const totalMinutes = parseFloat(document.getElementById('rp-total-minutes').value) || 1000;
+  const rate = parseFloat(document.getElementById('rp-rate').value) || 2.0;
+  const adminPass = localStorage.getItem('adminPassword') || 'admin123';
+
+  const permissions = {
+    can_add_clients: true,
+    max_clients: maxClients,
+    can_set_pricing: document.getElementById('rp-perm-pricing').checked,
+    can_use_crm: document.getElementById('rp-perm-crm').checked,
+    can_use_recording: document.getElementById('rp-perm-recording').checked,
+    can_use_api: document.getElementById('rp-perm-api').checked,
+    can_edit_landing_page: document.getElementById('rp-perm-landing').checked,
+    can_use_custom_domain: document.getElementById('rp-perm-custom-domain').checked,
+    show_callio_branding: document.getElementById('rp-perm-callio-brand').checked,
+    can_view_call_transcripts: document.getElementById('rp-perm-transcripts').checked
+  };
+
+  try {
+    // Update quota + rate
+    const rQuota = await fetch(`/api/admin/resellers/${id}/quota`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_password: adminPass, total_minutes: totalMinutes, wholesale_rate_per_minute: rate })
+    });
+    // Update permissions + package_name
+    const rPerms = await fetch(`/api/admin/resellers/${id}/permissions`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_password: adminPass, permissions, package_name: packageName })
+    });
+    const d1 = await rQuota.json();
+    const d2 = await rPerms.json();
+    if (d1.success && d2.success) {
+      document.getElementById('reseller-package-modal').style.display = 'none';
+      window.fetchAdminResellers();
+    } else {
+      alert('Error: ' + (d1.error || d2.error || 'Unknown error'));
+    }
+  } catch(e) { alert('Failed to save package: ' + e.message); }
+};
+
+window.rechargeResellerWallet = async function(id, name, usedMin, totalMin) {
+  const addMins = prompt(`Reseller: ${name}\nCurrent Quota: ${usedMin} used / ${totalMin} total minutes\n\nAdd minutes to quota:`, '500');
+  if (addMins === null) return;
+  const addAmount = parseFloat(addMins);
+  if (isNaN(addAmount) || addAmount <= 0) { alert('Please enter a valid number of minutes.'); return; }
+
+  const adminPass = localStorage.getItem('adminPassword') || 'admin123';
+  try {
+    const res = await fetch(`/api/admin/resellers/${id}/quota`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_password: adminPass, total_minutes: totalMin + addAmount })
+    });
+    const d = await res.json();
+    if (d.success) {
+      alert(`✅ Added ${addAmount} minutes to ${name}'s wallet!\nNew total: ${totalMin + addAmount} minutes.`);
+      window.fetchAdminResellers();
+    } else {
+      alert('Error: ' + d.error);
+    }
+  } catch(e) { alert('Failed to recharge wallet: ' + e.message); }
 };
 
 window.openCreateResellerModal = async function() {
@@ -8811,3 +8990,18 @@ window.toggleCallingCredentials = function() {
   }
 };
 
+// Admin Panel Uptime Counter
+(function() {
+  const startTime = Date.now();
+  function updateUptime() {
+    const el = document.getElementById('admin-uptime-display');
+    if (!el) return;
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const h = Math.floor(elapsed / 3600);
+    const m = Math.floor((elapsed % 3600) / 60);
+    const s = elapsed % 60;
+    el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  updateUptime();
+  window._adminUptimeInterval = window.setInterval(updateUptime, 1000);
+})();

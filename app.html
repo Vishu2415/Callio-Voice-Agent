@@ -1480,8 +1480,7 @@
             </div>
             <div style="display: flex; gap: 2rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-muted);">
               <div>ENVIRONMENT: <strong style="color: #10b981;">PRODUCTION LIVE</strong></div>
-              <div>FRONTEND PORT: <strong style="color: var(--text-main);">5050</strong></div>
-              <div>BACKEND PORT: <strong style="color: var(--text-main);">5050</strong></div>
+              <div>UPTIME: <strong id="admin-uptime-display" style="color: var(--text-main);">—</strong></div>
             </div>
             <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
               SPACING TOOL: 
@@ -1792,15 +1791,16 @@
                     <th>Reseller Name</th>
                     <th>Email</th>
                     <th>Subdomain / Domain</th>
+                    <th>Package</th>
                     <th>Quota (Used / Total)</th>
                     <th>Wholesale Rate</th>
                     <th>Clients</th>
                     <th>Status</th>
-                    <th style="text-align: right; width: 280px;">Actions</th>
+                    <th style="text-align: right; width: 300px;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="admin-resellers-table-body">
-                  <tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">Loading resellers...</td></tr>
+                  <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">Loading resellers...</td></tr>
                 </tbody>
               </table>
             </div>
