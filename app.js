@@ -725,12 +725,13 @@ window.closeAllActionCardsModal = function() {
 window.currentMetricModalType = 'failed';
 
 window.openMetricDetailsModal = function(type) {
+  console.log('[openMetricDetailsModal] Triggered with type:', type);
   window.currentMetricModalType = type || 'total';
   let modal = document.getElementById('dashboard-metric-detail-modal');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'dashboard-metric-detail-modal';
-    modal.style.cssText = 'display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:999999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(6px);';
+    modal.style.cssText = 'display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(8px);';
     modal.onclick = function(e) { if (e.target === modal) window.closeMetricDetailsModal(); };
     modal.innerHTML = `
       <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:20px; width:760px; max-width:95vw; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.5); overflow:hidden;">
@@ -761,13 +762,18 @@ window.openMetricDetailsModal = function(type) {
   const searchInput = document.getElementById('metric-modal-search');
   if (searchInput) searchInput.value = '';
   
-  modal.style.display = 'flex';
+  modal.style.setProperty('display', 'flex', 'important');
+  modal.style.setProperty('visibility', 'visible', 'important');
+  modal.style.setProperty('opacity', '1', 'important');
+  
   window.renderMetricDetailsModalContent();
 };
 
 window.closeMetricDetailsModal = function() {
   const modal = document.getElementById('dashboard-metric-detail-modal');
-  if (modal) modal.style.display = 'none';
+  if (modal) {
+    modal.style.setProperty('display', 'none', 'important');
+  }
 };
 
 window.triggerLeadCall = function(phone) {
