@@ -2027,6 +2027,7 @@ async function refreshCallsList() {
     const data = await res.json();
     if (data.success) {
       callsCache = data.calls;
+      window.callsCache = callsCache; // expose globally for metric modals
       
       if (typeof updateDashboardWithClientCalls === 'function') {
         updateDashboardWithClientCalls(callsCache);
@@ -5587,6 +5588,7 @@ async function refreshCallsListForDashboard() {
     const data = await res.json();
     if (data.success) {
       callsCache = data.calls;
+      window.callsCache = callsCache; // expose globally for metric modals
       // Re-render dashboard with full history
       updateDashboardWithClientCalls(callsCache);
       renderCallsSidebar();
