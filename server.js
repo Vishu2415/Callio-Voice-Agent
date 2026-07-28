@@ -91,6 +91,31 @@ const crmLogsDb = new Map();
 const clientsDb = new Map();
 const callbacksDb = new Map();
 const plansDb = new Map();
+const broadcastsDb = new Map();
+const BROADCASTS_DB_FILE = './broadcasts_db.json';
+
+function loadBroadcasts() {
+  try {
+    if (fs.existsSync(BROADCASTS_DB_FILE)) {
+      const raw = fs.readFileSync(BROADCASTS_DB_FILE, 'utf8');
+      const data = JSON.parse(raw);
+      for (const [k, v] of Object.entries(data)) {
+        broadcastsDb.set(k, v);
+      }
+    }
+  } catch (err) {
+    console.error('[Startup] Failed to load broadcasts:', err.message);
+  }
+}
+
+function saveBroadcasts() {
+  try {
+    const data = Object.fromEntries(broadcastsDb.entries());
+    fs.writeFileSync(BROADCASTS_DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[Database] Failed to save broadcasts:', err.message);
+  }
+}
 
 const BRANDING_DB_FILE = './branding_db.json';
 const brandingDb = new Map();
@@ -3312,81 +3337,202 @@ app.post('/api/webhooks/crm-trigger-call', express.json(), async (req, res) => {
 });
 
 
-// --- BROADCAST API ---
-app.post('/api/broadcast', async (req, res) => {
-  const { agentId, groupId, provider, publicUrl } = req.body;
-  
-  if (!agentId || !groupId || !publicUrl) {
-    return res.status(400).json({ success: false, error: 'agentId, groupId, and publicUrl required' });
+// --- BROADCAST API & SCHEDULER ---
+
+app.get('/api/broadcasts', authMiddleware('calls'), (req, res) => {
+  const { clientId } = req.query;
+  let list = Array.from(broadcastsDb.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  if (clientId && clientId !== 'admin') {
+    list = list.filter(b => b.clientId === clientId);
   }
-  
-  const agent = agentsDb.get(agentId);
-  if (!agent) return res.status(404).json({ success: false, error: 'Agent not found' });
-  
-  const contacts = Array.from(contactsDb.values()).filter(c => c.groupId === groupId);
-  if (contacts.length === 0) return res.status(400).json({ success: false, error: 'No contacts in this group' });
-  
-  // Return success immediately and process in background
-  res.json({ success: true, totalContacts: contacts.length, message: 'Broadcast started' });
-  
-  console.log(`[Broadcast] Starting broadcast for Group ${groupId} using Agent ${agent.name} (${contacts.length} contacts)`);
-  
-  // Create a mood-injected system instruction if mood isn't 'Professional'
-  let finalInstruction = agent.systemInstruction;
+  res.json({ success: true, broadcasts: list });
+});
+
+app.delete('/api/broadcasts/:id', authMiddleware('calls'), (req, res) => {
+  const { id } = req.params;
+  if (broadcastsDb.has(id)) {
+    broadcastsDb.delete(id);
+    saveBroadcasts();
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ success: false, error: 'Broadcast record not found' });
+  }
+});
+
+async function executeBroadcastCalls(broadcastId, agent, contacts, reqBody = {}) {
+  const record = broadcastsDb.get(broadcastId);
+  if (!record) return;
+
+  record.status = 'running';
+  saveBroadcasts();
+
+  console.log(`[Broadcast Engine] Executing Campaign ID=${broadcastId} for Target=${record.targetLabel} (${contacts.length} contacts)...`);
+
+  let finalInstruction = agent.systemInstruction || defaultCallConfig.systemInstruction || '';
   if (agent.name) {
-    finalInstruction = `[IDENTITY DIRECTIVE: Your name is "${agent.name}". You must introduce yourself as "${agent.name}" and identify as "${agent.name}" if asked for your name. In Hindi/Hinglish, you can say "Mera naam ${agent.name} hai".]\n\n` + finalInstruction;
+    finalInstruction = `[IDENTITY DIRECTIVE: Your name is "${agent.name}". You must introduce yourself as "${agent.name}".]\n\n` + finalInstruction;
   }
   if (agent.mood && agent.mood !== 'Professional') {
     finalInstruction = `[MOOD DIRECTIVE: You must act and speak in a ${agent.mood.toUpperCase()} mood at all times.]\n\n` + finalInstruction;
   }
-  
-  // We will call the existing /make-call logic for each contact with a delay
-  // We'll reuse the logic from /make-call but do it directly here using fetch to our own server, 
-  // or by abstracting the make-call logic. Since /make-call is an Express route, calling our own localhost is easiest.
-  
+
   const localCallUrl = `http://localhost:${PORT}/make-call`;
-  
+
   for (let i = 0; i < contacts.length; i++) {
     const contact = contacts[i];
-    console.log(`[Broadcast] Queuing call to ${contact.phone} (${i+1}/${contacts.length})...`);
-    
-    // Grab the global configurations since credentials are still stored globally for now
-    const globalConfigData = {
-      provider: provider || 'vobiz',
+    const currentRec = broadcastsDb.get(broadcastId);
+    if (!currentRec || currentRec.status === 'canceled') {
+      console.log(`[Broadcast Engine ${broadcastId}] Campaign canceled mid-execution.`);
+      break;
+    }
+
+    console.log(`[Broadcast Engine ${broadcastId}] Queuing call to ${contact.phone} (${i+1}/${contacts.length})...`);
+
+    const callPayload = {
+      provider: defaultCallConfig.telephonyProvider || 'vobiz',
       to: contact.phone,
-      name: contact.name,
-      publicUrl,
-      voice: agent.voice,
+      name: contact.name || 'Customer',
+      publicUrl: reqBody.publicUrl || defaultCallConfig.publicUrl || '',
+      voice: agent.voice || defaultCallConfig.voice,
       systemInstruction: finalInstruction,
-      recordCall: defaultCallConfig.recordCall || true,
-      
-      exotelApiKey: req.body.exotelApiKey,
-      exotelApiToken: req.body.exotelApiToken,
-      exotelAccountSid: req.body.exotelAccountSid,
-      exotelSubdomain: req.body.exotelSubdomain,
-      exotelCallerId: req.body.exotelCallerId,
-      
-      vobizAuthId: req.body.vobizAuthId,
-      vobizAuthToken: req.body.vobizAuthToken,
-      vobizCallerId: req.body.vobizCallerId,
-      clientId: req.body.clientId || req.body.client_id || agent.clientId || agent.client_id || null
+      recordCall: true,
+      model: agent.model || defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
+      clientId: reqBody.clientId || agent.clientId || null,
+
+      exotelApiKey: reqBody.exotelApiKey || defaultCallConfig.exotelApiKey,
+      exotelApiToken: reqBody.exotelApiToken || defaultCallConfig.exotelApiToken,
+      exotelAccountSid: reqBody.exotelAccountSid || defaultCallConfig.exotelAccountSid,
+      exotelSubdomain: reqBody.exotelSubdomain || defaultCallConfig.exotelSubdomain || 'api.exotel.com',
+      exotelCallerId: reqBody.exotelCallerId || defaultCallConfig.exotelCallerId,
+
+      vobizAuthId: reqBody.vobizAuthId || defaultCallConfig.vobizAuthId,
+      vobizAuthToken: reqBody.vobizAuthToken || defaultCallConfig.vobizAuthToken,
+      vobizCallerId: reqBody.vobizCallerId || defaultCallConfig.vobizCallerId
     };
-    
+
     try {
       fetch(localCallUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(globalConfigData)
-      }).catch(err => console.error(`[Broadcast Error] Failed calling ${contact.phone}:`, err.message));
+        body: JSON.stringify(callPayload)
+      }).catch(err => console.error(`[Broadcast Engine Error] Failed dialing ${contact.phone}:`, err.message));
+
+      record.dialedCount = (record.dialedCount || 0) + 1;
+      saveBroadcasts();
     } catch(e) {}
-    
-    // Wait 5 seconds between each call initiation to prevent rate limiting
+
     if (i < contacts.length - 1) {
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
-  console.log(`[Broadcast] Broadcast for Group ${groupId} completed.`);
+
+  const finalRec = broadcastsDb.get(broadcastId);
+  if (finalRec && finalRec.status === 'running') {
+    finalRec.status = 'completed';
+    saveBroadcasts();
+    console.log(`[Broadcast Engine ${broadcastId}] Broadcast completed cleanly.`);
+  }
+}
+
+app.post('/api/broadcast', async (req, res) => {
+  const { agentId, targetType, targetLabel, mode, scheduledAt, publicUrl, clientId } = req.body;
+  
+  if (!agentId) {
+    return res.status(400).json({ success: false, error: 'agentId is required' });
+  }
+  
+  const agent = agentsDb.get(agentId);
+  if (!agent) return res.status(404).json({ success: false, error: 'Agent not found' });
+
+  // Resolve contacts to dial
+  let allContacts = Array.from(contactsDb.values());
+  if (clientId && clientId !== 'admin') {
+    allContacts = allContacts.filter(c => c.clientId === clientId);
+  }
+
+  let contacts = allContacts;
+  if (targetType && targetType.startsWith('tag_')) {
+    const tagName = targetType.replace('tag_', '').toLowerCase();
+    contacts = allContacts.filter(c => (c.tag || 'Default').toLowerCase() === tagName);
+  } else if (targetType && targetType !== 'all') {
+    contacts = allContacts.filter(c => c.groupId === targetType);
+  }
+
+  if (contacts.length === 0) {
+    return res.status(400).json({ success: false, error: 'No contacts found in selected target' });
+  }
+
+  const broadcastId = 'bcast_' + Date.now();
+  const bcastRecord = {
+    id: broadcastId,
+    clientId: clientId || null,
+    agentId,
+    agentName: agent.name,
+    targetType: targetType || 'all',
+    targetLabel: targetLabel || 'All Contacts',
+    mode: mode || 'now',
+    scheduledAt: scheduledAt || null,
+    totalContacts: contacts.length,
+    dialedCount: 0,
+    connectedCount: 0,
+    failedCount: 0,
+    status: mode === 'schedule' ? 'scheduled' : 'running',
+    createdAt: new Date().toISOString()
+  };
+
+  broadcastsDb.set(broadcastId, bcastRecord);
+  saveBroadcasts();
+
+  if (mode === 'schedule') {
+    return res.json({ 
+      success: true, 
+      message: `✅ Broadcast scheduled for ${new Date(scheduledAt).toLocaleString()}`, 
+      broadcast: bcastRecord 
+    });
+  }
+
+  res.json({ 
+    success: true, 
+    message: `⚡ Broadcast started! Dialing ${contacts.length} contacts in background.`, 
+    totalContacts: contacts.length, 
+    broadcast: bcastRecord 
+  });
+
+  // Process instant broadcast in background
+  executeBroadcastCalls(broadcastId, agent, contacts, req.body);
 });
+
+// Background Cron for Scheduled Broadcasts
+setInterval(async () => {
+  const now = new Date();
+  for (const [id, bcast] of broadcastsDb.entries()) {
+    if (bcast.status !== 'scheduled' || !bcast.scheduledAt) continue;
+
+    let schedTime = new Date(bcast.scheduledAt);
+    if (schedTime <= now) {
+      console.log(`[Broadcast Scheduler] ⏰ Due scheduled broadcast ID=${id}. Executing...`);
+      const agent = agentsDb.get(bcast.agentId);
+      let allContacts = Array.from(contactsDb.values());
+      if (bcast.clientId && bcast.clientId !== 'admin') {
+        allContacts = allContacts.filter(c => c.clientId === bcast.clientId);
+      }
+      let targetContacts = allContacts;
+      if (bcast.targetType && bcast.targetType.startsWith('tag_')) {
+        const tagName = bcast.targetType.replace('tag_', '').toLowerCase();
+        targetContacts = allContacts.filter(c => (c.tag || 'Default').toLowerCase() === tagName);
+      } else if (bcast.targetType && bcast.targetType !== 'all') {
+        targetContacts = allContacts.filter(c => c.groupId === bcast.targetType);
+      }
+
+      if (agent && targetContacts.length > 0) {
+        executeBroadcastCalls(id, agent, targetContacts, { clientId: bcast.clientId });
+      } else {
+        bcast.status = 'failed';
+        saveBroadcasts();
+      }
+    }
+  }
+}, 30 * 1000); // Check every 30 seconds
 
 
 // ==========================================

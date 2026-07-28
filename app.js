@@ -3392,6 +3392,64 @@ document.getElementById('btn-save-default-incoming-agent')?.addEventListener('cl
 
 // ──────────────────────────────────────────────────────────────────────────────
 
+window.broadcastMode = 'now';
+
+window.setBroadcastMode = function(mode) {
+  window.broadcastMode = mode;
+  const btnNow = document.getElementById('btn-mode-now');
+  const btnSchedule = document.getElementById('btn-mode-schedule');
+  const wrapper = document.getElementById('broadcast-schedule-wrapper');
+
+  if (mode === 'now') {
+    if (btnNow) {
+      btnNow.style.borderColor = 'var(--color-cyan)';
+      btnNow.style.background = 'rgba(6, 182, 212, 0.15)';
+      btnNow.style.color = 'var(--color-cyan)';
+      btnNow.style.fontWeight = '700';
+    }
+    if (btnSchedule) {
+      btnSchedule.style.borderColor = 'var(--border-color)';
+      btnSchedule.style.background = 'var(--bg-surface)';
+      btnSchedule.style.color = 'var(--text-muted)';
+      btnSchedule.style.fontWeight = '600';
+    }
+    if (wrapper) wrapper.style.display = 'none';
+  } else {
+    if (btnSchedule) {
+      btnSchedule.style.borderColor = 'var(--color-cyan)';
+      btnSchedule.style.background = 'rgba(6, 182, 212, 0.15)';
+      btnSchedule.style.color = 'var(--color-cyan)';
+      btnSchedule.style.fontWeight = '700';
+    }
+    if (btnNow) {
+      btnNow.style.borderColor = 'var(--border-color)';
+      btnNow.style.background = 'var(--bg-surface)';
+      btnNow.style.color = 'var(--text-muted)';
+      btnNow.style.fontWeight = '600';
+    }
+    if (wrapper) wrapper.style.display = 'block';
+  }
+};
+
+window.updateBroadcastAudienceBadge = function() {
+  const select = document.getElementById('broadcast-group-select');
+  const countEl = document.getElementById('broadcast-target-count');
+  if (!select || !countEl) return;
+
+  const targetVal = select.value;
+  const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
+
+  if (targetVal === 'all') {
+    countEl.innerText = allContacts.length;
+  } else if (targetVal.startsWith('tag_')) {
+    const tagName = targetVal.replace('tag_', '');
+    const count = allContacts.filter(c => (c.tag || 'Default').toLowerCase() === tagName.toLowerCase()).length;
+    countEl.innerText = count;
+  } else {
+    const group = (localGroupsCache || []).find(g => g.id === targetVal);
+    countEl.innerText = group && group.contacts ? group.contacts.length : 0;
+  }
+};
 
 async function fetchGroupsForDropdowns() {
   try {
@@ -3399,45 +3457,88 @@ async function fetchGroupsForDropdowns() {
     const res = await fetch(`/api/groups?clientId=${clientId}`);
     const data = await res.json();
     if (data.success) {
+      localGroupsCache = data.groups;
       const bSelect = document.getElementById('broadcast-group-select');
-      let opts = '<option value="">-- Choose Group --</option>';
-      data.groups.forEach(g => {
-        opts += `<option value="${g.id}">${escapeHtml(g.name)} (${g.contacts.length} contacts)</option>`;
+      const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
+
+      let opts = `<option value="all" selected>👥 All Contacts (${allContacts.length} total)</option>`;
+
+      const uniqueTags = Array.from(new Set(allContacts.map(c => c.tag || 'Default'))).filter(Boolean);
+      uniqueTags.forEach(t => {
+        const count = allContacts.filter(c => (c.tag || 'Default') === t).length;
+        opts += `<option value="tag_${escapeHtml(t)}">🏷️ Tag: ${escapeHtml(t)} (${count} contacts)</option>`;
       });
-      if (bSelect) bSelect.innerHTML = opts;
+
+      if (bSelect) {
+        bSelect.innerHTML = opts;
+        window.updateBroadcastAudienceBadge();
+      }
     }
   } catch (e) {}
 }
 
-// --- 4. BROADCAST ACTION ---
-document.getElementById('btn-start-broadcast')?.addEventListener('click', async () => {
+window.handleStartBroadcastClick = async function() {
   const agentId = document.getElementById('broadcast-agent-select').value;
-  const groupId = document.getElementById('broadcast-group-select').value;
-  const provider = document.getElementById('broadcast-provider').value;
-  const publicUrl = document.getElementById('public-url').value;
-  
-  if (!agentId || !groupId) {
-    alert("Please select both an Agent and a Contact Group.");
+  const targetVal = document.getElementById('broadcast-group-select').value;
+  const publicUrl = document.getElementById('public-url')?.value || '';
+  const mode = window.broadcastMode || 'now';
+  const scheduleTime = document.getElementById('broadcast-schedule-time')?.value || '';
+
+  if (!agentId) {
+    alert("Please select an AI Agent.");
     return;
   }
-  
-  if (!confirm("Are you sure you want to start bulk calling this entire group?")) return;
-  
+
+  if (mode === 'schedule' && !scheduleTime) {
+    alert("Please select a valid Date & Time for scheduled broadcast.");
+    return;
+  }
+
+  const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
+  let targetContacts = allContacts;
+  let targetLabel = "All Contacts";
+
+  if (targetVal.startsWith('tag_')) {
+    const tagName = targetVal.replace('tag_', '');
+    targetContacts = allContacts.filter(c => (c.tag || 'Default').toLowerCase() === tagName.toLowerCase());
+    targetLabel = `Tag: ${tagName}`;
+  } else if (targetVal !== 'all') {
+    const group = (localGroupsCache || []).find(g => g.id === targetVal);
+    if (group) {
+      targetContacts = group.contacts || [];
+      targetLabel = `Group: ${group.name}`;
+    }
+  }
+
+  if (targetContacts.length === 0) {
+    alert("No contacts found in selected audience target.");
+    return;
+  }
+
+  const actionMsg = mode === 'schedule' 
+    ? `Schedule broadcast for ${targetContacts.length} contacts on ${new Date(scheduleTime).toLocaleString()}?`
+    : `Start bulk calling ${targetContacts.length} contacts right now?`;
+
+  if (!confirm(actionMsg)) return;
+
   const payload = {
     agentId,
-    groupId,
-    provider,
+    targetType: targetVal,
+    targetLabel,
+    mode,
+    scheduledAt: mode === 'schedule' ? scheduleTime : null,
     publicUrl,
-    exotelApiKey: elExotelApiKey.value,
-    exotelApiToken: elExotelApiToken.value,
-    exotelAccountSid: elExotelAccountSid.value,
-    exotelSubdomain: elExotelSubdomain.value,
-    exotelCallerId: elExotelCallerId.value,
-    vobizAuthId: elVobizAuthId.value,
-    vobizAuthToken: elVobizAuthToken.value,
-    vobizCallerId: elVobizCallerId.value
+    clientId: loggedInUser ? loggedInUser.id : null,
+    exotelApiKey: elExotelApiKey?.value || '',
+    exotelApiToken: elExotelApiToken?.value || '',
+    exotelAccountSid: elExotelAccountSid?.value || '',
+    exotelSubdomain: elExotelSubdomain?.value || '',
+    exotelCallerId: elExotelCallerId?.value || '',
+    vobizAuthId: elVobizAuthId?.value || '',
+    vobizAuthToken: elVobizAuthToken?.value || '',
+    vobizCallerId: elVobizCallerId?.value || ''
   };
-  
+
   try {
     const res = await fetch('/api/broadcast', {
       method: 'POST',
@@ -3446,16 +3547,99 @@ document.getElementById('btn-start-broadcast')?.addEventListener('click', async 
     });
     const data = await res.json();
     if (data.success) {
-      alert(`Broadcast Initiated! Dialing ${data.totalContacts} contacts in the background.`);
-      // Switch to dashboard tab
-      document.querySelector('.glass-navbar .nav-btn[data-tab="tab-recordings"]').click();
+      alert(data.message || (mode === 'schedule' ? '✅ Broadcast Scheduled Successfully!' : '⚡ Broadcast Started Successfully!'));
+      window.fetchRecentBroadcasts();
     } else {
-      alert("Error starting broadcast: " + data.error);
+      alert("Failed to start broadcast: " + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert("Error starting broadcast: " + err.message);
+  }
+};
+
+window.fetchRecentBroadcasts = async function() {
+  try {
+    const clientId = loggedInUser ? loggedInUser.id : '';
+    const res = await fetch(`/api/broadcasts?clientId=${clientId}`);
+    const data = await res.json();
+    if (data.success) {
+      window.renderRecentBroadcastsTable(data.broadcasts || []);
     }
   } catch (e) {
-    alert("Network error while starting broadcast.");
+    console.error("Failed to fetch recent broadcasts", e);
   }
-});
+};
+
+window.renderRecentBroadcastsTable = function(broadcasts) {
+  const tbody = document.getElementById('recent-broadcasts-table-body');
+  if (!tbody) return;
+
+  if (!broadcasts || broadcasts.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 3rem 1.5rem; color: var(--text-muted);">
+          <div style="font-size: 1.8rem; margin-bottom: 6px;">📡</div>
+          <p style="margin: 0; font-size: 0.82rem;">No recent broadcast campaigns found.</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = '';
+  broadcasts.forEach(b => {
+    const dateStr = b.scheduledAt ? new Date(b.scheduledAt).toLocaleString() : new Date(b.createdAt).toLocaleString();
+    let statusPill = '';
+    if (b.status === 'running') {
+      statusPill = `<span style="background: rgba(6,182,212,0.15); color: var(--color-cyan); font-size: 0.72rem; padding: 3px 8px; border-radius: 10px; font-weight: 700; border: 1px solid var(--color-cyan);">RUNNING</span>`;
+    } else if (b.status === 'scheduled') {
+      statusPill = `<span style="background: rgba(234,179,8,0.15); color: #eab308; font-size: 0.72rem; padding: 3px 8px; border-radius: 10px; font-weight: 700; border: 1px solid #eab308;">SCHEDULED</span>`;
+    } else if (b.status === 'completed') {
+      statusPill = `<span style="background: rgba(16,185,129,0.15); color: #10b981; font-size: 0.72rem; padding: 3px 8px; border-radius: 10px; font-weight: 700; border: 1px solid #10b981;">COMPLETED</span>`;
+    } else {
+      statusPill = `<span style="background: rgba(239,68,68,0.15); color: #ef4444; font-size: 0.72rem; padding: 3px 8px; border-radius: 10px; font-weight: 700; border: 1px solid #ef4444;">${escapeHtml((b.status || '').toUpperCase())}</span>`;
+    }
+
+    html += `
+      <tr>
+        <td style="font-weight: 600; color: var(--text-main); font-size: 0.88rem;">
+          <div>${escapeHtml(b.agentName || 'AI Agent')}</div>
+          <div style="font-size: 0.75rem; color: var(--color-cyan); font-weight: 500; margin-top: 2px;">Target: ${escapeHtml(b.targetLabel || 'All Contacts')}</div>
+        </td>
+        <td style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">
+          ${b.mode === 'schedule' ? '📅 Scheduled' : '⚡ Instant'}
+        </td>
+        <td>
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-main);">${b.dialedCount || 0} / ${b.totalContacts || 0}</span>
+        </td>
+        <td style="color: var(--text-muted); font-size: 0.8rem;">${dateStr}</td>
+        <td>${statusPill}</td>
+        <td style="text-align: right;">
+          <button onclick="window.deleteBroadcastDirect('${b.id}')" title="Cancel/Delete" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+            Delete
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+};
+
+window.deleteBroadcastDirect = async function(id) {
+  if (!confirm("Are you sure you want to delete this broadcast campaign record?")) return;
+  try {
+    const res = await fetch(`/api/broadcasts/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      window.fetchRecentBroadcasts();
+    } else {
+      alert("Failed to delete broadcast: " + data.error);
+    }
+  } catch (err) {
+    alert("Error deleting broadcast: " + err.message);
+  }
+};
 
 // --- 5. QUICK CALL ACTION ---
 document.getElementById('btn-dial-phone')?.addEventListener('click', async () => {

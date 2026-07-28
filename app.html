@@ -964,57 +964,96 @@
       <!-- TAB 4: Broadcast -->
       <div id="tab-broadcast" class="tab-pane">
         <div class="premium-tab-container">
-          <h2 class="tab-title">Broadcast Campaign</h2>
-          <div class="premium-split-layout equal-cols">
-            <!-- Left: Broadcast Configurator -->
-            <div class="form-card">
+          <div style="margin-bottom: 20px;">
+            <h2 class="tab-title" style="margin: 0;">📡 Broadcast Campaigns</h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Launch real-time AI bulk outbound calls across all contacts or tag-filtered audiences.</p>
+          </div>
+
+          <div class="premium-split-layout">
+            <!-- Left Column: Configure Campaign Form -->
+            <div class="form-card" style="width: 360px; flex-shrink: 0;">
               <h3>Configure Campaign</h3>
-              <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">Select an agent and a contact group to initiate bulk outbound calling.</p>
-              
+              <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1.25rem;">Set up your AI agent, target audience, and execution timing.</p>
+
+              <!-- 1. Select Agent -->
               <div class="form-group">
-                <label>Select Agent</label>
-                <select id="broadcast-agent-select">
+                <label>1. Select AI Agent</label>
+                <select id="broadcast-agent-select" style="width: 100%; padding: 10px 14px; font-size: 0.88rem; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
                   <option value="">-- Choose Agent --</option>
                 </select>
               </div>
-              
+
+              <!-- 2. Target Audience (All Contacts vs Tag-based) -->
               <div class="form-group">
-                <label>Select Contact Group</label>
-                <select id="broadcast-group-select">
-                  <option value="">-- Choose Group --</option>
+                <label>2. Target Audience</label>
+                <select id="broadcast-group-select" onchange="window.updateBroadcastAudienceBadge()" style="width: 100%; padding: 10px 14px; font-size: 0.88rem; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
+                  <option value="all">👥 All Contacts (Default)</option>
+                  <!-- Tag options populated dynamically -->
                 </select>
+                <div id="broadcast-audience-badge" style="font-size: 0.8rem; color: var(--color-cyan); font-weight: 700; margin-top: 6px;">
+                  Targeting: <span id="broadcast-target-count">0</span> Contacts
+                </div>
               </div>
 
+              <!-- 3. Execution Schedule (Broadcast Now vs Scheduled for Later) -->
               <div class="form-group">
-                <label>Telephony Provider</label>
-                <select id="broadcast-provider" class="compact-select">
-                  <option value="freeswitch" selected>FreeSwitch</option>
-                  <option value="twilio">Twilio</option>
-                  <option value="exotel">Exotel</option>
-                  <option value="vobiz">Vobiz</option>
-                </select>
+                <label>3. Campaign Schedule</label>
+                <div style="display: flex; gap: 8px; margin-top: 4px;">
+                  <button type="button" id="btn-mode-now" onclick="window.setBroadcastMode('now')" style="flex: 1; padding: 10px; font-size: 0.82rem; border-radius: 8px; border: 1px solid var(--color-cyan); background: rgba(6, 182, 212, 0.15); color: var(--color-cyan); font-weight: 700; cursor: pointer;">
+                    ⚡ Broadcast Now
+                  </button>
+                  <button type="button" id="btn-mode-schedule" onclick="window.setBroadcastMode('schedule')" style="flex: 1; padding: 10px; font-size: 0.82rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); font-weight: 600; cursor: pointer;">
+                    📅 Schedule for Later
+                  </button>
+                </div>
               </div>
-              
-              <button id="btn-start-broadcast" class="btn btn-primary" style="width: 100%; font-size: 1.05rem; padding: 12px; margin-top: 0.5rem;">Start Broadcast</button>
+
+              <!-- Date & Time Picker for Schedule (Hidden by default) -->
+              <div class="form-group" id="broadcast-schedule-wrapper" style="display: none;">
+                <label>Schedule Date & Time</label>
+                <input type="datetime-local" id="broadcast-schedule-time" style="width: 100%; padding: 10px 14px; font-size: 0.88rem; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
+              </div>
+
+              <button id="btn-start-broadcast" onclick="window.handleStartBroadcastClick()" class="btn btn-primary" style="width: 100%; height: 46px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; margin-top: 1rem; background: var(--grad-cyan-violet); color: #000;">🚀 Launch Broadcast</button>
             </div>
-            
-            <!-- Right: Campaign Analytics / Guide -->
-            <div class="form-card" style="height: 100%;">
-              <h3>Campaign Live Stats</h3>
-              <div class="empty-state" style="border: none; padding: 2.5rem 0;">
-                <div class="empty-state-icon" style="display: flex; align-items: center; justify-content: center;">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; color: var(--text-muted); opacity: 0.4;"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+
+            <!-- Right Column: Live Stats & Recent Campaigns Table -->
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+              <!-- Live Campaign Stats Card -->
+              <div class="vb-card" style="padding: 20px; border-radius: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h3 style="margin: 0; font-size: 1rem;">📊 Live Campaign Progression</h3>
+                  <span id="broadcast-live-status-pill" style="font-size: 0.72rem; padding: 3px 10px; border-radius: 12px; background: rgba(255,255,255,0.06); color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Idle</span>
                 </div>
-                <h4 class="empty-state-title" style="margin-top: 1rem;">No Active Campaign</h4>
-                <p class="empty-state-desc" style="font-size: 0.82rem; line-height: 1.5;">Configure your campaign on the left and click "Start Broadcast". The call progression, connection rates, and live outcomes will be charted here.</p>
+                
+                <div id="broadcast-active-info" style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">
+                  No active broadcast campaign currently running. Select an agent and audience on the left to initiate bulk dialing.
+                </div>
               </div>
-              
-              <div class="alert-card" style="margin-top: 1rem;">
-                <div class="alert-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--color-primary); display: block;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+
+              <!-- Recent Broadcast Campaigns Table -->
+              <div class="vb-card" style="padding: 20px; border-radius: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                  <h3 style="margin: 0; font-size: 1rem;">📋 Recent Broadcast Campaigns</h3>
+                  <button onclick="window.fetchRecentBroadcasts()" style="background: transparent; border: none; color: var(--color-cyan); cursor: pointer; font-size: 0.8rem; font-weight: 600;">🔄 Refresh</button>
                 </div>
-                <div class="alert-text">
-                  <strong>Best Practice:</strong> Keep your System Prompt concise and clear to minimize latency when calling large lists.
+                
+                <div class="table-responsive">
+                  <table class="premium-table">
+                    <thead>
+                      <tr>
+                        <th>Agent & Target</th>
+                        <th>Execution</th>
+                        <th>Recipients</th>
+                        <th>Created / Scheduled</th>
+                        <th>Status</th>
+                        <th style="text-align: right; width: 80px;">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="recent-broadcasts-table-body">
+                      <!-- Dynamically rendered -->
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
