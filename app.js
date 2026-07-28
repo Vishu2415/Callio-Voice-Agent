@@ -747,7 +747,7 @@ window.openMetricDetailsModal = function(type) {
             <div id="metric-modal-subtitle" style="font-size:0.78rem; color:var(--text-muted, #a1a1aa); line-height:1.4;">Detailed call breakdown</div>
           </div>
           <span id="metric-modal-badge" style="background:rgba(6,182,212,0.1); color:var(--color-cyan, #06b6d4); border:1px solid rgba(6,182,212,0.3); padding:4px 12px; border-radius:100px; font-size:0.75rem; font-weight:700; white-space:nowrap;">Count: 0</span>
-          <button onclick="window.closeMetricDetailsModal()" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color, #27272a); color:var(--text-muted, #a1a1aa); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; flex-shrink:0;">✕</button>
+          <button onclick="event.preventDefault(); event.stopPropagation(); window.closeMetricDetailsModal();" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color, #27272a); color:var(--text-muted, #a1a1aa); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; flex-shrink:0;">✕</button>
         </div>
         <div style="padding:14px 24px 0 24px; flex-shrink:0;">
           <input id="metric-modal-search" type="text" placeholder="🔍 Search by phone number or summary..." oninput="window.renderMetricDetailsModalContent()" style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border-color, #27272a); color:var(--text-main, #ffffff); border-radius:10px; padding:10px 14px; font-size:0.85rem; box-sizing:border-box; outline:none;" />
@@ -757,7 +757,7 @@ window.openMetricDetailsModal = function(type) {
         </div>
         <div style="padding:14px 24px; border-top:1px solid var(--border-color, #27272a); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; background:rgba(0,0,0,0.2);">
           <span style="font-size:0.78rem; color:var(--text-muted, #a1a1aa);">Click "Re-call Now" to quickly start a call</span>
-          <button onclick="window.closeMetricDetailsModal()" style="background:linear-gradient(135deg,var(--color-primary, #ea580c),#ae3115); color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.85rem;">Close</button>
+          <button onclick="event.preventDefault(); event.stopPropagation(); window.closeMetricDetailsModal();" style="background:linear-gradient(135deg,var(--color-primary, #ea580c),#ae3115); color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.85rem;">Close</button>
         </div>
       </div>
     `;
@@ -781,10 +781,12 @@ window.openMetricDetailsModal = function(type) {
 };
 
 window.closeMetricDetailsModal = function() {
-  const modal = document.getElementById('dashboard-metric-detail-modal');
-  if (modal) {
+  const modals = document.querySelectorAll('#dashboard-metric-detail-modal');
+  modals.forEach(modal => {
     modal.style.setProperty('display', 'none', 'important');
-  }
+    modal.style.setProperty('visibility', 'hidden', 'important');
+    modal.style.setProperty('opacity', '0', 'important');
+  });
 };
 
 window.triggerLeadCall = function(phone) {
@@ -808,7 +810,23 @@ window.renderMetricDetailsModalContent = function() {
   if (!bodyEl) return;
 
   const searchQuery = (searchInput ? searchInput.value.toLowerCase().trim() : '');
-  const calls = Array.isArray(window.callsCache) ? window.callsCache : [];
+  let calls = Array.isArray(window.callsCache) && window.callsCache.length > 0 ? window.callsCache : (Array.isArray(callsCache) && callsCache.length > 0 ? callsCache : []);
+
+  if (calls.length === 0 && !window._fetchingModalCalls) {
+    window._fetchingModalCalls = true;
+    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.id : '';
+    fetch(`/calls?clientId=${clientId}`)
+      .then(res => res.json())
+      .then(data => {
+        window._fetchingModalCalls = false;
+        if (data.success && Array.isArray(data.calls)) {
+          window.callsCache = data.calls;
+          callsCache = data.calls;
+          window.renderMetricDetailsModalContent();
+        }
+      })
+      .catch(e => { window._fetchingModalCalls = false; });
+  }
 
   let filteredCalls = [];
   let headerTitle = '';
