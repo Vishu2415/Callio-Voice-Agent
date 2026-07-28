@@ -810,8 +810,56 @@ window.renderMetricDetailsModalContent = function() {
   if (!bodyEl) return;
 
   const searchQuery = (searchInput ? searchInput.value.toLowerCase().trim() : '');
+
+  // 1. Resolve Header Metadata FIRST based on modal type
+  let headerTitle = 'All Calls Made Log';
+  let headerSubtitle = 'Complete log of all tracked calls across all statuses.';
+  let headerIcon = '📞';
+  let headerBg = 'rgba(167, 139, 250, 0.15)';
+  let headerColor = '#a78bfa';
+
+  if (type === 'failed') {
+    headerIcon = '❌';
+    headerBg = 'rgba(239, 68, 68, 0.15)';
+    headerColor = '#ef4444';
+    headerTitle = 'Failed & Rejected Calls Overview';
+    headerSubtitle = 'Detailed list of missed or failed calls. See failure reasons and re-dial directly.';
+  } else if (type === 'completed') {
+    headerIcon = '✅';
+    headerBg = 'rgba(6, 182, 212, 0.15)';
+    headerColor = '#06b6d4';
+    headerTitle = 'Completed Calls Log';
+    headerSubtitle = 'Successfully finished calls with AI conversation summaries and call duration.';
+  } else if (type === 'active') {
+    headerIcon = '⚡';
+    headerBg = 'rgba(245, 158, 11, 0.15)';
+    headerColor = '#f59e0b';
+    headerTitle = 'Active & Ongoing Call Sessions';
+    headerSubtitle = 'Live calls currently ringing or in active voice conversation.';
+  } else if (type === 'pickup') {
+    headerIcon = '📈';
+    headerBg = 'rgba(16, 185, 129, 0.15)';
+    headerColor = '#10b981';
+    headerTitle = 'Call Pickup & Success Analytics';
+    headerSubtitle = 'Pickup rate statistics and call outcome distributions.';
+  } else if (type === 'interested') {
+    headerIcon = '🔥';
+    headerBg = 'rgba(236, 72, 153, 0.15)';
+    headerColor = '#ec4899';
+    headerTitle = 'AI-Identified Interested Leads';
+    headerSubtitle = 'High intent prospects identified by AI during conversation calls.';
+  }
+
+  // Update header text & colors immediately so the modal header reflects the clicked card
+  if (iconEl) {
+    iconEl.innerText = headerIcon;
+    iconEl.style.background = headerBg;
+    iconEl.style.color = headerColor;
+  }
+  if (titleEl) titleEl.innerText = headerTitle;
+  if (subtitleEl) subtitleEl.innerText = headerSubtitle;
   
-  // Resolve calls array from all possible global cache sources
+  // 2. Resolve calls array from all possible global cache sources
   let calls = [];
   if (Array.isArray(window.lastDashboardCalls) && window.lastDashboardCalls.length > 0) {
     calls = window.lastDashboardCalls;
@@ -834,7 +882,7 @@ window.renderMetricDetailsModalContent = function() {
     } catch(e) {}
   }
 
-  // If data is currently empty, display loading state and auto-fetch from server
+  // 3. If calls data is currently empty, display loading state and auto-fetch from server
   if (calls.length === 0) {
     bodyEl.innerHTML = `
       <div style="text-align: center; padding: 50px 20px; color: var(--text-muted);">
@@ -846,7 +894,8 @@ window.renderMetricDetailsModalContent = function() {
 
     if (!window._fetchingModalCalls) {
       window._fetchingModalCalls = true;
-      const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.id : '';
+      const u = (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser : null;
+      const clientId = u ? (u.id || u._id || u.email || '') : '';
       fetch(`/calls?clientId=${clientId}`)
         .then(res => res.json())
         .then(data => {
@@ -864,79 +913,34 @@ window.renderMetricDetailsModalContent = function() {
     return;
   }
 
+  // 4. Filter calls by type
   let filteredCalls = [];
-  let headerTitle = '';
-  let headerSubtitle = '';
-  let headerIcon = '📞';
-  let headerBg = 'rgba(6, 182, 212, 0.15)';
-  let headerColor = 'var(--color-cyan)';
-
   if (type === 'failed') {
-    headerIcon = '❌';
-    headerBg = 'rgba(239, 68, 68, 0.15)';
-    headerColor = '#ef4444';
-    headerTitle = 'Failed & Rejected Calls Overview';
-    headerSubtitle = 'Detailed list of missed or failed calls. See failure reasons and re-dial directly with 1 click.';
     filteredCalls = calls.filter(c => {
       const st = String(c.status || '').toLowerCase();
       const err = String(c.error || c.failureReason || '').toLowerCase();
       return st === 'failed' || st === 'busy' || st === 'no-answer' || st === 'voicemail' || st === 'canceled' || st === 'rejected' || err.length > 0;
     });
   } else if (type === 'completed') {
-    headerIcon = '✅';
-    headerBg = 'rgba(6, 182, 212, 0.15)';
-    headerColor = '#06b6d4';
-    headerTitle = 'Completed Calls Log';
-    headerSubtitle = 'Successfully finished calls with AI conversation summaries and call duration.';
     filteredCalls = calls.filter(c => {
       const st = String(c.status || '').toLowerCase();
       return st === 'completed' || st === 'answered' || st === 'ended' || st === 'finished';
     });
   } else if (type === 'active') {
-    headerIcon = '⚡';
-    headerBg = 'rgba(245, 158, 11, 0.15)';
-    headerColor = '#f59e0b';
-    headerTitle = 'Active & Ongoing Call Sessions';
-    headerSubtitle = 'Live calls currently ringing or in active voice conversation.';
     filteredCalls = calls.filter(c => {
       const st = String(c.status || '').toLowerCase();
       return st === 'active' || st === 'calling' || st === 'in-progress' || st === 'ringing' || st === 'queued' || st === 'initiated';
     });
   } else if (type === 'pickup') {
-    headerIcon = '📈';
-    headerBg = 'rgba(16, 185, 129, 0.15)';
-    headerColor = '#10b981';
-    headerTitle = 'Call Pickup & Success Analytics';
-    headerSubtitle = 'Pickup rate statistics and call outcome distributions.';
     filteredCalls = calls;
   } else if (type === 'interested') {
-    headerIcon = '🔥';
-    headerBg = 'rgba(236, 72, 153, 0.15)';
-    headerColor = '#ec4899';
-    headerTitle = 'AI-Identified Interested Leads';
-    headerSubtitle = 'High intent prospects identified by AI during conversation calls.';
     filteredCalls = calls.filter(c => {
       const sum = String(c.summary || c.ai_verdict || '').toLowerCase();
       return (sum.includes('interested') && !sum.includes('not interested') && !sum.includes('not_interested')) || sum.includes('verdict:** interested');
     });
   } else {
-    // Total calls
-    headerIcon = '📞';
-    headerBg = 'rgba(167, 139, 250, 0.15)';
-    headerColor = '#a78bfa';
-    headerTitle = 'All Calls Made Log';
-    headerSubtitle = 'Complete log of all tracked calls across all statuses.';
     filteredCalls = calls;
   }
-
-  // Update header text & badges
-  if (iconEl) {
-    iconEl.innerText = headerIcon;
-    iconEl.style.background = headerBg;
-    iconEl.style.color = headerColor;
-  }
-  if (titleEl) titleEl.innerText = headerTitle;
-  if (subtitleEl) subtitleEl.innerText = headerSubtitle;
 
   // Filter by search query if any
   if (searchQuery) {
