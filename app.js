@@ -604,37 +604,36 @@ function createActionCardElement(card, isModal = false) {
   };
 
   const actionToTakeHtml = card.actionToTake ? `
-    <div style="background: rgba(6, 182, 212, 0.08); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 8px; padding: 6px 10px; font-size: 0.74rem; color: var(--color-cyan); font-weight: 600; margin-top: 4px; text-align: left; display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;" title="Action to Take">
-      <span style="font-size: 0.85rem; line-height: 1;">⚡</span>
+    <div style="background: rgba(6, 182, 212, 0.08); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 8px; padding: 5px 8px; font-size: 0.72rem; color: var(--color-cyan); font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 5px; line-height: 1.3;" title="Action to Take">
+      <span style="font-size: 0.8rem; line-height: 1;">⚡</span>
       <span style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;"><strong>Action:</strong> ${card.actionToTake}</span>
     </div>
   ` : '';
 
   cardEl.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0;">
-      <span style="font-size: 0.95rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono); letter-spacing: -0.2px;">${card.phone}</span>
-      <span style="font-size: 0.6rem; font-weight: 800; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.5px;">${card.urgency}</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0; gap: 6px;">
+      <span style="font-size: 0.9rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono); letter-spacing: -0.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${card.phone}</span>
+      <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+        <span style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; background: ${card.sentimentBg}; color: ${card.color}; border: 1px solid ${card.sentimentBorder}; letter-spacing: 0.3px; white-space: nowrap;">
+          ${card.sentiment}
+        </span>
+        <span style="font-size: 0.6rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.3px; white-space: nowrap;">${card.urgency}</span>
+      </div>
     </div>
     
-    <div style="margin-bottom: 8px; text-align: left; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;">
-      <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; background: ${card.sentimentBg}; color: ${card.color}; font-weight: 800; font-size: 0.78rem; border: 1px solid ${card.sentimentBorder}; text-transform: uppercase; letter-spacing: 0.5px;">
-        ${card.sentiment}
-      </span>
-    </div>
-    
-    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; text-align: left;">
-      <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; text-align: left; overflow: hidden;">
+      <div style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
         ${card.summary}
       </div>
       ${actionToTakeHtml}
     </div>
     
     <div style="display: flex; gap: 8px; margin-top: auto; flex-shrink: 0;">
-      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}'); event.stopPropagation();" style="flex: 1; padding: 4px; font-size: 0.74rem; border-radius: 8px; background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 6px; height: 30px; cursor: pointer; border: none; transition: background 0.2s;">
+      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}'); event.stopPropagation();" style="flex: 1; padding: 4px 8px; font-size: 0.74rem; border-radius: 8px; background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 6px; height: 32px; cursor: pointer; border: none; transition: background 0.2s;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         ${card.actionText}
       </button>
-      <button class="btn btn-secondary" onclick="window.dismissLeadCard(this); event.stopPropagation();" style="padding: 4px 12px; font-size: 0.74rem; border-radius: 8px; font-weight: 600; height: 30px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: background 0.2s;">
+      <button class="btn btn-secondary" onclick="window.dismissLeadCard(this); event.stopPropagation();" style="padding: 4px 14px; font-size: 0.74rem; border-radius: 8px; font-weight: 600; height: 32px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: background 0.2s;">
         Done
       </button>
     </div>
