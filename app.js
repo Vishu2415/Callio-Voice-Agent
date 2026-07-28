@@ -5431,9 +5431,131 @@ function formatParsedSummaryHTML(summaryRaw, compact = false) {
   `;
 }
 
-window.navigateToCallingsPage = function() {
-  const btn = document.getElementById('nav-quick-call');
-  if (btn) btn.click();
+window.navigateToSummariesPage = function() {
+  document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
+  const target = document.getElementById('tab-ai-summaries');
+  if (target) target.style.display = 'block';
+  window.renderAISummariesPageTable();
+};
+
+window.summariesPageFilter = 'all';
+
+window.filterSummariesPage = function(filter, btnEl) {
+  window.summariesPageFilter = filter;
+  const buttons = document.querySelectorAll('#page-sum-filter-buttons .btn-filter-sum');
+  buttons.forEach(btn => {
+    btn.style.borderColor = 'var(--border-color)';
+    btn.style.background = 'var(--bg-surface)';
+    btn.style.color = 'var(--text-muted)';
+    btn.style.fontWeight = '600';
+  });
+  if (btnEl) {
+    btnEl.style.borderColor = 'var(--color-cyan)';
+    btnEl.style.background = 'rgba(6, 182, 212, 0.15)';
+    btnEl.style.color = 'var(--color-cyan)';
+    btnEl.style.fontWeight = '700';
+  }
+  window.renderAISummariesPageTable();
+};
+
+window.renderAISummariesPageTable = function() {
+  const container = document.getElementById('page-summaries-list-container');
+  if (!container) return;
+
+  const calls = Array.isArray(window.lastDashboardCalls || window.callsCache) ? (window.lastDashboardCalls || window.callsCache) : [];
+  const callsWithSummary = calls.filter(c => c.summary && c.summary.trim() !== '');
+
+  // Counters
+  const totalCount = callsWithSummary.length;
+  const interestedCount = callsWithSummary.filter(c => {
+    const parsed = parseCallSummary(c.summary);
+    return parsed.verdict.toLowerCase().includes('interested') && !parsed.verdict.toLowerCase().includes('not');
+  }).length;
+  const notInterestedCount = totalCount - interestedCount;
+
+  const elTotal = document.getElementById('page-sum-total-count');
+  const elInterested = document.getElementById('page-sum-interested-count');
+  const elNotInterested = document.getElementById('page-sum-notinterested-count');
+
+  if (elTotal) elTotal.innerText = totalCount;
+  if (elInterested) elInterested.innerText = interestedCount;
+  if (elNotInterested) elNotInterested.innerText = notInterestedCount;
+
+  // Filtering
+  const filter = window.summariesPageFilter || 'all';
+  const searchInput = document.getElementById('page-sum-search-input');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+  let list = callsWithSummary;
+  if (filter === 'interested') {
+    list = list.filter(c => {
+      const parsed = parseCallSummary(c.summary);
+      return parsed.verdict.toLowerCase().includes('interested') && !parsed.verdict.toLowerCase().includes('not');
+    });
+  } else if (filter === 'not_interested') {
+    list = list.filter(c => {
+      const parsed = parseCallSummary(c.summary);
+      return !parsed.verdict.toLowerCase().includes('interested') || parsed.verdict.toLowerCase().includes('not');
+    });
+  }
+
+  if (query) {
+    list = list.filter(c => {
+      const sum = String(c.summary || '').toLowerCase();
+      const phone = String(c.to || c.from || '').toLowerCase();
+      return sum.includes(query) || phone.includes(query);
+    });
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 50px 20px; color: var(--text-muted); font-size: 0.95rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 10px;">🤖</div>
+        No AI call summaries match the selected criteria.
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).forEach(c => {
+    const isIncoming = c.direction ? (c.direction === 'incoming') : (loggedInUser && (c.to === loggedInUser.phone_number || (loggedInUser.phone_number && loggedInUser.phone_number.includes(c.to))));
+    const directionIcon = isIncoming ? 
+      `<span style="color: var(--color-green); font-weight: bold;">⬇ Incoming</span>` : 
+      `<span style="color: var(--color-cyan); font-weight: bold;">⬆ Outgoing</span>`;
+
+    const toNum = c.to || 'Unknown';
+    const partiesText = isIncoming ? `Caller ➔ You` : `You ➔ ${toNum}`;
+
+    const callDate = new Date(c.createdAt);
+    const timeText = isNaN(callDate.getTime()) ? '' : callDate.toLocaleString([], { weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+    // Calculate duration using fallbacks
+    const end = c.endedAt || c.updatedAt;
+    const start = c.startedAt || c.createdAt;
+    const durationSecs = end && start ? Math.round((new Date(end) - new Date(start)) / 1000) : null;
+    const durationText = durationSecs !== null && durationSecs >= 0 ? durationSecs + 's' : '-';
+
+    const formattedSummary = formatParsedSummaryHTML(c.summary, false);
+
+    html += `
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px; transition: border-color 0.2s;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            ${directionIcon}
+            <strong style="color: var(--text-main); font-size: 1rem; font-family: var(--font-mono);">${partiesText}</strong>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; font-size: 0.8rem; color: var(--text-muted);">
+            <span>🕒 ${timeText}</span>
+            <span>Duration: <strong style="color: var(--text-main);">${durationText}</strong></span>
+          </div>
+        </div>
+        ${formattedSummary}
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
 };
 
   const summariesList = document.getElementById('dashboard-summaries-list');
@@ -5454,12 +5576,21 @@ window.navigateToCallingsPage = function() {
           div.style.marginBottom = '6px';
           
           const isIncoming = c.direction ? (c.direction === 'incoming') : (loggedInUser && (c.to === loggedInUser.phone_number || (loggedInUser.phone_number && loggedInUser.phone_number.includes(c.to))));
-          
+          const parsed = parseCallSummary(c.summary);
+          const cleanText = parsed.cleanSummary || c.summary.replace(/\*\*/g, '').trim();
+          const isInterested = parsed.verdict.toLowerCase().includes('interested') && !parsed.verdict.toLowerCase().includes('not');
+          const badgeColor = isInterested ? 'var(--color-green)' : 'var(--color-red)';
+          const badgeText = isInterested ? 'Interested' : 'No Interest';
+
           div.innerHTML = `
-            <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 6px; font-size: 0.78rem; color: var(--text-main);">
-              <span>${isIncoming ? 'Incoming ➔ You' : `You ➔ ${c.to || 'Unknown'}`}</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-bottom: 4px; font-size: 0.78rem;">
+              <span style="color: var(--text-main);">${isIncoming ? 'Incoming ➔ You' : `You ➔ ${c.to || 'Unknown'}`}</span>
+              <span style="font-size: 0.72rem; font-weight: 700; color: ${badgeColor}; display: flex; align-items: center; gap: 5px;">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: ${badgeColor}; display: inline-block;"></span>
+                ${badgeText}
+              </span>
             </div>
-            ${formatParsedSummaryHTML(c.summary, true)}
+            <div style="color: var(--text-muted); font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35;" title="${escapeHtml(cleanText)}">${escapeHtml(cleanText)}</div>
           `;
           summariesList.appendChild(div);
         });
