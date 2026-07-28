@@ -829,7 +829,9 @@
                 <label>System Instruction (Prompt)</label>
                 <textarea id="agent-prompt" rows="5" placeholder="Define the agent's persona..."></textarea>
               </div>
-              <button id="btn-save-agent" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">Save Agent</button>
+              <div id="agent-form-buttons-container" style="display: flex; gap: 12px; margin-top: 1rem; width: 100%; align-items: center;">
+                <button id="btn-save-agent" class="btn btn-primary" style="flex: 1; height: 46px; font-weight: 700; border-radius: 12px; font-size: 0.9rem; margin: 0;">Save Agent</button>
+              </div>
             </div>
             
             <!-- Right: Agents Grid (No outer card, renders directly on background) -->
@@ -846,58 +848,55 @@
       <!-- TAB 3: Contacts -->
       <div id="tab-contacts" class="tab-pane">
         <div class="premium-tab-container">
-          <h2 class="tab-title">Contact Management</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2 class="tab-title" style="margin: 0;">👥 Contact Management & Tags</h2>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Manage all contacts, assign custom tags, import bulk lists, and export data anytime.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button onclick="window.downloadSampleContactsCsv()" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.82rem; border-radius: 10px; cursor: pointer; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 600;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 15px; height: 15px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                📥 Sample CSV Sheet
+              </button>
+              <button onclick="window.exportContactsCsv()" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.82rem; border-radius: 10px; cursor: pointer; background: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.3); color: var(--color-cyan); font-weight: 700;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 15px; height: 15px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                📤 Export Contacts (CSV)
+              </button>
+            </div>
+          </div>
+
           <div class="premium-split-layout">
             <!-- Left: Sidebar container -->
             <div style="width: 320px; display: flex; flex-direction: column; gap: 1.5rem; flex-shrink: 0;">
               <!-- Left: Upload Card -->
               <div class="form-card" style="width: 100%;">
-                <h3>Import Contacts</h3>
-                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">Upload a CSV or Excel file containing your contact list.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <h3 style="margin: 0;">Import Contacts</h3>
+                </div>
+                <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1.25rem;">Upload a CSV or Excel file containing your contact list.</p>
                 
                 <div class="form-group">
-                  <label>Group Name</label>
-                  <input type="text" id="contact-group-name" placeholder="e.g. June Campaign List">
+                  <label>Tag Name / Category</label>
+                  <input type="text" id="contact-group-name" placeholder="e.g. Hot Leads, VIP, Campaign1">
                 </div>
                 <div class="form-group">
-                  <label class="btn-file-upload-large" for="campaign-file-input" style="border-style: dashed; padding: 2.5rem 1.5rem;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px; color: var(--color-cyan); margin-bottom: 0.5rem;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <span>Select CSV/Excel File</span>
+                  <label class="btn-file-upload-large" for="campaign-file-input" style="border-style: dashed; padding: 1.8rem 1.25rem;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 28px; height: 28px; color: var(--color-cyan); margin-bottom: 0.4rem;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span style="font-size: 0.88rem; font-weight: 600;">Select CSV / Excel File</span>
                     <span style="font-size: 0.75rem; font-weight: normal; color: var(--text-muted);">Drag & drop or browse</span>
                   </label>
                   <input type="file" id="campaign-file-input" accept=".csv,.xlsx,.xls" style="display: none;">
-                  <div id="upload-status" style="margin-top: 10px; font-size: 0.85rem; color: var(--color-cyan); font-weight: 500;"></div>
+                  <div id="upload-status" style="margin-top: 8px; font-size: 0.82rem; color: var(--color-cyan); font-weight: 500;"></div>
                 </div>
                 
-                <button id="btn-save-contacts" class="btn btn-primary" style="width: 100%;" disabled>Upload & Save Group</button>
-                
-                <div class="alert-card" style="margin-top: 1.25rem;">
-                  <div class="alert-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: #ffca28; display: block;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                  </div>
-                  <div class="alert-text">
-                    <strong>Note:</strong> Yeh process sirf contact list save karega. Call tabhi lagegi jab aap <strong>Broadcast</strong> tab me jaakar campaign start karenge.
-                  </div>
-                </div>
+                <button id="btn-save-contacts" class="btn btn-primary" style="width: 100%; height: 42px; font-weight: 700; border-radius: 10px;" disabled>Upload & Save Contacts</button>
               </div>
 
               <!-- Left: Add Single Contact Card -->
               <div class="form-card" style="width: 100%;">
                 <h3>Add Single Contact</h3>
-                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">Add a single contact to an existing group or create a new group.</p>
+                <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1.25rem;">Add an individual contact with a custom tag.</p>
                 
-                <div class="form-group">
-                  <label>Select Group</label>
-                  <select id="single-contact-group-select" onchange="toggleNewGroupInput()" style="width: 100%; padding: 8px 12px; font-size: 0.9rem; border-radius: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main);">
-                    <!-- Options will be populated dynamically -->
-                  </select>
-                </div>
-
-                <div class="form-group" id="new-group-input-wrapper" style="display: none;">
-                  <label>New Group Name</label>
-                  <input type="text" id="single-contact-new-group-name" placeholder="e.g. Special Leads">
-                </div>
-
                 <div class="form-group">
                   <label>Contact Name</label>
                   <input type="text" id="single-contact-name" placeholder="e.g. Rahul Sharma">
@@ -907,33 +906,55 @@
                   <label>Phone Number</label>
                   <input type="text" id="single-contact-phone" placeholder="e.g. 9876543210">
                 </div>
-                
+
                 <div class="form-group">
-                  <label>Agent Tag (Routing)</label>
-                  <input type="text" id="single-contact-tag" placeholder="e.g. sales, support, charon" style="width: 100%; padding: 8px 12px; font-size: 0.9rem; border-radius: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); box-sizing: border-box;">
+                  <label>Select or Enter Tag</label>
+                  <input type="text" id="single-contact-tag" placeholder="e.g. VIP, Sales, Followup" style="width: 100%; padding: 10px 14px; font-size: 0.88rem; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
+                </div>
+
+                <div class="form-group" style="display: none;">
+                  <select id="single-contact-group-select" onchange="toggleNewGroupInput()"></select>
                 </div>
                 
-                <button id="btn-add-single-contact" onclick="addSingleContactFromSidebar()" class="btn btn-primary" style="width: 100%; background: var(--grad-cyan-violet); color: #000; font-weight: 600;">Add Contact</button>
+                <button id="btn-add-single-contact" onclick="addSingleContactFromSidebar()" class="btn btn-primary" style="width: 100%; height: 42px; font-weight: 700; border-radius: 10px; background: var(--grad-cyan-violet); color: #000;">➕ Add Contact</button>
               </div>
             </div>
             
-            <!-- Right: Groups List (Premium Table) -->
-            <div style="flex: 1;">
-              <h3 class="section-title">Contact Groups</h3>
-              <div class="table-responsive">
-                <table class="premium-table">
-                  <thead>
-                    <tr>
-                      <th>Group Name</th>
-                      <th>Total Contacts</th>
-                      <th>Created Date</th>
-                      <th style="text-align: right; width: 120px;">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="groups-table-body">
-                    <!-- Groups will render here -->
-                  </tbody>
-                </table>
+            <!-- Right: All Contacts & Tags (Premium View) -->
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+              <!-- Search & Tag Filter Bar -->
+              <div class="vb-card" style="padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 14px;">
+                <div style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+                  <input type="text" id="contacts-search-input" placeholder="Search contacts by name, phone or tag..." oninput="window.renderAllContactsTable()" style="flex: 1; min-width: 250px; padding: 10px 16px; font-size: 0.88rem; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
+                  <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">
+                    Total: <strong id="total-contacts-count-badge" style="color: var(--color-cyan);">0</strong> Contacts
+                  </div>
+                </div>
+
+                <!-- Tag Filter Pills -->
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;" id="contacts-tag-filters">
+                  <!-- Dynamically generated tag filter pills -->
+                </div>
+              </div>
+
+              <!-- Main Table Container -->
+              <div class="vb-card" style="padding: 20px; border-radius: 16px;">
+                <div class="table-responsive">
+                  <table class="premium-table">
+                    <thead>
+                      <tr>
+                        <th>Contact Name</th>
+                        <th>Phone Number</th>
+                        <th>Tag / Category</th>
+                        <th>Added Date</th>
+                        <th style="text-align: right; width: 100px;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="all-contacts-table-body">
+                      <!-- Contacts rendered dynamically -->
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>

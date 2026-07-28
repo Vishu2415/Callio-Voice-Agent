@@ -2475,8 +2475,10 @@ window.editAgent = function(id) {
   document.getElementById('agent-prompt').value = agent.systemInstruction || '';
   
   const saveBtn = document.getElementById('btn-save-agent');
+  const btnContainer = document.getElementById('agent-form-buttons-container') || saveBtn?.parentNode;
   if (saveBtn) {
     saveBtn.innerText = 'Update Agent';
+    saveBtn.style.flex = '2';
     
     // Create/toggle Cancel button if it doesn't exist
     let cancelBtn = document.getElementById('btn-cancel-agent-edit');
@@ -2485,12 +2487,12 @@ window.editAgent = function(id) {
       cancelBtn.id = 'btn-cancel-agent-edit';
       cancelBtn.className = 'btn btn-secondary';
       cancelBtn.innerText = 'Cancel';
-      cancelBtn.style.marginLeft = '8px';
+      cancelBtn.style.cssText = 'flex: 1; height: 46px; font-weight: 700; border-radius: 12px; font-size: 0.9rem; border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.08); color: var(--text-main); cursor: pointer; transition: all 0.2s ease; margin: 0;';
       cancelBtn.addEventListener('click', (e) => {
         e.preventDefault();
         clearAgentForm();
       });
-      saveBtn.parentNode.appendChild(cancelBtn);
+      if (btnContainer) btnContainer.appendChild(cancelBtn);
     }
   }
 };
@@ -2503,6 +2505,7 @@ window.clearAgentForm = function() {
   const saveBtn = document.getElementById('btn-save-agent');
   if (saveBtn) {
     saveBtn.innerText = 'Save Agent';
+    saveBtn.style.flex = '1';
   }
   const cancelBtn = document.getElementById('btn-cancel-agent-edit');
   if (cancelBtn) {
@@ -2588,6 +2591,7 @@ async function fetchGroups() {
     if (data.success) {
       localGroupsCache = data.groups;
       renderGroupsTable(data.groups);
+      renderAllContactsTable();
       populateSingleContactGroups(data.groups);
     }
   } catch (e) {
@@ -2595,56 +2599,196 @@ async function fetchGroups() {
   }
 }
 
-function renderGroupsTable(groups) {
-  const container = document.querySelector('#groups-table-body');
-  if (!container) return;
-  container.innerHTML = '';
-  
-  if (groups.length === 0) {
-    container.innerHTML = `
+window.contactsSelectedTag = 'all';
+
+window.downloadSampleContactsCsv = function() {
+  const csvContent = "Name,Phone,Tag\nRahul Sharma,9876543210,VIP\nPriya Singh,9123456789,Hot Leads\nAmit Verma,9988776655,Followup\nVikram Gupta,9898989898,Testing\n";
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", "sample_contacts.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+window.exportContactsCsv = function() {
+  const contacts = window.getFilteredContactsList();
+  if (contacts.length === 0) {
+    alert("No contacts available to export.");
+    return;
+  }
+
+  let csvContent = "Name,Phone,Tag,Added Date\n";
+  contacts.forEach(c => {
+    const name = `"${(c.name || '').replace(/"/g, '""')}"`;
+    const phone = `"${(c.phone || '').replace(/"/g, '""')}"`;
+    const tag = `"${(c.tag || 'Default').replace(/"/g, '""')}"`;
+    const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleString() : '';
+    csvContent += `${name},${phone},${tag},"${dateStr}"\n`;
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  const dateTag = new Date().toISOString().slice(0, 10);
+  link.setAttribute("download", `contacts_export_${dateTag}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+window.getAllContactsList = function() {
+  const all = [];
+  (localGroupsCache || []).forEach(g => {
+    if (g.contacts && Array.isArray(g.contacts)) {
+      g.contacts.forEach(c => {
+        all.push({
+          ...c,
+          tag: c.tag || g.name || 'Default',
+          groupId: g.id,
+          groupName: g.name
+        });
+      });
+    }
+  });
+  return all;
+};
+
+window.getFilteredContactsList = function() {
+  const all = window.getAllContactsList();
+  const filterTag = window.contactsSelectedTag || 'all';
+  const searchInput = document.getElementById('contacts-search-input');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+  let list = all;
+  if (filterTag !== 'all') {
+    list = list.filter(c => String(c.tag || '').toLowerCase() === filterTag.toLowerCase());
+  }
+
+  if (query) {
+    list = list.filter(c => {
+      const name = String(c.name || '').toLowerCase();
+      const phone = String(c.phone || '').toLowerCase();
+      const tag = String(c.tag || '').toLowerCase();
+      return name.includes(query) || phone.includes(query) || tag.includes(query);
+    });
+  }
+
+  return list;
+};
+
+window.filterContactsByTag = function(tag, btnEl) {
+  window.contactsSelectedTag = tag;
+  const buttons = document.querySelectorAll('#contacts-tag-filters .btn-tag-filter');
+  buttons.forEach(btn => {
+    btn.style.borderColor = 'var(--border-color)';
+    btn.style.background = 'var(--bg-surface)';
+    btn.style.color = 'var(--text-muted)';
+    btn.style.fontWeight = '600';
+  });
+  if (btnEl) {
+    btnEl.style.borderColor = 'var(--color-cyan)';
+    btnEl.style.background = 'rgba(6, 182, 212, 0.15)';
+    btnEl.style.color = 'var(--color-cyan)';
+    btnEl.style.fontWeight = '700';
+  }
+  window.renderAllContactsTable();
+};
+
+window.renderAllContactsTable = function() {
+  const tbody = document.getElementById('all-contacts-table-body');
+  if (!tbody) return;
+
+  const allContacts = window.getAllContactsList();
+
+  // Total badge
+  const totalBadge = document.getElementById('total-contacts-count-badge');
+  if (totalBadge) totalBadge.innerText = allContacts.length;
+
+  // Build Tag Filter Pills
+  const tagFiltersContainer = document.getElementById('contacts-tag-filters');
+  if (tagFiltersContainer) {
+    const uniqueTags = Array.from(new Set(allContacts.map(c => c.tag || 'Default'))).filter(Boolean);
+    let tagHtml = `
+      <button class="btn-tag-filter ${window.contactsSelectedTag === 'all' ? 'active' : ''}" onclick="window.filterContactsByTag('all', this)" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 20px; cursor: pointer; ${window.contactsSelectedTag === 'all' ? 'border: 1px solid var(--color-cyan); background: rgba(6, 182, 212, 0.15); color: var(--color-cyan); font-weight: 700;' : 'border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); font-weight: 600;'}">
+        All (${allContacts.length})
+      </button>
+    `;
+    uniqueTags.forEach(t => {
+      const count = allContacts.filter(c => (c.tag || 'Default') === t).length;
+      const isActive = (window.contactsSelectedTag || '').toLowerCase() === t.toLowerCase();
+      tagHtml += `
+        <button class="btn-tag-filter ${isActive ? 'active' : ''}" onclick="window.filterContactsByTag('${escapeHtml(t)}', this)" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 20px; cursor: pointer; ${isActive ? 'border: 1px solid var(--color-cyan); background: rgba(6, 182, 212, 0.15); color: var(--color-cyan); font-weight: 700;' : 'border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); font-weight: 600;'}">
+          🏷️ ${escapeHtml(t)} (${count})
+        </button>
+      `;
+    });
+    tagFiltersContainer.innerHTML = tagHtml;
+  }
+
+  const list = window.getFilteredContactsList();
+
+  if (list.length === 0) {
+    tbody.innerHTML = `
       <tr>
-        <td colspan="4" style="text-align: center; padding: 4rem 2rem;">
-          <div class="empty-state" style="border: none; background: transparent; padding: 0;">
-            <div class="empty-state-icon" style="display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 44px; height: 44px; color: var(--text-muted); opacity: 0.4;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            </div>
-            <h4 class="empty-state-title" style="font-size: 1rem; margin-bottom: 0.25rem;">No Contact Groups</h4>
-            <p class="empty-state-desc" style="font-size: 0.8rem; max-width: 320px; margin: 0 auto;">Upload a CSV or Excel file on the left to create a contact group.</p>
-          </div>
+        <td colspan="5" style="text-align: center; padding: 4rem 2rem; color: var(--text-muted);">
+          <div style="font-size: 2.2rem; margin-bottom: 8px;">👥</div>
+          <h4 style="color: var(--text-main); margin-bottom: 4px;">No Contacts Found</h4>
+          <p style="font-size: 0.82rem;">Import a CSV file or add a single contact from the left panel.</p>
         </td>
       </tr>
     `;
     return;
   }
-  
-  groups.forEach(group => {
-    const tr = document.createElement('tr');
-    const dateStr = new Date(group.createdAt).toLocaleString();
-    
-    tr.innerHTML = `
-      <td style="font-weight: 500; color: var(--text-main);">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--color-cyan);"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          ${escapeHtml(group.name)}
-        </div>
-      </td>
-      <td>
-        <span class="group-card-count" onclick="viewGroupContacts('${group.id}')" style="cursor: pointer; background: rgba(0, 255, 255, 0.1); color: var(--color-cyan); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 500; border: 1px solid rgba(0, 255, 255, 0.15);">${group.contacts.length} Contacts</span>
-      </td>
-      <td style="color: var(--text-muted); font-size: 0.85rem;">${dateStr}</td>
-      <td style="text-align: right;">
-        <div style="display: flex; gap: 8px; justify-content: flex-end;">
-          <button class="btn btn-secondary btn-icon" onclick="viewGroupContacts('${group.id}')" title="View Contacts" style="padding: 6px 10px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
-          <button class="btn btn-secondary btn-icon" onclick="deleteGroup('${group.id}')" title="Delete" style="padding: 6px 10px; color: var(--color-red); border-color: rgba(239, 68, 68, 0.15);">
+
+  let html = '';
+  list.forEach(c => {
+    const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }) : '—';
+    const tagLabel = c.tag || 'Default';
+
+    html += `
+      <tr>
+        <td style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${escapeHtml(c.name || 'N/A')}</td>
+        <td style="font-family: var(--font-mono); color: var(--color-cyan); font-weight: 600; font-size: 0.88rem;">${escapeHtml(c.phone || 'N/A')}</td>
+        <td>
+          <span style="background: rgba(6,182,212,0.12); color: var(--color-cyan); font-size: 0.72rem; padding: 3px 10px; border-radius: 12px; font-weight: 700; border: 1px solid rgba(6,182,212,0.3); text-transform: uppercase; letter-spacing: 0.3px;">🏷️ ${escapeHtml(tagLabel)}</span>
+        </td>
+        <td style="color: var(--text-muted); font-size: 0.82rem;">${dateStr}</td>
+        <td style="text-align: right;">
+          <button class="btn btn-secondary btn-icon" onclick="window.deleteSingleContactDirect('${c.id}', '${c.groupId}')" title="Delete Contact" style="padding: 4px 8px; color: var(--color-red); border-color: rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.08); border-radius: 6px; cursor: pointer;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
-        </div>
-      </td>
+        </td>
+      </tr>
     `;
-    container.appendChild(tr);
   });
+
+  tbody.innerHTML = html;
+};
+
+window.deleteSingleContactDirect = async function(contactId, groupId) {
+  if (!confirm("Are you sure you want to delete this contact?")) return;
+  try {
+    const clientId = loggedInUser ? loggedInUser.id : '';
+    const res = await fetch(`/api/groups/${groupId}/contacts/${contactId}?clientId=${clientId}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (data.success) {
+      fetchGroups();
+    } else {
+      alert("Failed to delete contact: " + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert("Error deleting contact: " + err.message);
+  }
+};
+
+function renderGroupsTable(groups) {
+  renderAllContactsTable();
 }
 
 window.viewGroupContacts = function(groupId) {
@@ -2868,18 +3012,16 @@ window.toggleNewGroupInput = function() {
 };
 
 window.addSingleContactFromSidebar = async function() {
-  const select = document.getElementById('single-contact-group-select');
-  const newGroupNameInput = document.getElementById('single-contact-new-group-name');
   const nameInput = document.getElementById('single-contact-name');
   const phoneInput = document.getElementById('single-contact-phone');
   const tagInput = document.getElementById('single-contact-tag');
   
-  if (!select || !nameInput || !phoneInput) return;
+  if (!nameInput || !phoneInput) return;
   
   const name = nameInput.value.trim();
   const phone = phoneInput.value.trim();
-  const tag = tagInput ? tagInput.value.trim() : '';
-  let groupId = select.value;
+  let tag = tagInput ? tagInput.value.trim() : 'Default';
+  if (!tag) tag = 'Default';
   
   if (!phone) {
     alert("Phone number is required.");
@@ -2887,29 +3029,25 @@ window.addSingleContactFromSidebar = async function() {
   }
   
   try {
-    // 1. If "Create New Group" is selected, create the group first!
-    if (groupId === 'new_group') {
-      const groupName = newGroupNameInput.value.trim();
-      if (!groupName) {
-        alert("Please enter a name for the new group.");
-        return;
-      }
-      
+    const clientId = loggedInUser ? loggedInUser.id : null;
+    let targetGroup = (localGroupsCache || []).find(g => g.name.toLowerCase() === tag.toLowerCase());
+    let groupId = targetGroup ? targetGroup.id : null;
+
+    if (!groupId) {
       const groupRes = await fetch('/api/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: groupName, clientId: loggedInUser ? loggedInUser.id : null })
+        body: JSON.stringify({ name: tag, clientId })
       });
       const groupData = await groupRes.json();
       if (groupData.success) {
         groupId = groupData.group.id;
       } else {
-        alert("Failed to create group: " + groupData.error);
+        alert("Failed to create tag category: " + groupData.error);
         return;
       }
     }
-    
-    // 2. Add the contact to the resolved group
+
     const res = await fetch('/api/contacts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2917,21 +3055,17 @@ window.addSingleContactFromSidebar = async function() {
     });
     const data = await res.json();
     if (data.success) {
-      // Clear inputs
       nameInput.value = '';
       phoneInput.value = '';
       if (tagInput) tagInput.value = '';
-      if (newGroupNameInput) newGroupNameInput.value = '';
-      
-      // Refresh groups list
-      await fetchGroups();
-      alert("Contact added successfully!");
+      fetchGroups();
+      alert("✅ Contact added successfully!");
     } else {
-      alert("Failed to add contact: " + data.error);
+      alert("Error adding contact: " + data.error);
     }
   } catch (e) {
     console.error(e);
-    alert("Error adding contact.");
+    alert("Error adding contact: " + e.message);
   }
 };
 
