@@ -590,7 +590,8 @@
               </div>
               <div id="dashboard-last-call-box" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-grow: 1; padding-right: 4px;">
                 <div style="color: var(--text-muted); text-align: center; padding-top: 30px; font-size: 0.85rem;">No calls yet</div>
-                      <a href="#" onclick="event.preventDefault(); window.navigateToTodayCallsPage();" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">See All Today's Calls ➔</a>
+              </div>
+              <a href="#" onclick="event.preventDefault(); window.navigateToTodayCallsPage();" style="color: var(--color-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: block; text-align: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">See All Today's Calls ➔</a>
             </div>
 
             <!-- Box 2: Scheduled Callbacks (NEW) -->
@@ -2613,7 +2614,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=20260728_v16"></script>
+  <script type="module" src="app.js?v=20260728_v17"></script>
   <!-- Today's Calls & Summaries Modal -->
   <div id="today-calls-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="width: 90%; max-width: 700px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 25px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh;">
