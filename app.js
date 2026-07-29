@@ -818,16 +818,12 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
 
   const activeName = card.contactName || (typeof window.getContactNameForPhone === 'function' ? window.getContactNameForPhone(card.phone) : null);
 
-  // Display BOTH Name and Phone Number inside the Modal Header
+  // Display BOTH Name and Phone Number inside the Modal Header (Name on top line, Phone number underneath)
   if (phoneEl) {
     phoneEl.innerText = activeName ? activeName : card.phone;
   }
   if (subtitleEl) {
-    if (activeName) {
-      subtitleEl.innerHTML = `<span style="color:var(--color-cyan, #06b6d4); font-weight:700;">📞 ${card.phone}</span> • Unified Lead Timeline & Call History Log`;
-    } else {
-      subtitleEl.innerText = 'Unified Lead Timeline & Call History Log';
-    }
+    subtitleEl.innerHTML = `<span style="color:var(--color-cyan, #06b6d4); font-weight:700;">📞 ${card.phone}</span> • Unified Lead Timeline & Call History Log`;
   }
 
   if (sentimentEl) {
