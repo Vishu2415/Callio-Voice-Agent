@@ -737,6 +737,11 @@ function createActionCardElement(card, isModal = false) {
 window.openLeadDetailModal = function(cardId, cardFallback = null) {
   let card = (window.allActiveActionCards || []).find(c => c && String(c.id) === String(cardId));
   if (!card && cardFallback) card = cardFallback;
+  if (card && cardFallback) {
+    if (!card.contactName && cardFallback.contactName) {
+      card.contactName = cardFallback.contactName;
+    }
+  }
   if (!card) return;
 
   let modal = document.getElementById('lead-card-detail-modal');
@@ -816,7 +821,12 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
   const btnCall = document.getElementById('btn-lead-detail-call');
   const btnDone = document.getElementById('btn-lead-detail-done');
 
-  const activeName = card.contactName || (typeof window.getContactNameForPhone === 'function' ? window.getContactNameForPhone(card.phone) : null);
+  let activeName = card.contactName || 
+                   card.name || 
+                   card.customerName || 
+                   (cardFallback && (cardFallback.contactName || cardFallback.name || cardFallback.customerName)) ||
+                   (card.calls && Array.isArray(card.calls) && card.calls.find(c => c && (c.customerName || c.name))?.customerName) ||
+                   (typeof window.getContactNameForPhone === 'function' ? window.getContactNameForPhone(card.phone) : null);
 
   // Display BOTH Name and Phone Number inside the Modal Header (Name on top line, Phone number underneath)
   if (phoneEl) {
@@ -824,6 +834,24 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
   }
   if (subtitleEl) {
     subtitleEl.innerHTML = `<span style="color:var(--color-cyan, #06b6d4); font-weight:700;">📞 ${card.phone}</span> • Unified Lead Timeline & Call History Log`;
+  }
+
+  // Fallback async API fetch to /api/contacts if name is missing in local memory
+  if (!activeName && card.phone) {
+    fetch('/api/contacts')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.contacts)) {
+          const normKey = window.normalizePhoneKey ? window.normalizePhoneKey(card.phone) : card.phone.replace(/\D/g, '');
+          const match = data.contacts.find(c => c && c.phone && (window.normalizePhoneKey ? window.normalizePhoneKey(c.phone) : c.phone.replace(/\D/g, '')) === normKey && c.name);
+          if (match && match.name && match.name.trim() !== '') {
+            const fetchedName = match.name.trim();
+            card.contactName = fetchedName;
+            if (phoneEl) phoneEl.innerText = fetchedName;
+          }
+        }
+      })
+      .catch(() => {});
   }
 
   if (sentimentEl) {
