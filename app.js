@@ -323,7 +323,32 @@ function showEmptyState(container) {
     </div>
   `;
 }
+window.getContactNameForPhone = function(phoneStr) {
+  if (!phoneStr) return null;
+  const normKey = normalizePhoneKey(phoneStr);
+  if (!normKey) return null;
 
+  if (typeof window.getAllContactsList === 'function') {
+    const list = window.getAllContactsList();
+    if (Array.isArray(list)) {
+      const match = list.find(c => c && c.phone && normalizePhoneKey(c.phone) === normKey && c.name);
+      if (match && match.name && match.name.trim() !== '' && normalizePhoneKey(match.name) !== normKey) {
+        return match.name.trim();
+      }
+    }
+  }
+
+  if (typeof contactsCache !== 'undefined' && Array.isArray(contactsCache)) {
+    const match = contactsCache.find(c => c && c.phone && normalizePhoneKey(c.phone) === normKey && c.name);
+    if (match && match.name && match.name.trim() !== '' && normalizePhoneKey(match.name) !== normKey) {
+      return match.name.trim();
+    }
+  }
+
+  return null;
+};
+
+// Convert actual calls to action cards
 window.populateAIActionPlanner = function() {
   const container = document.getElementById('ai-action-cards-container');
   if (!container) return;
@@ -478,7 +503,7 @@ window.populateAIActionPlanner = function() {
         actionToTake
       };
 
-      const cName = call.customerName || call.name || (typeof window.allContacts !== 'undefined' && Array.isArray(window.allContacts) ? window.allContacts.find(c => c.phone && normalizePhoneKey(c.phone) === normKey)?.name : null);
+      const cName = call.customerName || call.contactName || call.name || (typeof window.getContactNameForPhone === 'function' ? window.getContactNameForPhone(bestPhone) : null);
 
       if (!leadMap.has(normKey)) {
         leadMap.set(normKey, {
@@ -777,12 +802,14 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
   const btnCall = document.getElementById('btn-lead-detail-call');
   const btnDone = document.getElementById('btn-lead-detail-done');
 
+  const activeName = card.contactName || (typeof window.getContactNameForPhone === 'function' ? window.getContactNameForPhone(card.phone) : null);
+
   // Display BOTH Name and Phone Number inside the Modal Header
   if (phoneEl) {
-    phoneEl.innerText = card.contactName ? card.contactName : card.phone;
+    phoneEl.innerText = activeName ? activeName : card.phone;
   }
   if (subtitleEl) {
-    if (card.contactName) {
+    if (activeName) {
       subtitleEl.innerHTML = `<span style="color:var(--color-cyan, #06b6d4); font-weight:700;">📞 ${card.phone}</span> • Unified Lead Timeline & Call History Log`;
     } else {
       subtitleEl.innerText = 'Unified Lead Timeline & Call History Log';
