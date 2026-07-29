@@ -1068,9 +1068,10 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
   const callState = activeCalls.get(callSid);
   if (!callState) return;
 
-  if (callState.status === 'completed' || callState.status === 'failed' || callState.status === 'voicemail') {
+  if (callState._billingProcessed) {
     return;
   }
+  callState._billingProcessed = true;
 
   console.log(`[Call Lifecycle] Call ${callSid} ended. Setting status to: ${finalStatus}`);
   callState.status = finalStatus;
@@ -1087,85 +1088,110 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
     if (clientId && clientsDb.has(clientId)) {
       const client = clientsDb.get(clientId);
 
-      // 1. Check if call was actually answered and had conversation audio
       const wasAnswered = Boolean(callState.answeredAt || callState.mediaStartedAt);
       const hasSpeechOrTranscript = Boolean((callState.transcript && callState.transcript.length > 0) || callState.userHasSpoken);
+      const isUnbilledStatus = ['failed', 'busy', 'no-answer', 'canceled', 'voicemail', 'rejected'].includes(finalStatus) || 
+                               ['failed', 'busy', 'no-answer', 'canceled', 'voicemail', 'rejected'].includes(callState.status);
 
-      const isUnbilledStatus = ['failed', 'busy', 'no-answer', 'canceled', 'voicemail'].includes(finalStatus) || 
-                               ['failed', 'busy', 'no-answer', 'canceled', 'voicemail'].includes(callState.status);
-
-      let durationSec = 0;
-      let totalCharge = 0;
-
-      if (!wasAnswered || !hasSpeechOrTranscript || isUnbilledStatus) {
-        console.log(`[SaaS Billing] Zero charge for call ${callSid}: wasAnswered=${wasAnswered}, hasSpeechOrTranscript=${hasSpeechOrTranscript}, status=${finalStatus}`);
-      } else {
-        let rawDuration = 0;
-
-        if (callState.providerDuration && !isNaN(callState.providerDuration) && Number(callState.providerDuration) > 0) {
-          rawDuration = Number(callState.providerDuration);
-        } else if (callState.mediaStartedAt && callState.mediaEndedAt) {
-          const mStart = new Date(callState.mediaStartedAt).getTime();
-          const mEnd = new Date(callState.mediaEndedAt).getTime();
-          if (!isNaN(mStart) && !isNaN(mEnd) && mEnd > mStart) {
-            rawDuration = Math.round((mEnd - mStart) / 1000);
-          }
-        } else if (callState.answeredAt) {
-          const aStart = new Date(callState.answeredAt).getTime();
-          const aEnd = new Date(callState.mediaEndedAt || callState.endedAt || Date.now()).getTime();
-          if (!isNaN(aStart) && !isNaN(aEnd) && aEnd > aStart) {
-            rawDuration = Math.round((aEnd - aStart) / 1000);
-          }
+      let rawDuration = 0;
+      if (callState.providerDuration && !isNaN(callState.providerDuration) && Number(callState.providerDuration) > 0) {
+        rawDuration = Number(callState.providerDuration);
+      } else if (callState.mediaStartedAt && callState.mediaEndedAt) {
+        const mStart = new Date(callState.mediaStartedAt).getTime();
+        const mEnd = new Date(callState.mediaEndedAt).getTime();
+        if (!isNaN(mStart) && !isNaN(mEnd) && mEnd > mStart) {
+          rawDuration = Math.round((mEnd - mStart) / 1000);
         }
-
-        // Safety cap: Duration CANNOT exceed actual WebSocket stream lifetime + 5 seconds
-        if (callState.mediaStartedAt) {
-          const maxStreamSec = Math.round((new Date(callState.mediaEndedAt || Date.now()).getTime() - new Date(callState.mediaStartedAt).getTime()) / 1000) + 5;
-          if (rawDuration > maxStreamSec && maxStreamSec > 0) {
-            console.warn(`[SaaS Billing] Capping raw duration ${rawDuration}s to max stream lifetime ${maxStreamSec}s for call ${callSid}`);
-            rawDuration = maxStreamSec;
-          }
+      } else if (callState.answeredAt) {
+        const aStart = new Date(callState.answeredAt).getTime();
+        const aEnd = new Date(callState.mediaEndedAt || callState.endedAt || Date.now()).getTime();
+        if (!isNaN(aStart) && !isNaN(aEnd) && aEnd > aStart) {
+          rawDuration = Math.round((aEnd - aStart) / 1000);
         }
-
-        // Hard cap: Single AI call cannot exceed 15 minutes (900 seconds)
-        durationSec = Math.min(Math.max(0, rawDuration), 900);
-
-        // Ceiling billing: 1 second = 1 full minute (standard AI calling rate)
-        const billedMinutes = durationSec > 0 ? Math.ceil(durationSec / 60) : 0;
-
-        // Hard safety cap: single call cannot deduct more than 15 minutes
-        totalCharge = Math.min(billedMinutes, 15);
       }
 
-      if (totalCharge > 0) {
-        // Guard: never let balance go below -100 (prevent runaway negative balances)
-        const currentBalance = typeof client.balance === 'number' ? client.balance : 0;
-        if (currentBalance < -100) {
-          console.warn(`[SaaS Billing] Skipping charge for client ${clientId} — balance already critically negative: ${currentBalance}`);
+      // Safety cap: Duration CANNOT exceed actual WebSocket stream lifetime + 5 seconds
+      if (callState.mediaStartedAt) {
+        const maxStreamSec = Math.round((new Date(callState.mediaEndedAt || Date.now()).getTime() - new Date(callState.mediaStartedAt).getTime()) / 1000) + 5;
+        if (rawDuration > maxStreamSec && maxStreamSec > 0) {
+          rawDuration = maxStreamSec;
+        }
+      }
+
+      const durationSec = Math.min(Math.max(0, rawDuration), 900);
+
+      // Disconnected / Early-Cut / Failed Call detection:
+      // Calls cut within 10s, unanswered, without speech, or with failed status count towards the 3-disconnect rule
+      const isDisconnectedCall = !wasAnswered || !hasSpeechOrTranscript || isUnbilledStatus || durationSec < 10;
+
+      if (isDisconnectedCall) {
+        client.disconnected_call_count = (client.disconnected_call_count || 0) + 1;
+        console.log(`[Disconnect Billing] Disconnected / Early-Cut Call detected (${callSid}, duration: ${durationSec}s, status: ${finalStatus}). Count for client ${client.name} (${client.id}): ${client.disconnected_call_count}/3`);
+
+        if (client.disconnected_call_count >= 3) {
+          client.disconnected_call_count = 0; // reset counter after penalty
+          const penaltyMinutes = 1;
+          const currentBalance = typeof client.balance === 'number' ? client.balance : 0;
+
+          if (currentBalance >= -100) {
+            client.balance = Number((currentBalance - penaltyMinutes).toFixed(2));
+            client.used_minutes = Number(((client.used_minutes || 0) + penaltyMinutes).toFixed(2));
+            client.billing_history = client.billing_history || [];
+            client.billing_history.unshift({
+              id: `txn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              timestamp: new Date().toISOString(),
+              type: 'disconnect_penalty_charge',
+              callSid: callSid,
+              phone: callState.to || '',
+              duration: durationSec,
+              callCost: 0,
+              recordingCost: 0,
+              sessionCost: 0,
+              totalCharge: penaltyMinutes,
+              description: `Disconnect Penalty Charge: 3 Disconnected / Early-Cut Calls (1 min deducted)`
+            });
+
+            console.log(`[Disconnect Billing] Deducted 1 min penalty from client ${client.name} for 3 disconnected call attempts. New balance: ${client.balance} mins`);
+            saveClients();
+
+            if (typeof global.chargeResellerForCall === 'function') {
+              global.chargeResellerForCall(clientId, penaltyMinutes);
+            }
+          }
         } else {
-          client.balance = Number((currentBalance - totalCharge).toFixed(2));
-          client.used_minutes = Number(((client.used_minutes || 0) + totalCharge).toFixed(2));
-          client.billing_history = client.billing_history || [];
-          client.billing_history.unshift({
-            id: `txn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-            timestamp: new Date().toISOString(),
-            type: 'call_charge',
-            callSid: callSid,
-            phone: callState.to || '',
-            duration: durationSec,
-            callCost: 0,
-            recordingCost: 0,
-            sessionCost: 0,
-            totalCharge,
-            description: `Call to ${callState.to || 'Unknown'} (${durationSec}s → billed ${totalCharge} min) ${callState.recordCall ? 'with recording' : 'no recording'}`
-          });
-
-          console.log(`[SaaS Billing] Charged Client: ${client.name} (ID: ${clientId}) total: ${totalCharge} min for CallSid: ${callSid}. New balance: ${client.balance} mins`);
           saveClients();
+        }
+      } else {
+        // Standard Billed Call (duration >= 10s with conversation)
+        const billedMinutes = durationSec > 0 ? Math.ceil(durationSec / 60) : 0;
+        const totalCharge = Math.min(billedMinutes, 15);
 
-          // Reseller billing: if client belongs to a reseller, charge reseller quota at wholesale rate
-          if (typeof global.chargeResellerForCall === 'function' && totalCharge > 0) {
-            global.chargeResellerForCall(clientId, totalCharge);
+        if (totalCharge > 0) {
+          const currentBalance = typeof client.balance === 'number' ? client.balance : 0;
+          if (currentBalance >= -100) {
+            client.balance = Number((currentBalance - totalCharge).toFixed(2));
+            client.used_minutes = Number(((client.used_minutes || 0) + totalCharge).toFixed(2));
+            client.billing_history = client.billing_history || [];
+            client.billing_history.unshift({
+              id: `txn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              timestamp: new Date().toISOString(),
+              type: 'call_charge',
+              callSid: callSid,
+              phone: callState.to || '',
+              duration: durationSec,
+              callCost: 0,
+              recordingCost: 0,
+              sessionCost: 0,
+              totalCharge,
+              description: `Call to ${callState.to || 'Unknown'} (${durationSec}s → billed ${totalCharge} min) ${callState.recordCall ? 'with recording' : 'no recording'}`
+            });
+
+            console.log(`[SaaS Billing] Charged Client: ${client.name} (ID: ${clientId}) total: ${totalCharge} min for CallSid: ${callSid}. New balance: ${client.balance} mins`);
+            saveClients();
+
+            if (typeof global.chargeResellerForCall === 'function' && totalCharge > 0) {
+              global.chargeResellerForCall(clientId, totalCharge);
+            }
           }
         }
       }
@@ -4627,6 +4653,7 @@ app.get('/api/admin/resellers', express.json(), (req, res) => {
     quota: r.quota,
     permissions: r.permissions,
     package_name: r.package_name || 'Standard',
+    wallet_balance: r.wallet_balance !== undefined ? r.wallet_balance : 0,
     branding: r.branding,
     client_count: getResellerClients(r.id).length
   }));
@@ -4658,6 +4685,7 @@ app.post('/api/admin/resellers', express.json(), (req, res) => {
     created_at: new Date().toISOString(),
     domain: domain || '',
     subdomain: subdomain || (name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.callio.in'),
+    wallet_balance: 0,
     branding: {
       appName: name,
       logoUrl: '',
@@ -4739,7 +4767,7 @@ app.put('/api/admin/resellers/:id/permissions', express.json(), (req, res) => {
   res.json({ success: true, permissions: reseller.permissions, package_name: reseller.package_name });
 });
 
-// PUT update reseller quota & wholesale rate (Super Admin only)
+// PUT update reseller quota, wallet & wholesale rate (Super Admin only)
 app.put('/api/admin/resellers/:id/quota', express.json(), (req, res) => {
   const adminPassword = defaultCallConfig.adminPassword || 'admin123';
   if (req.body.admin_password !== adminPassword) return res.status(401).json({ success: false, error: 'Admin auth required.' });
@@ -4749,10 +4777,14 @@ app.put('/api/admin/resellers/:id/quota', express.json(), (req, res) => {
 
   if (req.body.total_minutes !== undefined) reseller.quota.total_minutes = Number(req.body.total_minutes);
   if (req.body.wholesale_rate_per_minute !== undefined) reseller.quota.wholesale_rate_per_minute = Number(req.body.wholesale_rate_per_minute);
+  if (req.body.wallet_balance !== undefined) reseller.wallet_balance = Number(req.body.wallet_balance);
+  if (req.body.add_wallet_balance !== undefined) {
+    reseller.wallet_balance = (reseller.wallet_balance || 0) + Number(req.body.add_wallet_balance);
+  }
 
   resellersDb.set(reseller.id, reseller);
   saveResellers();
-  res.json({ success: true, quota: reseller.quota });
+  res.json({ success: true, quota: reseller.quota, wallet_balance: reseller.wallet_balance });
 });
 
 // PUT suspend or activate reseller

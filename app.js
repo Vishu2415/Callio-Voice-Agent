@@ -380,20 +380,38 @@ window.populateAIActionPlanner = function() {
     if (!phone) return true;
     const cleaned = String(phone).replace(/\D/g, '');
     if (!cleaned || cleaned.length < 8) return true;
-    // Known virtual/caller ID numbers — these should never be displayed as customer
     const systemNumbers = ['917971442441', '7971442441', '971442441'];
     return systemNumbers.some(n => cleaned === n || cleaned.endsWith(n) || n.endsWith(cleaned));
   }
 
-  // Convert actual calls to action cards
+  // Helper: normalize phone number for unique lead grouping
+  function normalizePhoneKey(phoneStr) {
+    if (!phoneStr) return '';
+    let digits = String(phoneStr).replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) {
+      digits = digits.substring(2);
+    } else if (digits.length > 10) {
+      digits = digits.slice(-10);
+    }
+    return digits;
+  }
+
+  // Group calls by unique customer phone number (Unified Lead Architecture)
   if (typeof callsCache !== 'undefined' && callsCache && callsCache.length > 0) {
-    // Filter out calls where 'to' is a system/virtual number
     const validCalls = callsCache.filter(call => {
       const candidatePhone = call.customerNumber || call.phone || call.to || call.from;
       return candidatePhone && !isSystemNumber(candidatePhone);
     });
 
-    validCalls.forEach(call => {
+    // Sort calls newest first
+    const sortedValidCalls = [...validCalls].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    const leadMap = new Map(); // normPhone -> Lead object
+
+    sortedValidCalls.forEach(call => {
+      const bestPhone = [call.customerNumber, call.phone, call.to, call.from]
+        .find(p => p && !isSystemNumber(p)) || '+91 XXXXXXXXXX';
+      const normKey = normalizePhoneKey(bestPhone) || bestPhone;
+
       const parsed = parseCallSummary(call.summary);
 
       let urgency = 'Medium';
@@ -405,7 +423,6 @@ window.populateAIActionPlanner = function() {
       let sentimentColor = '#94a3b8';
       let sentimentBg = 'rgba(255, 255, 255, 0.05)';
       let sentimentBorder = 'rgba(255, 255, 255, 0.15)';
-      
       let actionText = 'Call Back';
       
       if (call.sentiment || parsed.verdict) {
@@ -437,12 +454,7 @@ window.populateAIActionPlanner = function() {
       if (!summaryText) {
         if (call.status === 'no-answer' || call.status === 'busy') {
           summaryText = 'Call was not answered. Customer was busy or did not pick up.';
-          urgency = 'Medium';
-          urgencyColor = '#eab308';
           sentiment = 'No Answer';
-          sentimentColor = '#94a3b8';
-          sentimentBg = 'rgba(255, 255, 255, 0.05)';
-          sentimentBorder = 'rgba(255, 255, 255, 0.15)';
           actionText = 'Retry Call';
         } else if (call.status === 'completed') {
           summaryText = `Call completed (Duration: ${typeof formatDuration === 'function' ? formatDuration(call.duration || 0) : (call.duration || 0) + 's'}).`;
@@ -452,27 +464,65 @@ window.populateAIActionPlanner = function() {
         }
       }
       
-      const bestPhone = [call.customerNumber, call.phone, call.to, call.from]
-        .find(p => p && !isSystemNumber(p)) || '+91 XXXXXXXXXX';
-        
       const actionToTake = call.action_to_take || parsed.actionToTake || 'Follow up with lead';
 
-      cardsData.push({
-        id: call.callSid || call.sid || call.id || `call_${call.createdAt || Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        phone: bestPhone,
-        urgency,
-        sentiment,
-        color: sentimentColor,
-        sentimentBg,
-        sentimentBorder,
-        urgencyColor,
-        urgencyBg,
-        urgencyBorder,
+      const callHistoryItem = {
+        id: call.callSid || call.sid || call.id || `call_${Date.now()}`,
+        direction: call.direction || 'outbound',
+        status: call.status || 'ended',
+        duration: call.duration || 0,
+        createdAt: call.createdAt || new Date().toISOString(),
         summary: summaryText,
-        actionToTake: actionToTake,
-        actionText
-      });
+        sentiment,
+        urgency,
+        actionToTake
+      };
+
+      if (!leadMap.has(normKey)) {
+        leadMap.set(normKey, {
+          id: `lead_${normKey}`,
+          phone: bestPhone,
+          normKey,
+          urgency,
+          sentiment,
+          color: sentimentColor,
+          sentimentBg,
+          sentimentBorder,
+          urgencyColor,
+          urgencyBg,
+          urgencyBorder,
+          summary: summaryText,
+          actionToTake,
+          actionText,
+          totalCalls: 1,
+          calls: [callHistoryItem]
+        });
+      } else {
+        const lead = leadMap.get(normKey);
+        lead.totalCalls += 1;
+        lead.calls.push(callHistoryItem);
+        // Elevate sentiment if interested
+        if (sentiment === 'Interested' && lead.sentiment !== 'Interested') {
+          lead.sentiment = 'Interested';
+          lead.color = sentimentColor;
+          lead.sentimentBg = sentimentBg;
+          lead.sentimentBorder = sentimentBorder;
+          lead.urgency = 'Urgent';
+          lead.urgencyColor = urgencyColor;
+          lead.urgencyBg = urgencyBg;
+          lead.urgencyBorder = urgencyBorder;
+        }
+        // Retain most descriptive summary & latest action
+        if (actionToTake && actionToTake !== 'Follow up with lead') {
+          lead.actionToTake = actionToTake;
+        }
+        if (summaryText && !summaryText.toLowerCase().includes('failed') && summaryText.length > (lead.summary || '').length) {
+          lead.summary = summaryText;
+        }
+      }
     });
+
+    cardsData.push(...Array.from(leadMap.values()));
   }
   
   // Fill with mock leads if we have less than 3
@@ -579,8 +629,9 @@ function createActionCardElement(card, isModal = false) {
   cardEl.className = 'action-lead-card';
   cardEl.dataset.id = card.id;
 
-  const flexBasis = isModal ? '100%' : '315px';
-  cardEl.style.cssText = `flex: 0 0 ${flexBasis}; background: var(--bg-surface, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 205px; max-height: 205px; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; backdrop-filter: blur(12px); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05); cursor: pointer; user-select: none; overflow: hidden;`;
+  const flexBasis = isModal ? '100%' : '0 0 310px';
+  const widthConstraint = isModal ? '' : 'min-width: 300px; max-width: 340px;';
+  cardEl.style.cssText = `flex: ${flexBasis}; ${widthConstraint} border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 205px; max-height: 205px; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; backdrop-filter: blur(16px); cursor: pointer; user-select: none; overflow: hidden;`;
 
   cardEl.onclick = (e) => {
     // If user clicks on button or inside a button, don't trigger modal
@@ -589,50 +640,46 @@ function createActionCardElement(card, isModal = false) {
   };
 
   cardEl.onmouseover = () => {
-    cardEl.style.borderColor = 'rgba(6, 182, 212, 0.6)';
     cardEl.style.transform = 'translateY(-3px)';
-    cardEl.style.boxShadow = '0 12px 30px 0 rgba(6, 182, 212, 0.2)';
   };
   cardEl.onmouseout = () => {
-    cardEl.style.borderColor = 'var(--border-color, #e2e8f0)';
     cardEl.style.transform = 'none';
-    cardEl.style.boxShadow = '0 4px 18px rgba(0, 0, 0, 0.05)';
   };
 
   const actionToTakeHtml = card.actionToTake ? `
-    <div style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.02)); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 8px; padding: 4px 8px; font-size: 0.71rem; color: var(--color-cyan, #06b6d4); font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 5px; line-height: 1.25;" title="Action to Take">
-      <span style="font-size: 0.8rem; line-height: 1;">⚡</span>
+    <div class="action-box" style="border-radius: 10px; padding: 5px 9px; font-size: 0.73rem; font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 6px; line-height: 1.3; margin-top: 3px;" title="Action to Take">
+      <span style="font-size: 0.8rem; line-height: 1; flex-shrink: 0;">⚡</span>
       <span style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;"><strong>Action:</strong> ${card.actionToTake}</span>
     </div>
   ` : '';
 
   cardEl.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0; gap: 6px;">
-      <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
-        <span style="color: var(--color-cyan, #06b6d4); font-size: 0.82rem;">📞</span>
-        <span style="font-size: 0.9rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace); letter-spacing: -0.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${card.phone}</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+        <span style="color: var(--color-primary, #ff5f52); font-size: 0.88rem;">📞</span>
+        <span style="font-size: 0.88rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace); letter-spacing: -0.3px; white-space: nowrap;">${card.phone}</span>
       </div>
       <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-        <span style="font-size: 0.62rem; font-weight: 800; text-transform: uppercase; padding: 2px 7px; border-radius: 20px; background: ${card.sentimentBg}; color: ${card.color}; border: 1px solid ${card.sentimentBorder}; letter-spacing: 0.3px; white-space: nowrap;">
+        <span style="font-size: 0.58rem; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 9999px; background: ${card.sentimentBg}; color: ${card.color}; border: 1px solid ${card.sentimentBorder}; letter-spacing: 0.3px; white-space: nowrap;">
           ${card.sentiment}
         </span>
-        <span style="font-size: 0.58rem; font-weight: 800; text-transform: uppercase; padding: 2px 5px; border-radius: 20px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.3px; white-space: nowrap;">${card.urgency}</span>
+        <span style="font-size: 0.56rem; font-weight: 700; text-transform: uppercase; padding: 2px 5px; border-radius: 9999px; background: ${card.urgencyBg}; color: ${card.urgencyColor}; border: 1px solid ${card.urgencyBorder}; letter-spacing: 0.3px; white-space: nowrap;">${card.urgency}</span>
       </div>
     </div>
     
-    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; text-align: left; overflow: hidden;">
-      <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px; margin-bottom: 6px; text-align: left; overflow: hidden;">
+      <div style="font-size: 0.76rem; color: var(--text-main); line-height: 1.38; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${card.summary}">
         ${card.summary}
       </div>
       ${actionToTakeHtml}
     </div>
     
     <div style="display: flex; gap: 8px; margin-top: auto; flex-shrink: 0;">
-      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}'); event.stopPropagation();" style="flex: 1; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); border: none; color: #ffffff; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25); transition: all 0.2s;">
+      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}'); event.stopPropagation();" style="flex: 1; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--color-primary, #ff5f52), #e11d48); border: none; color: #ffffff; font-weight: 700; font-size: 0.76rem; display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25); transition: all 0.2s;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         ${card.actionText}
       </button>
-      <button class="btn btn-secondary" onclick="window.dismissLeadCard(this); event.stopPropagation();" style="height: 32px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 0.74rem; background: rgba(0,0,0,0.04); border: 1px solid var(--border-color, #e2e8f0); color: var(--text-muted); cursor: pointer; transition: all 0.2s;">
+      <button class="btn btn-secondary btn-done" onclick="window.dismissLeadCard(this); event.stopPropagation();" style="height: 32px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; cursor: pointer; transition: all 0.2s;">
         Done
       </button>
     </div>
@@ -656,25 +703,26 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
     modal.style.cssText = 'display:none; position:fixed !important; top:0 !important; left:0 !important; width:100vw !important; height:100vh !important; background:rgba(0,0,0,0.85) !important; z-index:99999999 !important; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(8px);';
     modal.onclick = function(e) { if (e.target === modal) window.closeLeadDetailModal(); };
     modal.innerHTML = `
-      <div style="background:var(--bg-surface, #18181b); border:1px solid var(--border-color, #27272a); border-radius:24px; width:600px; max-width:92vw; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.7); overflow:hidden; position:relative;">
-        <div style="padding:22px 26px 18px 26px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border-color, #27272a); flex-shrink:0; background:rgba(255,255,255,0.02);">
+      <div style="background:var(--bg-surface, #18181b); border:1px solid var(--border-color, #27272a); border-radius:24px; width:640px; max-width:94vw; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.7); overflow:hidden; position:relative;">
+        <div style="padding:20px 24px 16px 24px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border-color, #27272a); flex-shrink:0; background:rgba(255,255,255,0.02);">
           <div style="display:flex; align-items:center; gap:12px;">
             <div style="width:42px; height:42px; border-radius:12px; background:rgba(6,182,212,0.15); color:var(--color-cyan, #06b6d4); display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">🎯</div>
             <div>
               <div id="lead-detail-phone" style="font-size:1.2rem; font-weight:800; color:var(--text-main, #ffffff); font-family:var(--font-mono, monospace);">+91 XXXXXXXXXX</div>
-              <div style="font-size:0.78rem; color:var(--text-muted, #a1a1aa); margin-top:2px;">AI Lead Insight & Recommended Action</div>
+              <div style="font-size:0.78rem; color:var(--text-muted, #a1a1aa); margin-top:2px;">Unified Lead Timeline & Call History</div>
             </div>
           </div>
           <button onclick="event.preventDefault(); event.stopPropagation(); window.closeLeadDetailModal();" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color, #27272a); color:var(--text-muted, #a1a1aa); width:34px; height:34px; border-radius:10px; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center;">✕</button>
         </div>
 
-        <div style="padding:22px 26px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:16px;">
+        <div style="padding:20px 24px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:16px;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span id="lead-detail-sentiment" style="padding:4px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">INTERESTED</span>
-            <span id="lead-detail-urgency" style="padding:4px 10px; border-radius:8px; font-weight:800; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.5px;">URGENT</span>
+            <span id="lead-detail-sentiment" style="padding:4px 12px; border-radius:9999px; font-weight:800; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">INTERESTED</span>
+            <span id="lead-detail-urgency" style="padding:4px 10px; border-radius:9999px; font-weight:800; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.5px;">URGENT</span>
+            <span id="lead-detail-call-count" style="padding:4px 10px; border-radius:9999px; font-weight:800; font-size:0.72rem; text-transform:uppercase; background:rgba(6,182,212,0.12); color:#06b6d4; border:1px solid rgba(6,182,212,0.3); letter-spacing:0.5px;">1 CALL</span>
           </div>
 
-          <div style="background:linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.02)); border:1px dashed rgba(6, 182, 212, 0.35); border-radius:14px; padding:14px 16px;">
+          <div style="background:linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.02)); border:1px solid rgba(6, 182, 212, 0.25); border-radius:14px; padding:14px 16px;">
             <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--color-cyan, #06b6d4); letter-spacing:0.5px; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
               <span>⚡</span> Recommended Action
             </div>
@@ -682,16 +730,26 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
           </div>
 
           <div>
-            <div style="font-size:0.78rem; font-weight:700; text-transform:uppercase; color:var(--text-muted, #a1a1aa); letter-spacing:0.5px; margin-bottom:8px;">Call Conversation Summary</div>
+            <div style="font-size:0.78rem; font-weight:700; text-transform:uppercase; color:var(--text-muted, #a1a1aa); letter-spacing:0.5px; margin-bottom:8px;">Current Lead Summary</div>
             <div id="lead-detail-summary" style="font-size:0.86rem; color:var(--text-main, #ffffff); line-height:1.6; background:rgba(0,0,0,0.2); border:1px solid var(--border-color, #27272a); border-radius:12px; padding:14px 16px;">
               Call details loading...
             </div>
           </div>
+
+          <!-- Chronological Call History Timeline Section -->
+          <div>
+            <div style="font-size:0.78rem; font-weight:700; text-transform:uppercase; color:var(--text-muted, #a1a1aa); letter-spacing:0.5px; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+              <span>📜</span> Call Activity & Conversation History
+            </div>
+            <div id="lead-detail-timeline-container" style="display:flex; flex-direction:column; gap:10px;">
+              <!-- Dynamically populated timeline -->
+            </div>
+          </div>
         </div>
 
-        <div style="padding:16px 26px; border-top:1px solid var(--border-color, #27272a); display:flex; gap:12px; justify-content:flex-end; flex-shrink:0; background:rgba(0,0,0,0.2);">
+        <div style="padding:16px 24px; border-top:1px solid var(--border-color, #27272a); display:flex; gap:12px; justify-content:flex-end; flex-shrink:0; background:rgba(0,0,0,0.2);">
           <button id="btn-lead-detail-done" style="padding:10px 20px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.85rem; background:rgba(255,255,255,0.06); border:1px solid var(--border-color, #27272a); color:var(--text-muted, #a1a1aa);">Mark Done</button>
-          <button id="btn-lead-detail-call" style="padding:10px 24px; border-radius:10px; font-weight:800; cursor:pointer; font-size:0.85rem; background:linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); border:none; color:white; display:flex; align-items:center; gap:8px; box-shadow:0 4px 15px rgba(234,88,12,0.3);">
+          <button id="btn-lead-detail-call" style="padding:10px 24px; border-radius:10px; font-weight:800; cursor:pointer; font-size:0.85rem; background:linear-gradient(135deg, var(--color-primary, #ff5f52), #e11d48); border:none; color:white; display:flex; align-items:center; gap:8px; box-shadow:0 4px 15px rgba(225,29,72,0.3);">
             <span>📞</span> Call Back Now
           </button>
         </div>
@@ -703,8 +761,10 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
   const phoneEl = document.getElementById('lead-detail-phone');
   const sentimentEl = document.getElementById('lead-detail-sentiment');
   const urgencyEl = document.getElementById('lead-detail-urgency');
+  const callCountEl = document.getElementById('lead-detail-call-count');
   const actionTextEl = document.getElementById('lead-detail-action-text');
   const summaryEl = document.getElementById('lead-detail-summary');
+  const timelineContainer = document.getElementById('lead-detail-timeline-container');
   const btnCall = document.getElementById('btn-lead-detail-call');
   const btnDone = document.getElementById('btn-lead-detail-done');
 
@@ -722,6 +782,53 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
     urgencyEl.style.background = card.urgencyBg;
     urgencyEl.style.color = card.urgencyColor;
     urgencyEl.style.border = `1px solid ${card.urgencyBorder}`;
+  }
+
+  if (callCountEl) {
+    const count = card.totalCalls || (card.calls ? card.calls.length : 1);
+    callCountEl.innerText = `${count} CALL${count > 1 ? 'S' : ''}`;
+  }
+
+  if (actionTextEl) {
+    actionTextEl.innerText = card.actionToTake || 'Follow up with lead';
+  }
+
+  if (summaryEl) {
+    summaryEl.innerText = card.summary || 'No detailed summary available.';
+  }
+
+  // Populate Call History Timeline
+  if (timelineContainer) {
+    const callLogs = card.calls || [];
+    if (callLogs.length > 0) {
+      timelineContainer.innerHTML = callLogs.map((cLog, idx) => {
+        const cDate = new Date(cLog.createdAt);
+        const dateFormatted = isNaN(cDate.getTime()) ? '-' : cDate.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const isInc = cLog.direction === 'incoming';
+        const dirBadge = isInc 
+          ? `<span style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">⬇ Incoming Call</span>`
+          : `<span style="background: rgba(6,182,212,0.15); color: #06b6d4; border: 1px solid rgba(6,182,212,0.3); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">⬆ Outbound Call</span>`;
+        const durText = typeof formatDuration === 'function' ? formatDuration(cLog.duration || 0) : (cLog.duration || 0) + 's';
+        
+        return `
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #27272a); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                ${dirBadge}
+                <span style="font-size: 0.78rem; color: var(--text-muted, #a1a1aa); font-weight: 600;">${dateFormatted}</span>
+              </div>
+              <span style="font-size: 0.72rem; color: var(--text-muted, #a1a1aa); font-family: var(--font-mono, monospace);">Duration: ${durText} • Status: ${cLog.status}</span>
+            </div>
+            <div style="font-size: 0.84rem; color: var(--text-main, #ffffff); line-height: 1.45; margin-top: 2px;">
+              ${cLog.summary}
+            </div>
+            ${cLog.actionToTake ? `<div style="font-size: 0.76rem; color: #f59e0b; font-weight: 600; margin-top: 2px;">⚡ Action: ${cLog.actionToTake}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    } else {
+      timelineContainer.innerHTML = `<div style="font-size: 0.82rem; color: var(--text-muted); padding: 10px;">No prior call history logged for this number.</div>`;
+    }
   }
 
   if (actionTextEl) {
@@ -5572,11 +5679,11 @@ function applyUserRole(user) {
     }
   }
   
-  // Handle wallet indicator visibility & remaining minutes
+  // Handle wallet indicator visibility (Hidden per user design preference)
   const walletIndicator = document.getElementById('wallet-balance-indicator');
   const headerWalletBalance = document.getElementById('header-wallet-balance');
   if (walletIndicator && headerWalletBalance) {
-    walletIndicator.style.display = 'flex';
+    walletIndicator.style.display = 'none';
     const bal = user.balance !== undefined ? user.balance : 0;
     const remaining = bal >= 99999 ? '∞' : Math.max(0, bal).toFixed(1);
     headerWalletBalance.textContent = `${remaining}`;
@@ -5588,25 +5695,23 @@ function applyUserRole(user) {
   // Apply pricing plans features locking and details UI
   applyUserPlanAndLimits(user);
 
-  // Reset all nav buttons visibility
-  document.querySelectorAll('.glass-navbar .nav-btn').forEach(btn => btn.style.display = 'none');
+  // Reset all nav buttons inline display styles so CSS role-rules can govern cleanly
+  document.querySelectorAll('.glass-navbar .nav-btn').forEach(btn => btn.style.display = '');
   
-  if (user.role === 'admin') {
-    // Admin has access to all standard tabs + admin tab + billing + settings
-    document.getElementById('nav-dashboard').style.display = 'block';
-    document.getElementById('nav-agents').style.display = 'block';
-    document.getElementById('nav-contacts').style.display = 'block';
-    document.getElementById('nav-broadcast').style.display = 'block';
-    document.getElementById('nav-quick-call').style.display = 'block';
-    document.getElementById('nav-crm-automation').style.display = 'block';
-    document.getElementById('nav-api-sharing').style.display = 'block';
-    document.getElementById('nav-admin-panel').style.display = 'block';
+  const role = user ? (user.role || 'client') : 'guest';
+  if (role === 'admin' || role === 'reseller') {
+    // Admin & Reseller access
+    ['nav-dashboard', 'nav-agents', 'nav-contacts', 'nav-broadcast', 'nav-quick-call', 'nav-crm-automation', 'nav-api-sharing', 'nav-admin-panel'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.style.display = 'inline-flex';
+    });
+    const navBilling = document.getElementById('nav-billing');
+    if (navBilling) navBilling.style.display = 'none';
     
-    // Populate branding settings form
-    window.loadBrandingToForm();
-    document.getElementById('nav-billing').style.display = 'none';
+    // Populate branding settings form for admin/reseller
+    if (typeof window.loadBrandingToForm === 'function') window.loadBrandingToForm();
     
-    // Show settings and provider selection for admin
+    // Show settings and provider selection for admin/reseller
     const settingsBtn = document.getElementById('btn-toggle-settings');
     if (settingsBtn) settingsBtn.style.display = 'flex';
     const adminSettingsOnly = document.getElementById('admin-settings-only');
@@ -5638,20 +5743,18 @@ function applyUserRole(user) {
     }
     
     // Fetch Admin data
-    fetchAdminRequests();
-    fetchAdminClients();
-    fetchAdminTransactions();
+    if (typeof fetchAdminRequests === 'function') fetchAdminRequests();
+    if (typeof fetchAdminClients === 'function') fetchAdminClients();
+    if (typeof fetchAdminTransactions === 'function') fetchAdminTransactions();
     fetchClientDashboardData();
   } else {
     // Client has access to all standard tabs except Admin Panel
-    document.getElementById('nav-dashboard').style.display = 'block';
-    document.getElementById('nav-agents').style.display = 'block';
-    document.getElementById('nav-contacts').style.display = 'block';
-    document.getElementById('nav-broadcast').style.display = 'block';
-    document.getElementById('nav-quick-call').style.display = 'block';
-    document.getElementById('nav-crm-automation').style.display = 'block';
-    document.getElementById('nav-api-sharing').style.display = 'block';
-    document.getElementById('nav-billing').style.display = 'block';
+    ['nav-dashboard', 'nav-agents', 'nav-contacts', 'nav-broadcast', 'nav-quick-call', 'nav-crm-automation', 'nav-api-sharing', 'nav-billing'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.style.display = 'inline-flex';
+    });
+    const navAdmin = document.getElementById('nav-admin-panel');
+    if (navAdmin) navAdmin.style.display = 'none';
     
     // Show settings for client but hide admin-only config panels
     const settingsBtn = document.getElementById('btn-toggle-settings');
@@ -7730,30 +7833,35 @@ window.fetchAdminResellers = async function() {
       const packageName = r.package_name || 'Standard';
       const usedMin = r.quota?.used_minutes || 0;
       const totalMin = r.quota?.total_minutes || 0;
-      const ratePM = r.quota?.wholesale_rate_per_minute || 2.0;
+      const ratePM = r.quota?.wholesale_rate_per_minute !== undefined ? r.quota.wholesale_rate_per_minute : 2.0;
+      const walletBal = r.wallet_balance !== undefined ? r.wallet_balance : 0;
       return `
       <tr>
-        <td style="font-weight: 600;">${r.name}</td>
+        <td style="font-weight: 700; color: var(--text-main);">${r.name}</td>
         <td style="font-size: 0.85rem; color: var(--text-muted);">${r.email}</td>
-        <td style="font-size: 0.85rem; font-family: monospace;">${r.domain || r.subdomain || '—'}</td>
+        <td style="font-size: 0.85rem; font-family: monospace; color: var(--color-cyan);">${r.domain || r.subdomain || '—'}</td>
         <td>
-          <span style="background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">${packageName}</span>
+          <span style="background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); padding: 3px 9px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;">${packageName}</span>
         </td>
         <td style="font-size: 0.85rem;">
-          <strong>${usedMin}</strong> / ${totalMin} min
+          <div><strong>${usedMin}</strong> / ${totalMin} min</div>
+          <div style="font-size: 0.72rem; color: #10b981; font-weight: 600; margin-top: 2px;">Wallet: ₹${Number(walletBal).toLocaleString()}</div>
           <div style="width: 80px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 4px; margin-top: 4px; overflow: hidden;">
             <div style="width: ${totalMin > 0 ? Math.min(100, Math.round((usedMin/totalMin)*100)) : 0}%; height: 100%; background: linear-gradient(90deg, #06b6d4, #8b5cf6); border-radius: 4px;"></div>
           </div>
+        </td>
+        <td>
+          <span style="color: #06b6d4; font-weight: 800; font-size: 0.88rem;">₹${Number(ratePM).toFixed(2)}</span><span style="font-size: 0.72rem; color: var(--text-muted);">/min</span>
         </td>
         <td style="font-size: 0.85rem;">${r.client_count || 0} clients</td>
         <td>
           <span class="badge ${r.status === 'active' ? 'badge-green' : 'badge-red'}" style="padding: 2px 8px; border-radius: 100px; font-size: 0.75rem; font-weight: 600;">${r.status}</span>
         </td>
         <td style="text-align: right;">
-          <button onclick="window.openResellerPackageModal('${r.id}', '${r.name}', ${totalMin}, ${ratePM}, '${packageName}', ${r.permissions?.max_clients || 10})" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; margin-right: 4px;">📦 Package</button>
-          <button onclick="window.rechargeResellerWallet('${r.id}', '${r.name}', ${usedMin}, ${totalMin})" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; margin-right: 4px; color: #10b981; border-color: rgba(16,185,129,0.3);">💰 Wallet</button>
-          <button onclick="window.toggleResellerStatus('${r.id}', '${r.status}')" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; margin-right: 4px;">${r.status === 'active' ? 'Suspend' : 'Activate'}</button>
-          <button onclick="window.deleteReseller('${r.id}', '${r.name}')" class="btn btn-danger" style="padding: 3px 8px; font-size: 0.75rem; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3);">Delete</button>
+          <button onclick="window.openResellerPackageModal('${r.id}', '${r.name}', ${totalMin}, ${ratePM}, '${packageName}', ${r.permissions?.max_clients || 10}, ${walletBal})" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; margin-right: 4px; font-weight: 600;">📦 Package & Rate</button>
+          <button onclick="window.rechargeResellerWallet('${r.id}', '${r.name}', ${usedMin}, ${totalMin}, ${walletBal})" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; margin-right: 4px; color: #10b981; border-color: rgba(16,185,129,0.3); font-weight: 600;">💰 Wallet</button>
+          <button onclick="window.toggleResellerStatus('${r.id}', '${r.status}')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">${r.status === 'active' ? 'Suspend' : 'Activate'}</button>
+          <button onclick="window.deleteReseller('${r.id}', '${r.name}')" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3);">Delete</button>
         </td>
       </tr>
     `;
@@ -7765,7 +7873,7 @@ window.fetchAdminResellers = async function() {
 };
 
 // Package & Permissions Modal for Reseller
-window.openResellerPackageModal = function(id, name, currentTotal, currentRate, currentPackage, currentMaxClients) {
+window.openResellerPackageModal = function(id, name, currentTotal, currentRate, currentPackage, currentMaxClients, currentWallet = 0) {
   // Create or reuse modal
   let modal = document.getElementById('reseller-package-modal');
   if (!modal) {
@@ -7773,10 +7881,10 @@ window.openResellerPackageModal = function(id, name, currentTotal, currentRate, 
     modal.id = 'reseller-package-modal';
     modal.style.cssText = 'display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;';
     modal.innerHTML = `
-      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 28px; width: 500px; max-width: 95vw; max-height: 90vh; overflow-y: auto;">
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 28px; width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <div>
-            <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-main);">📦 Reseller Package Settings</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-main);">📦 Reseller Package & Pricing Settings</div>
             <div id="rp-reseller-name" style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;"></div>
           </div>
           <button onclick="document.getElementById('reseller-package-modal').style.display='none'" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer;">✕</button>
@@ -7798,8 +7906,12 @@ window.openResellerPackageModal = function(id, name, currentTotal, currentRate, 
             <input id="rp-total-minutes" type="number" min="0" placeholder="e.g. 1000" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; outline: none; width: 100%;">
           </div>
           <div>
-            <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 5px;">Wholesale Rate (₹/min)</label>
-            <input id="rp-rate" type="number" step="0.5" min="0" placeholder="e.g. 2.0" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; outline: none; width: 100%;">
+            <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 5px;">Per-Minute Call Price (₹/min)</label>
+            <input id="rp-rate" type="number" step="0.1" min="0" placeholder="e.g. 1.80" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; outline: none; width: 100%;">
+          </div>
+          <div style="grid-column: span 2;">
+            <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 5px;">Wallet Credit Balance (₹)</label>
+            <input id="rp-wallet-balance" type="number" step="100" min="0" placeholder="e.g. 5000" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: #10b981; font-weight: 700; border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; outline: none; width: 100%;">
           </div>
         </div>
 
@@ -7834,7 +7946,7 @@ window.openResellerPackageModal = function(id, name, currentTotal, currentRate, 
         </div>
 
         <div style="display: flex; gap: 10px;">
-          <button onclick="window.saveResellerPackage()" style="flex: 2; background: linear-gradient(135deg, #8b5cf6, #06b6d4); color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.9rem;">💾 Save Package Settings</button>
+          <button onclick="window.saveResellerPackage()" style="flex: 2; background: linear-gradient(135deg, #8b5cf6, #06b6d4); color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.9rem;">💾 Save Custom Package & Rates</button>
           <button onclick="document.getElementById('reseller-package-modal').style.display='none'" style="flex: 1; background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-color); padding: 10px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 0.85rem;">Cancel</button>
         </div>
       </div>
@@ -7849,6 +7961,7 @@ window.openResellerPackageModal = function(id, name, currentTotal, currentRate, 
   document.getElementById('rp-max-clients').value = currentMaxClients || 10;
   document.getElementById('rp-total-minutes').value = currentTotal || 1000;
   document.getElementById('rp-rate').value = currentRate || 2.0;
+  document.getElementById('rp-wallet-balance').value = currentWallet || 0;
 
   // Load current permissions from fetched reseller data
   const resellerRow = window._cachedResellers?.find(r => r.id === id);
@@ -7873,6 +7986,7 @@ window.saveResellerPackage = async function() {
   const maxClients = parseInt(document.getElementById('rp-max-clients').value) || 10;
   const totalMinutes = parseFloat(document.getElementById('rp-total-minutes').value) || 1000;
   const rate = parseFloat(document.getElementById('rp-rate').value) || 2.0;
+  const walletBal = parseFloat(document.getElementById('rp-wallet-balance').value) || 0;
   const adminPass = localStorage.getItem('adminPassword') || 'admin123';
 
   const permissions = {
@@ -7889,10 +8003,10 @@ window.saveResellerPackage = async function() {
   };
 
   try {
-    // Update quota + rate
+    // Update quota + rate + wallet_balance
     const rQuota = await fetch(`/api/admin/resellers/${id}/quota`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ admin_password: adminPass, total_minutes: totalMinutes, wholesale_rate_per_minute: rate })
+      body: JSON.stringify({ admin_password: adminPass, total_minutes: totalMinutes, wholesale_rate_per_minute: rate, wallet_balance: walletBal })
     });
     // Update permissions + package_name
     const rPerms = await fetch(`/api/admin/resellers/${id}/permissions`, {
@@ -7910,26 +8024,53 @@ window.saveResellerPackage = async function() {
   } catch(e) { alert('Failed to save package: ' + e.message); }
 };
 
-window.rechargeResellerWallet = async function(id, name, usedMin, totalMin) {
-  const addMins = prompt(`Reseller: ${name}\nCurrent Quota: ${usedMin} used / ${totalMin} total minutes\n\nAdd minutes to quota:`, '500');
-  if (addMins === null) return;
-  const addAmount = parseFloat(addMins);
-  if (isNaN(addAmount) || addAmount <= 0) { alert('Please enter a valid number of minutes.'); return; }
+window.rechargeResellerWallet = async function(id, name, usedMin, totalMin, currentWallet = 0) {
+  const choice = prompt(`Reseller Wallet & Quota Manager: ${name}\n-----------------------------------\nCurrent Wallet Balance: ₹${Number(currentWallet).toLocaleString()}\nCurrent Call Quota: ${usedMin} used / ${totalMin} total min\n\nChoose an action:\n1 - Add Wallet Balance (in ₹ Rupees)\n2 - Add Call Minutes (to Minute Quota)\n\nEnter 1 or 2:`, '1');
+  
+  if (!choice) return;
 
   const adminPass = localStorage.getItem('adminPassword') || 'admin123';
-  try {
-    const res = await fetch(`/api/admin/resellers/${id}/quota`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ admin_password: adminPass, total_minutes: totalMin + addAmount })
-    });
-    const d = await res.json();
-    if (d.success) {
-      alert(`✅ Added ${addAmount} minutes to ${name}'s wallet!\nNew total: ${totalMin + addAmount} minutes.`);
-      window.fetchAdminResellers();
-    } else {
-      alert('Error: ' + d.error);
-    }
-  } catch(e) { alert('Failed to recharge wallet: ' + e.message); }
+
+  if (choice.trim() === '1') {
+    const amtStr = prompt(`Enter amount in ₹ to add to ${name}'s Wallet Balance:`, "5000");
+    if (!amtStr) return;
+    const addAmt = parseFloat(amtStr);
+    if (isNaN(addAmt) || addAmt <= 0) { alert('Please enter a valid positive amount.'); return; }
+
+    try {
+      const res = await fetch(`/api/admin/resellers/${id}/quota`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_password: adminPass, add_wallet_balance: addAmt })
+      });
+      const d = await res.json();
+      if (d.success) {
+        alert(`✅ Successfully added ₹${addAmt.toLocaleString()} to ${name}'s wallet!\nNew Balance: ₹${Number(d.wallet_balance || (currentWallet + addAmt)).toLocaleString()}`);
+        window.fetchAdminResellers();
+      } else {
+        alert('Error: ' + d.error);
+      }
+    } catch(e) { alert('Failed to recharge wallet: ' + e.message); }
+
+  } else if (choice.trim() === '2') {
+    const minStr = prompt(`Enter call minutes to add to ${name}'s Minute Quota:`, "1000");
+    if (!minStr) return;
+    const addMins = parseFloat(minStr);
+    if (isNaN(addMins) || addMins <= 0) { alert('Please enter valid minutes.'); return; }
+
+    try {
+      const res = await fetch(`/api/admin/resellers/${id}/quota`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_password: adminPass, total_minutes: totalMin + addMins })
+      });
+      const d = await res.json();
+      if (d.success) {
+        alert(`✅ Added ${addMins} minutes to ${name}'s quota!\nNew total: ${totalMin + addMins} minutes.`);
+        window.fetchAdminResellers();
+      } else {
+        alert('Error: ' + d.error);
+      }
+    } catch(e) { alert('Failed to recharge quota: ' + e.message); }
+  }
 };
 
 window.openCreateResellerModal = async function() {
