@@ -370,45 +370,51 @@ window.populateAIActionPlanner = function() {
   const mockLeads = [
     {
       id: 'mock_1',
-      phone: '+91 88474 92101',
-      urgency: 'Urgent',
-      sentiment: 'Highly Interested',
+      contactName: 'Thanos',
+      phone: '8630301466',
+      urgency: 'URGENT',
+      sentiment: 'INTERESTED',
       color: '#10b981', // green
       sentimentBg: 'rgba(16, 185, 129, 0.12)',
       sentimentBorder: 'rgba(16, 185, 129, 0.3)',
       urgencyColor: '#ef4444', // red
       urgencyBg: 'rgba(239, 68, 68, 0.15)',
       urgencyBorder: 'rgba(239, 68, 68, 0.25)',
-      summary: 'Called about API integration. Wants to buy Enterprise plan immediately. Send pricing quotation.',
+      summary: 'User wants to reschedule today\'s appointment. Agent found no immediate slot.',
+      actionToTake: 'Re-attempt contact at a different time.',
       actionText: 'Call Back'
     },
     {
       id: 'mock_2',
-      phone: '+91 91234 56789',
-      urgency: 'High',
-      sentiment: 'Skeptical',
+      contactName: '8384828654',
+      phone: '8384828654',
+      urgency: 'MEDIUM',
+      sentiment: 'NEUTRAL',
       color: '#f59e0b', // orange
       sentimentBg: 'rgba(245, 158, 11, 0.12)',
       sentimentBorder: 'rgba(245, 158, 11, 0.3)',
       urgencyColor: '#f97316', // orange
       urgencyBg: 'rgba(249, 115, 22, 0.15)',
       urgencyBorder: 'rgba(249, 115, 22, 0.25)',
-      summary: 'Concerned about latency. Needs technical documentation and latency benchmarks via WhatsApp.',
-      actionText: 'Send Doc'
+      summary: 'No conversation occurred during the call.',
+      actionToTake: 'Follow up with lead',
+      actionText: 'Call Back'
     },
     {
       id: 'mock_3',
-      phone: '+91 99887 76655',
-      urgency: 'Medium',
-      sentiment: 'Busy (Callback)',
-      color: '#3b82f6', // blue
-      sentimentBg: 'rgba(59, 130, 246, 0.12)',
-      sentimentBorder: 'rgba(59, 130, 246, 0.3)',
-      urgencyColor: '#eab308', // yellow
-      urgencyBg: 'rgba(234, 179, 8, 0.15)',
-      urgencyBorder: 'rgba(234, 179, 8, 0.25)',
-      summary: 'Was driving during the call. Requested a callback in the evening around 6 PM.',
-      actionText: 'Call Later'
+      contactName: 'Callback Customer',
+      phone: '8273176799',
+      urgency: 'URGENT',
+      sentiment: 'INTERESTED',
+      color: '#10b981', // green
+      sentimentBg: 'rgba(16, 185, 129, 0.12)',
+      sentimentBorder: 'rgba(16, 185, 129, 0.3)',
+      urgencyColor: '#ef4444', // red
+      urgencyBg: 'rgba(239, 68, 68, 0.15)',
+      urgencyBorder: 'rgba(239, 68, 68, 0.25)',
+      summary: 'User wants to book an appointment. User asked about slot availability.',
+      actionToTake: 'Do not contact user for this specific offer.',
+      actionText: 'Call Back'
     }
   ];
   
@@ -691,12 +697,13 @@ function createActionCardElement(card, isModal = false) {
     cardEl.style.transform = 'none';
   };
 
-  const actionToTakeHtml = card.actionToTake ? `
-    <div class="action-box" style="border-radius: 10px; padding: 5px 9px; font-size: 0.73rem; font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 6px; line-height: 1.3; margin-top: 3px;" title="Action to Take">
+  const defaultAction = card.actionToTake || 'Follow up with lead';
+  const actionToTakeHtml = `
+    <div class="action-box" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 4px 8px; font-size: 0.73rem; font-weight: 600; text-align: left; display: flex; align-items: center; gap: 6px; line-height: 1.3; margin-top: 3px; color: #d97706;" title="Action to Take">
       <span style="font-size: 0.8rem; line-height: 1; flex-shrink: 0;">⚡</span>
-      <span style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;"><strong>Action:</strong> ${card.actionToTake}</span>
+      <span style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;"><strong>Action:</strong> ${defaultAction}</span>
     </div>
-  ` : '';
+  `;
 
   const titleText = card.contactName ? card.contactName : card.phone;
 
