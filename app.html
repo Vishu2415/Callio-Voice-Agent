@@ -1730,24 +1730,90 @@
             </div>
           </div>
 
-          <!-- SECTION 4: Manage Pricing Plans -->
+          <!-- SECTION 4: Manage Pricing Plans & Whitelabel Reseller Commission Controls -->
           <div id="admin-panel-section-plans" style="display: none;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-              <h3 class="section-title" style="margin: 0;">Platform Subscription Plans</h3>
-              <button onclick="window.openCreatePlanModal()" class="admin-action-btn admin-action-btn-recharge" style="font-size: 0.85rem !important; padding: 8px 16px !important;">➕ Create New Plan</button>
+            
+            <!-- Reseller Wallet & Commission Controls Banner (Visible to Whitelabel Resellers & Admins) -->
+            <div id="reseller-wallet-commission-card" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(225, 29, 72, 0.05)); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 20px; padding: 22px 26px; margin-bottom: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                  <div style="width: 48px; height: 48px; border-radius: 14px; background: rgba(6, 182, 212, 0.2); color: var(--color-cyan); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">💳</div>
+                  <div>
+                    <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--text-main);">Whitelabel Billing & Reseller Commission Console</h3>
+                    <p style="margin: 3px 0 0 0; font-size: 0.78rem; color: var(--text-muted);">Set your custom profit markup on monthly plans & calling prices. Platform charges wholesale base cost from your wallet.</p>
+                  </div>
+                </div>
+                
+                <!-- Wallet Balance Badge & Recharge -->
+                <div style="display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 14px; padding: 10px 18px;">
+                  <div>
+                    <div style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Reseller Wallet Balance</div>
+                    <div id="reseller-wallet-balance-display" style="font-size: 1.3rem; font-weight: 900; color: var(--color-green, #10b981); font-family: var(--font-mono);">₹10,000.00</div>
+                  </div>
+                  <button onclick="window.openResellerWalletRechargeModal()" class="admin-action-btn admin-action-btn-recharge" style="padding: 8px 16px !important; font-weight: 800; font-size: 0.82rem !important; border-radius: 10px !important;">⚡ Recharge Wallet</button>
+                </div>
+              </div>
+
+              <!-- Reseller Custom Markup Controls Form -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                <!-- Calling Price Markup -->
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px;">
+                  <label style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; color: var(--color-cyan); letter-spacing: 0.5px; display: block; margin-bottom: 6px;">📞 Calling Price Commission Markup</label>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Base Rate: <strong id="reseller-base-calling-rate" style="color: var(--text-main);">₹2.00/min</strong> + </span>
+                    <input type="number" id="reseller-per-minute-markup-input" step="0.1" min="0" value="1.5" style="width: 90px; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 800; font-family: var(--font-mono); font-size: 0.9rem;" placeholder="0.0" oninput="window.updateResellerMarkupCalculations()">
+                    <span style="font-size: 0.85rem; color: var(--color-green); font-weight: 700;">= Retail: <span id="reseller-retail-calling-rate">₹3.50/min</span></span>
+                  </div>
+                </div>
+
+                <!-- Monthly Plan Commission Markups -->
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px;">
+                  <label style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; color: var(--color-cyan); letter-spacing: 0.5px; display: block; margin-bottom: 6px;">💳 Monthly Subscription Markup (Basic / Pro / Custom)</label>
+                  <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px;">
+                    <div style="flex: 1; min-width: 80px;">
+                      <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">Basic (+₹)</span>
+                      <input type="number" id="reseller-markup-basic" step="50" min="0" value="500" style="width: 100%; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem;" oninput="window.updateResellerMarkupCalculations()">
+                    </div>
+                    <div style="flex: 1; min-width: 80px;">
+                      <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">Pro (+₹)</span>
+                      <input type="number" id="reseller-markup-pro" step="50" min="0" value="1000" style="width: 100%; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem;" oninput="window.updateResellerMarkupCalculations()">
+                    </div>
+                    <div style="flex: 1; min-width: 80px;">
+                      <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">Custom (+₹)</span>
+                      <input type="number" id="reseller-markup-custom" step="100" min="0" value="3000" style="width: 100%; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem;" oninput="window.updateResellerMarkupCalculations()">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Save Markups Button -->
+              <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
+                <button onclick="window.saveResellerMarkups()" class="admin-action-btn admin-action-btn-recharge" style="padding: 8px 24px !important; font-size: 0.85rem !important; font-weight: 800;">💾 Save Commission Markups</button>
+              </div>
             </div>
+
+            <!-- Platform Subscription Plans Table -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+              <div>
+                <h3 class="section-title" style="margin: 0;">Platform Subscription Plans</h3>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 3px 0 0 0;">Platform fixed base costs and your final customer retail prices.</p>
+              </div>
+              <button id="btn-create-new-plan-admin" onclick="window.openCreatePlanModal()" class="admin-action-btn admin-action-btn-recharge" style="font-size: 0.85rem !important; padding: 8px 16px !important;">➕ Create New Base Plan</button>
+            </div>
+            
             <div class="table-responsive">
               <table class="premium-table">
                 <thead>
                   <tr>
                     <th>Plan Name</th>
                     <th>Plan ID</th>
-                    <th>Price / Month</th>
+                    <th>Fixed Base Cost</th>
+                    <th>Your Commission Markup</th>
+                    <th>Final Retail Price</th>
                     <th>Minutes Limit</th>
                     <th>Agents Limit</th>
-                    <th>Cost / Minute</th>
-                    <th>CRM Integration</th>
-                    <th>Developer API</th>
+                    <th>Base Calling Price</th>
+                    <th>Retail Calling Price</th>
                     <th style="text-align: right;">Actions</th>
                   </tr>
                 </thead>

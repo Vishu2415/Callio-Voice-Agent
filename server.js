@@ -5043,6 +5043,79 @@ app.put('/api/reseller/landing-page', express.json(), resellerAuthMiddleware, (r
   res.json({ success: true, landing_page: reseller.landing_page });
 });
 
+// GET reseller pricing config & base plans
+app.get('/api/reseller/pricing-config', resellerAuthMiddleware, (req, res) => {
+  const reseller = req.reseller;
+  const basePlans = Array.from(plansDb.values()).map(p => ({
+    id: p.id,
+    name: p.name,
+    base_price_per_month: p.base_price_per_month !== undefined ? p.base_price_per_month : p.price_per_month,
+    base_rate_per_minute: p.base_rate_per_minute !== undefined ? p.base_rate_per_minute : (p.rate_per_minute || 5),
+    max_minutes: p.max_minutes,
+    max_agents: p.max_agents,
+    crm_integration: p.crm_integration,
+    api_sharing: p.api_sharing
+  }));
+
+  reseller.markups = reseller.markups || { per_minute_markup: 0, plan_markups: {} };
+  reseller.wallet_balance = reseller.wallet_balance !== undefined ? reseller.wallet_balance : 10000;
+
+  res.json({
+    success: true,
+    wallet_balance: reseller.wallet_balance,
+    wholesale_rate_per_minute: reseller.quota?.wholesale_rate_per_minute || 2.0,
+    base_plans: basePlans,
+    markups: reseller.markups
+  });
+});
+
+// PUT reseller custom markups / commissions
+app.put('/api/reseller/markups', express.json(), resellerAuthMiddleware, (req, res) => {
+  const reseller = req.reseller;
+  const { per_minute_markup, plan_markups } = req.body;
+
+  reseller.markups = reseller.markups || {};
+  if (per_minute_markup !== undefined) {
+    reseller.markups.per_minute_markup = Math.max(0, Number(per_minute_markup) || 0);
+  }
+  if (plan_markups && typeof plan_markups === 'object') {
+    reseller.markups.plan_markups = reseller.markups.plan_markups || {};
+    for (const [pId, val] of Object.entries(plan_markups)) {
+      reseller.markups.plan_markups[pId] = Math.max(0, Number(val) || 0);
+    }
+  }
+
+  resellersDb.set(reseller.id, reseller);
+  saveResellers();
+  console.log(`[Reseller Markups] Updated markups for ${reseller.name}:`, reseller.markups);
+  res.json({ success: true, markups: reseller.markups });
+});
+
+// POST reseller wallet recharge (Top up funds)
+app.post('/api/reseller/wallet/recharge', express.json(), resellerAuthMiddleware, (req, res) => {
+  const reseller = req.reseller;
+  const amount = Number(req.body.amount);
+  if (!amount || isNaN(amount) || amount <= 0) {
+    return res.status(400).json({ success: false, error: 'Valid positive recharge amount required.' });
+  }
+
+  reseller.wallet_balance = (reseller.wallet_balance !== undefined ? reseller.wallet_balance : 10000) + amount;
+  reseller.billing_history = reseller.billing_history || [];
+  reseller.billing_history.unshift({
+    id: 'rwtx_' + Date.now(),
+    timestamp: new Date().toISOString(),
+    type: 'recharge',
+    amount: amount,
+    balance_after: reseller.wallet_balance,
+    description: `Reseller Wallet Recharge — Added ₹${amount.toLocaleString('en-IN')}`
+  });
+
+  resellersDb.set(reseller.id, reseller);
+  saveResellers();
+  console.log(`[Reseller Wallet] Recharged ${reseller.name} by ₹${amount}. New Balance: ₹${reseller.wallet_balance}`);
+  res.json({ success: true, wallet_balance: reseller.wallet_balance, message: `Successfully recharged ₹${amount}` });
+});
+
 // ─── RESELLER CLIENT MANAGEMENT ───────────────────────────────────────────────
 
 // GET reseller's own clients
@@ -5208,10 +5281,13 @@ function chargeResellerForCall(clientId, durationMinutes) {
   const reseller = resellersDb.get(client.reseller_id);
   if (!reseller) return;
 
-  const wholesaleRate = reseller.quota.wholesale_rate_per_minute || 2.0;
-  const charge = Math.ceil(durationMinutes) * wholesaleRate;
+  const wholesaleRate = reseller.quota?.wholesale_rate_per_minute || 2.0;
+  const charge = Number((Math.ceil(durationMinutes) * wholesaleRate).toFixed(2));
 
+  reseller.quota = reseller.quota || {};
   reseller.quota.used_minutes = (reseller.quota.used_minutes || 0) + Math.ceil(durationMinutes);
+  reseller.wallet_balance = Number(((reseller.wallet_balance !== undefined ? reseller.wallet_balance : 10000) - charge).toFixed(2));
+
   reseller.billing_history = reseller.billing_history || [];
   reseller.billing_history.unshift({
     id: 'rtxn_' + Date.now(),
@@ -5221,12 +5297,13 @@ function chargeResellerForCall(clientId, durationMinutes) {
     duration_minutes: Math.ceil(durationMinutes),
     wholesale_rate: wholesaleRate,
     total_charge: charge,
-    description: `Call by client ${client.name} — ${Math.ceil(durationMinutes)} min @ ₹${wholesaleRate}/min`
+    wallet_balance_after: reseller.wallet_balance,
+    description: `Call by client ${client.name} — ${Math.ceil(durationMinutes)} min @ ₹${wholesaleRate}/min base rate`
   });
 
   resellersDb.set(reseller.id, reseller);
   saveResellers();
-  console.log(`[Reseller Billing] Charged ${reseller.name}: ${Math.ceil(durationMinutes)} min, ₹${charge} wholesale for client ${client.name}`);
+  console.log(`[Reseller Billing] Charged ${reseller.name} wallet: ${Math.ceil(durationMinutes)} min, ₹${charge} wholesale (New Wallet Balance: ₹${reseller.wallet_balance})`);
 }
 
 // Export for use in billing code

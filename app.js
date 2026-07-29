@@ -8794,6 +8794,175 @@ window.viewClientCallDetail = function(callSid) {
   elTabSummary.click();
 };
 
+window.renderAdminPlansTable = async function() {
+  try {
+    const isReseller = loggedInUser && loggedInUser.role === 'reseller';
+    
+    // Hide 'Create New Base Plan' button for Whitelabel Resellers (Base plans are fixed by Super Admin)
+    const btnCreatePlan = document.getElementById('btn-create-new-plan-admin');
+    if (btnCreatePlan) {
+      btnCreatePlan.style.display = isReseller ? 'none' : 'inline-flex';
+    }
+
+    // Fetch Reseller Pricing Config if logged in as reseller
+    let resellerConfig = null;
+    if (isReseller) {
+      try {
+        const rRes = await fetch('/api/reseller/pricing-config');
+        resellerConfig = await rRes.json();
+        if (resellerConfig.success) {
+          const wBal = document.getElementById('reseller-wallet-balance-display');
+          if (wBal) wBal.innerText = `₹${Number(resellerConfig.wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+          
+          const baseRateEl = document.getElementById('reseller-base-calling-rate');
+          if (baseRateEl) baseRateEl.innerText = `₹${resellerConfig.wholesale_rate_per_minute}/min`;
+
+          const pMinInput = document.getElementById('reseller-per-minute-markup-input');
+          if (pMinInput && resellerConfig.markups) {
+            pMinInput.value = resellerConfig.markups.per_minute_markup || 0;
+          }
+
+          if (resellerConfig.markups?.plan_markups) {
+            const mB = document.getElementById('reseller-markup-basic');
+            const mP = document.getElementById('reseller-markup-pro');
+            const mC = document.getElementById('reseller-markup-custom');
+            if (mB) mB.value = resellerConfig.markups.plan_markups.basic || 0;
+            if (mP) mP.value = resellerConfig.markups.plan_markups.pro || 0;
+            if (mC) mC.value = resellerConfig.markups.plan_markups.custom || 0;
+          }
+          window.updateResellerMarkupCalculations();
+        }
+      } catch(e) {}
+    }
+
+    const res = await fetch('/api/plans');
+    const data = await res.json();
+    if (data.success && data.plans) {
+      window.activePlans = data.plans;
+      
+      const tbody = document.getElementById('admin-plans-table-body');
+      if (tbody) {
+        tbody.innerHTML = '';
+        if (data.plans.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">No platform base plans configured.</td></tr>`;
+          return;
+        }
+        data.plans.forEach(p => {
+          const row = document.createElement('tr');
+          
+          const basePrice = p.base_price_per_month !== undefined ? p.base_price_per_month : p.price_per_month;
+          const baseCalling = p.base_rate_per_minute !== undefined ? p.base_rate_per_minute : (p.rate_per_minute || 5);
+          const markupMonthly = p.reseller_markup_monthly || (resellerConfig?.markups?.plan_markups?.[p.id] || 0);
+          const markupPerMin = p.reseller_markup_per_minute || (resellerConfig?.markups?.per_minute_markup || 0);
+          const finalRetailMonthly = basePrice + markupMonthly;
+          const finalRetailCalling = Number((baseCalling + markupPerMin).toFixed(2));
+
+          const basePriceStr = `₹${Number(basePrice).toLocaleString('en-IN')}`;
+          const markupMonthlyStr = `+₹${Number(markupMonthly).toLocaleString('en-IN')}`;
+          const finalRetailMonthlyStr = `₹${Number(finalRetailMonthly).toLocaleString('en-IN')}`;
+          const minsStr = p.max_minutes >= 99999 ? 'Unlimited' : `${p.max_minutes} mins`;
+          const agentsStr = p.max_agents >= 99999 ? 'Unlimited' : p.max_agents;
+          const baseCallingStr = `₹${baseCalling}/min`;
+          const retailCallingStr = `₹${finalRetailCalling}/min`;
+          
+          const actionButtons = isReseller 
+            ? `<span style="font-size: 0.72rem; color: var(--color-cyan); font-weight: 700;">🔒 Platform Fixed Base</span>` 
+            : `<button onclick="window.openEditPlanModal('${p.id}')" class="admin-action-btn" style="margin-right: 6px;">Edit Base</button>
+               ${p.id === 'basic' ? `<button disabled class="admin-action-btn admin-action-btn-delete" style="opacity:0.5;">Delete</button>` : `<button onclick="window.deletePlan('${p.id}')" class="admin-action-btn admin-action-btn-delete">Delete</button>`}`;
+            
+          row.innerHTML = `
+            <td style="font-weight: 700; color: var(--text-main);">${escapeHtml(p.name)}</td>
+            <td style="font-family: monospace; font-size: 0.82rem; color: var(--color-cyan);">${escapeHtml(p.id)}</td>
+            <td style="font-weight: 600; color: var(--text-muted);">${basePriceStr}</td>
+            <td style="font-weight: 700; color: var(--color-cyan);">${markupMonthlyStr} <span style="font-size:0.68rem; opacity:0.8;">(Profit)</span></td>
+            <td style="font-weight: 800; color: var(--color-green, #10b981);">${finalRetailMonthlyStr}</td>
+            <td>${minsStr}</td>
+            <td>${agentsStr}</td>
+            <td style="font-weight: 500; color: var(--text-muted);">${baseCallingStr}</td>
+            <td style="font-weight: 800; color: var(--color-green, #10b981);">${retailCallingStr}</td>
+            <td style="text-align: right; white-space: nowrap;">${actionButtons}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch admin plans:', err);
+  }
+};
+
+window.updateResellerMarkupCalculations = function() {
+  const pMinInput = document.getElementById('reseller-per-minute-markup-input');
+  const baseRateEl = document.getElementById('reseller-base-calling-rate');
+  const retailRateEl = document.getElementById('reseller-retail-calling-rate');
+  if (pMinInput && retailRateEl) {
+    const baseRate = parseFloat((baseRateEl?.innerText || '2.00').replace(/[^\d.]/g, '')) || 2.0;
+    const markup = parseFloat(pMinInput.value) || 0;
+    retailRateEl.innerText = `₹${(baseRate + markup).toFixed(2)}/min`;
+  }
+};
+
+window.saveResellerMarkups = async function() {
+  const perMinMarkup = parseFloat(document.getElementById('reseller-per-minute-markup-input')?.value || 0);
+  const basicMarkup = parseFloat(document.getElementById('reseller-markup-basic')?.value || 0);
+  const proMarkup = parseFloat(document.getElementById('reseller-markup-pro')?.value || 0);
+  const customMarkup = parseFloat(document.getElementById('reseller-markup-custom')?.value || 0);
+
+  const payload = {
+    per_minute_markup: perMinMarkup,
+    plan_markups: {
+      basic: basicMarkup,
+      pro: proMarkup,
+      custom: customMarkup
+    }
+  };
+
+  try {
+    const res = await fetch('/api/reseller/markups', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert("✅ Commission markups saved successfully! Your sub-clients will see the new retail prices.");
+      if (typeof window.renderAdminPlansTable === 'function') window.renderAdminPlansTable();
+    } else {
+      alert("Error saving markups: " + (data.error || 'Failed'));
+    }
+  } catch (e) {
+    alert("Network error saving reseller markups.");
+  }
+};
+
+window.openResellerWalletRechargeModal = function() {
+  const amountStr = prompt("Enter amount in ₹ to recharge Whitelabel Reseller Wallet:", "5000");
+  if (!amountStr) return;
+  const amount = parseFloat(amountStr);
+  if (isNaN(amount) || amount <= 0) {
+    alert("Please enter a valid positive amount.");
+    return;
+  }
+
+  fetch('/api/reseller/wallet/recharge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      alert(`🎉 Wallet Recharged Successfully! Added ₹${amount.toLocaleString('en-IN')}. New Balance: ₹${Number(data.wallet_balance).toLocaleString('en-IN')}`);
+      if (typeof window.renderAdminPlansTable === 'function') window.renderAdminPlansTable();
+    } else {
+      alert("Recharge failed: " + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(err => {
+    alert("Network error recharging wallet.");
+  });
+};
+
 // Bind logout action
 document.getElementById('btn-logout')?.addEventListener('click', logout);
 
