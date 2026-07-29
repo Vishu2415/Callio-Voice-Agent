@@ -3568,12 +3568,43 @@ window.addSingleContactFromSidebar = async function() {
       if (tagInput) tagInput.value = '';
       fetchGroups();
       alert("✅ Contact added successfully!");
+      return true;
     } else {
       alert("Error adding contact: " + data.error);
+      return false;
     }
   } catch (e) {
     console.error(e);
     alert("Error adding contact: " + e.message);
+    return false;
+  }
+};
+
+window.openAddSingleContactModal = function() {
+  const modal = document.getElementById('modal-add-single-contact');
+  if (modal) {
+    modal.style.display = 'flex';
+    const n = document.getElementById('single-contact-name');
+    const p = document.getElementById('single-contact-phone');
+    const t = document.getElementById('single-contact-tag');
+    if (n) n.value = '';
+    if (p) p.value = '';
+    if (t) t.value = '';
+    if (n) n.focus();
+  }
+};
+
+window.closeAddSingleContactModal = function() {
+  const modal = document.getElementById('modal-add-single-contact');
+  if (modal) modal.style.display = 'none';
+};
+
+window.submitSingleContactFromModal = async function() {
+  if (typeof window.addSingleContactFromSidebar === 'function') {
+    const success = await window.addSingleContactFromSidebar();
+    if (success !== false) {
+      window.closeAddSingleContactModal();
+    }
   }
 };
 
