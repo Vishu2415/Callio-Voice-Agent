@@ -4266,12 +4266,39 @@ body.light-theme .input-action-btn:hover,
     gap: 1.25rem !important;
   }
   .vb-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-columns: repeat(6, 1fr) !important;
     gap: 1rem !important;
   }
   .vb-metric {
-    grid-column: span 1 !important;
+    grid-column: span 2 !important;
   }
+  .vb-grid > .vb-card {
+    grid-column: span 3 !important;
+  }
+  .vb-chart-panel {
+    grid-column: span 3 !important;
+  }
+  .vb-bar-panel, #dashboard-spacing-card {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+/* Universal ApexCharts Responsive Containment */
+.vb-chart,
+.vb-chart-panel,
+.vb-bar-panel {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.apexcharts-canvas,
+.apexcharts-svg,
+.apexcharts-inner,
+.apexcharts-graphical {
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 /* ================================================================

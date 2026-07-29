@@ -4950,7 +4950,7 @@ function initVobizCharts() {
   const gridColor = isDark ? '#222' : '#e2e8f0';
 
   const usageOptions = {
-    chart: { type: 'line', height: lineChartHeight, toolbar: { show: false }, background: 'transparent', animations: { enabled: true, dynamicAnimation: { speed: 1000 } } },
+    chart: { type: 'line', width: '100%', height: lineChartHeight, toolbar: { show: false }, background: 'transparent', redrawOnParentResize: true, redrawOnWindowResize: true, animations: { enabled: true, dynamicAnimation: { speed: 1000 } } },
     series: [ { name: 'Total Calls', data: [] }, { name: 'Completed', data: [] }, { name: 'Failed', data: [] } ],
     colors: ['#00ff66', '#ff9900', '#ff3b3b'],
     stroke: { curve: 'smooth', width: 2 },
@@ -4964,7 +4964,7 @@ function initVobizCharts() {
   usageChart.render();
 
   const costOptions = {
-    chart: { type: 'line', height: lineChartHeight, toolbar: { show: false }, background: 'transparent', animations: { enabled: true } },
+    chart: { type: 'line', width: '100%', height: lineChartHeight, toolbar: { show: false }, background: 'transparent', redrawOnParentResize: true, redrawOnWindowResize: true, animations: { enabled: true } },
     series: [ { name: 'Interested', data: [] }, { name: 'Not Interested', data: [] } ],
     colors: ['#a64dff', '#ff4444'],
     stroke: { curve: 'straight', width: 2 },
@@ -4978,7 +4978,7 @@ function initVobizCharts() {
   costChart.render();
 
   const inboundOptions = {
-    chart: { type: 'bar', height: barChartHeight, stacked: true, toolbar: { show: false }, background: 'transparent', animations: { enabled: true } },
+    chart: { type: 'bar', width: '100%', height: barChartHeight, stacked: true, toolbar: { show: false }, background: 'transparent', redrawOnParentResize: true, redrawOnWindowResize: true, animations: { enabled: true } },
     series: [ { name: 'Inbound', data: [] }, { name: 'Outbound', data: [] } ],
     colors: ['#00ff66', '#ff9900'],
     plotOptions: { bar: { columnWidth: '20%', borderRadius: 2 } },
@@ -4991,6 +4991,14 @@ function initVobizCharts() {
   };
   inboundChart = new ApexCharts(document.querySelector("#vb-chart-inbound"), inboundOptions);
   inboundChart.render();
+
+  window.addEventListener('resize', () => {
+    try {
+      if (usageChart) usageChart.windowResizeHandler();
+      if (costChart) costChart.windowResizeHandler();
+      if (inboundChart) inboundChart.windowResizeHandler();
+    } catch(e) {}
+  });
 }
 
 // ====================================================
