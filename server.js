@@ -338,6 +338,17 @@ function saveCrmRules() { saveDatabase(CRM_RULES_DB_FILE, crmRulesDb); }
 function loadCrmLogs() { loadDatabase(CRM_LOGS_DB_FILE, crmLogsDb); }
 function saveCrmLogs() { saveDatabase(CRM_LOGS_DB_FILE, crmLogsDb); }
 
+function normalizePhoneKey(phoneStr) {
+  if (!phoneStr) return '';
+  let digits = String(phoneStr).replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    digits = digits.substring(2);
+  } else if (digits.length > 10) {
+    digits = digits.slice(-10);
+  }
+  return digits;
+}
+
 async function syncVobizNumberWebhook(phoneNumber, clientId = null) {
   if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.trim() === '') return;
   const rawNumber = phoneNumber.trim();
@@ -5489,7 +5500,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
       }
     }
     const toolRule = `\n\n[CRITICAL TOOL RULE]: If the user says goodbye, bye, or asks to hang up/cut the call, YOU MUST IMMEDIATELY CALL THE 'hangupCall' TOOL to end the connection. Do not wait or ask for confirmation.\n\n[VOICEMAIL RULE]: If you hear an automated voicemail greeting (e.g., 'forwarded to voicemail', 'leave a message', 'record your message', 'after the tone'), YOU MUST IMMEDIATELY CALL THE 'hangupCall' TOOL. DO NOT PITCH THE EVENT. DO NOT LEAVE A VOICEMAIL MESSAGE. Just call hangupCall immediately!`;
-    const finalInstruction = `${systemInstruction}${greetingInstruction}${toolRule}\n\n[CRITICAL GRAMMAR RULE]: ${genderRule}`;
+    const instantGreetingRule = `\n\n[CRITICAL INSTANT GREETING RULE]: As soon as the call connects, IMMEDIATELY speak your opening greeting within 0.5 seconds! Do NOT delay or wait. Speak your opening hello instantly.`;
+    const finalInstruction = `${systemInstruction}${greetingInstruction}${toolRule}${instantGreetingRule}\n\n[CRITICAL GRAMMAR RULE]: ${genderRule}`;
     
     let resolvedModel = model || 'gemini-3.1-flash-live-preview';
     if (resolvedModel === 'gemini-2.5-flash') {
