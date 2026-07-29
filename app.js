@@ -830,6 +830,10 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
 
   // Display BOTH Name and Phone Number inside the Modal Header (Name on top line, Phone number underneath)
   if (phoneEl) {
+    phoneEl.style.webkitTextFillColor = 'initial';
+    phoneEl.style.color = 'var(--text-main, #ffffff)';
+    phoneEl.style.background = 'none';
+    phoneEl.style.display = 'block';
     phoneEl.innerText = activeName ? activeName : card.phone;
   }
   if (subtitleEl) {
