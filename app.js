@@ -323,6 +323,20 @@ function showEmptyState(container) {
     </div>
   `;
 }
+window.normalizePhoneKey = function(phoneStr) {
+  if (!phoneStr) return '';
+  let digits = String(phoneStr).replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    digits = digits.substring(2);
+  } else if (digits.length > 10) {
+    digits = digits.slice(-10);
+  }
+  return digits;
+};
+function normalizePhoneKey(phoneStr) {
+  return window.normalizePhoneKey(phoneStr);
+}
+
 window.getContactNameForPhone = function(phoneStr) {
   if (!phoneStr) return null;
   const normKey = normalizePhoneKey(phoneStr);
