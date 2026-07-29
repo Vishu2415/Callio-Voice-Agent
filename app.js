@@ -478,10 +478,13 @@ window.populateAIActionPlanner = function() {
         actionToTake
       };
 
+      const cName = call.customerName || call.name || (typeof window.allContacts !== 'undefined' && Array.isArray(window.allContacts) ? window.allContacts.find(c => c.phone && normalizePhoneKey(c.phone) === normKey)?.name : null);
+
       if (!leadMap.has(normKey)) {
         leadMap.set(normKey, {
           id: `lead_${normKey}`,
           phone: bestPhone,
+          contactName: cName || null,
           normKey,
           urgency,
           sentiment,
@@ -499,6 +502,9 @@ window.populateAIActionPlanner = function() {
         });
       } else {
         const lead = leadMap.get(normKey);
+        if (!lead.contactName && cName) {
+          lead.contactName = cName;
+        }
         lead.totalCalls += 1;
         lead.calls.push(callHistoryItem);
         // Elevate sentiment if interested
@@ -653,11 +659,13 @@ function createActionCardElement(card, isModal = false) {
     </div>
   ` : '';
 
+  const titleText = card.contactName ? `${card.contactName} (${card.phone})` : card.phone;
+
   cardEl.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0; gap: 8px;">
-      <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+      <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0; overflow: hidden;">
         <span style="color: var(--color-primary, #ff5f52); font-size: 0.88rem;">📞</span>
-        <span style="font-size: 0.88rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace); letter-spacing: -0.3px; white-space: nowrap;">${card.phone}</span>
+        <span style="font-size: 0.86rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace); letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;" title="${titleText}">${titleText}</span>
       </div>
       <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
         <span style="font-size: 0.58rem; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 9999px; background: ${card.sentimentBg}; color: ${card.color}; border: 1px solid ${card.sentimentBorder}; letter-spacing: 0.3px; white-space: nowrap;">

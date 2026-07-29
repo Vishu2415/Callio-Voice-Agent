@@ -1001,30 +1001,28 @@ async function generateCallSummaryBackend(callSid) {
     .map(turn => `${turn.role === 'user' ? 'User' : 'Agent'}: ${turn.text}`)
     .join('\n');
 
-  const prompt = `You are a call analyst. Read this sales call transcript and give a CRISP, DIRECT summary in this EXACT format:
+  const prompt = `You are an AI sales call analyst. Read this call transcript carefully and extract TWO things:
 
+1. A direct, crisp summary in this EXACT format:
 **VERDICT:** [INTERESTED / NOT INTERESTED / UNDECIDED]
 
 **Key Points:**
 - [1-line point]
 - [1-line point]
-- [1-line point max]
 
 **Next Action:** [What should the agent do next - 1 sentence]
 
+2. **CUSTOMER_NAME:** [If the customer explicitly stated, introduced, or confirmed their name in the transcript (e.g. "My name is Vishnu", "I am Rahul Verma", "Mera naam Amit hai", "Haan main Priya bol rahi hoon"), write ONLY the full name of the customer here (e.g. "Vishnu Verma"). If NO name was stated, write "UNKNOWN"]
+
 Rules:
-- Be brutally direct. No fluff. No rephrasing what both parties said.
+- Be brutally direct. No fluff.
 - VERDICT must be the very first thing.
-- Max 4 bullet points total. Each bullet max 10 words.
-- If user said "not interested" or "cut the call" → VERDICT: NOT INTERESTED
-- If user asked for more info, price, dates → VERDICT: INTERESTED
-- If user said "will think" or "will call back" → VERDICT: UNDECIDED
+- If customer stated their name, CUSTOMER_NAME must be written at the bottom.
 
 Transcript:
 ${formattedTranscript}`;
 
-
-  console.log(`[Summary Engine] Generating summary for call ${callSid} using gemini-2.5-flash...`);
+  console.log(`[Summary Engine] Generating summary & name extraction for call ${callSid} using gemini-2.5-flash...`);
   
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
@@ -1042,10 +1040,106 @@ ${formattedTranscript}`;
 
     if (response.ok) {
       const data = await response.json();
-      const summaryText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (summaryText) {
-        callState.summary = summaryText.trim();
-        console.log(`[Summary Engine] Summary generated successfully for call ${callSid}.`);
+      const rawSummaryText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (rawSummaryText) {
+        let extractedName = null;
+
+        // 1. Try extracting name from Gemini response
+        const nameMatch = rawSummaryText.match(/\*\*(?:CUSTOMER_NAME|Customer Name):\*\*\s*([^\n]+)/i) || 
+                          rawSummaryText.match(/(?:CUSTOMER_NAME|Customer Name):\s*([^\n]+)/i);
+        if (nameMatch) {
+          const rawName = nameMatch[1].trim().replace(/[\*\_\"]/g, '');
+          if (rawName && !rawName.toUpperCase().includes('UNKNOWN') && rawName.length >= 2 && rawName.length <= 40) {
+            extractedName = rawName;
+          }
+        }
+
+        // 2. Fallback regex extraction on formattedTranscript (Hindi & English patterns)
+        if (!extractedName) {
+          const introRegex = /(?:mera naam|my name is|i am|main|this is|call me)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)/i;
+          const match = formattedTranscript.match(introRegex);
+          if (match && match[1]) {
+            const candidate = match[1].trim();
+            const blacklist = ['agent', 'user', 'call', 'hello', 'hi', 'telephony', 'ai', 'callio', 'vobiz'];
+            if (candidate && candidate.length >= 2 && !blacklist.includes(candidate.toLowerCase())) {
+              extractedName = candidate;
+            }
+          }
+        }
+
+        // Clean out CUSTOMER_NAME tag line from summary text for clean display
+        const cleanSummary = rawSummaryText
+          .replace(/\*\*(?:CUSTOMER_NAME|Customer Name):\*\*\s*[^\n]*/gi, '')
+          .replace(/(?:CUSTOMER_NAME|Customer Name):\s*[^\n]*/gi, '')
+          .trim();
+
+        callState.summary = cleanSummary;
+
+        // Auto-save/update contact in contactsDb if name was detected
+        if (extractedName) {
+          console.log(`[Auto Contact Save] 👤 Extracted customer name: "${extractedName}" for call ${callSid}`);
+          
+          const systemNumbers = ['917971442441', '7971442441', '971442441'];
+          function isSysNum(ph) {
+            if (!ph) return true;
+            const c = String(ph).replace(/\D/g, '');
+            return !c || c.length < 8 || systemNumbers.some(n => c === n || c.endsWith(n) || n.endsWith(c));
+          }
+
+          const candidatePhone = [callState.customerNumber, callState.phone, callState.to, callState.from]
+            .find(p => p && !isSysNum(p));
+
+          if (candidatePhone) {
+            const normKey = normalizePhoneKey(candidatePhone);
+            let existingContact = null;
+
+            for (const contact of contactsDb.values()) {
+              if (contact && contact.phone && normalizePhoneKey(contact.phone) === normKey) {
+                existingContact = contact;
+                break;
+              }
+            }
+
+            if (existingContact) {
+              if (!existingContact.name || existingContact.name === candidatePhone || normalizePhoneKey(existingContact.name) === normKey) {
+                existingContact.name = extractedName;
+                existingContact.updatedAt = Date.now();
+                contactsDb.set(existingContact.id, existingContact);
+                saveContacts();
+                console.log(`[Auto Contact Save] ✏️ Updated existing contact ${existingContact.id} with name: "${extractedName}"`);
+              }
+            } else {
+              let groupId = 'default';
+              for (const [gId, g] of groupsDb.entries()) {
+                if (g) { groupId = gId; break; }
+              }
+
+              const newContactId = `cont_ai_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+              const newContact = {
+                id: newContactId,
+                groupId: groupId,
+                phone: candidatePhone,
+                name: extractedName,
+                tag: 'AI Auto-Saved',
+                notes: `Auto-saved from AI call on ${new Date().toLocaleDateString()}`,
+                createdAt: Date.now()
+              };
+
+              contactsDb.set(newContactId, newContact);
+              saveContacts();
+              console.log(`[Auto Contact Save] 🌟 Auto-created NEW Contact: "${extractedName}" (${candidatePhone})`);
+            }
+
+            callState.customerName = extractedName;
+            if (callState.callSid && callsDb.has(callState.callSid)) {
+              const cRecord = callsDb.get(callState.callSid);
+              cRecord.customerName = extractedName;
+              callsDb.set(callState.callSid, cRecord);
+            }
+          }
+        }
+
+        console.log(`[Summary Engine] Summary & Contact extraction completed successfully for call ${callSid}.`);
         scheduleSaveCalls();
       } else {
         callState.summary = "Failed to parse summary response from Gemini.";
