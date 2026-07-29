@@ -5447,6 +5447,40 @@ html[data-theme="light"] .premium-modal-select {
   transform: translateY(1px) !important;
 }
 
+/* --- Skeleton Loader Shimmer Effects --- */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-box {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 25%, rgba(255, 255, 255, 0.1) 37%, rgba(255, 255, 255, 0.03) 63%) !important;
+  background-size: 400% 100% !important;
+  animation: skeleton-shimmer 1.4s ease infinite !important;
+  border-radius: 8px;
+}
+
+html[data-theme="light"] .skeleton-box {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.04) 25%, rgba(0, 0, 0, 0.1) 37%, rgba(0, 0, 0, 0.04) 63%) !important;
+  background-size: 400% 100% !important;
+  animation: skeleton-shimmer 1.4s ease infinite !important;
+}
+
+.skeleton-card {
+  flex: 0 0 310px;
+  min-width: 300px;
+  max-width: 340px;
+  height: 205px;
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
 
 
 

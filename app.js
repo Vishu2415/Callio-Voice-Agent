@@ -6005,9 +6005,34 @@ document.getElementById('btn-login-submit')?.addEventListener('click', async () 
   });
 });
 
+window.showDashboardSkeletons = function() {
+  const container = document.getElementById('ai-action-cards-container');
+  if (container && (!container.children.length || container.querySelector('.skeleton-card'))) {
+    container.innerHTML = `
+      <div class="skeleton-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="skeleton-box" style="width: 120px; height: 18px;"></div>
+          <div class="skeleton-box" style="width: 65px; height: 18px; border-radius: 999px;"></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin: 12px 0;">
+          <div class="skeleton-box" style="width: 100%; height: 12px;"></div>
+          <div class="skeleton-box" style="width: 80%; height: 12px;"></div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <div class="skeleton-box" style="flex: 1; height: 32px;"></div>
+          <div class="skeleton-box" style="width: 55px; height: 32px;"></div>
+        </div>
+      </div>
+    `.repeat(3);
+  }
+};
+
 // 3. Client Dashboard Data Fetch
 async function fetchClientDashboardData() {
   if (!loggedInUser) return;
+  if (!callsCache || callsCache.length === 0) {
+    if (typeof window.showDashboardSkeletons === 'function') window.showDashboardSkeletons();
+  }
   
   // Instant render from local cache if available (0ms delay)
   if (Array.isArray(callsCache) && callsCache.length > 0) {
