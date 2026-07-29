@@ -659,13 +659,13 @@ function createActionCardElement(card, isModal = false) {
     </div>
   ` : '';
 
-  const titleText = card.contactName ? `${card.contactName} (${card.phone})` : card.phone;
+  const titleText = card.contactName ? card.contactName : card.phone;
 
   cardEl.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0; gap: 8px;">
       <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0; overflow: hidden;">
         <span style="color: var(--color-primary, #ff5f52); font-size: 0.88rem;">📞</span>
-        <span style="font-size: 0.86rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace); letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;" title="${titleText}">${titleText}</span>
+        <span style="font-size: 0.90rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace); letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;" title="${titleText}">${titleText}</span>
       </div>
       <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
         <span style="font-size: 0.58rem; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 9999px; background: ${card.sentimentBg}; color: ${card.color}; border: 1px solid ${card.sentimentBorder}; letter-spacing: 0.3px; white-space: nowrap;">
@@ -687,7 +687,7 @@ function createActionCardElement(card, isModal = false) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         ${card.actionText}
       </button>
-      <button class="btn btn-secondary btn-done" onclick="window.dismissLeadCard(this); event.stopPropagation();" style="height: 32px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; cursor: pointer; transition: all 0.2s;">
+      <button class="btn btn-secondary btn-done" onclick="window.dismissLeadCard('${card.id}'); event.stopPropagation();" style="height: 32px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-muted); font-weight: 600; font-size: 0.76rem; padding: 0 12px; cursor: pointer; transition: all 0.2s;">
         Done
       </button>
     </div>
@@ -716,8 +716,8 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
           <div style="display:flex; align-items:center; gap:12px;">
             <div style="width:42px; height:42px; border-radius:12px; background:rgba(6,182,212,0.15); color:var(--color-cyan, #06b6d4); display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">🎯</div>
             <div>
-              <div id="lead-detail-phone" style="font-size:1.2rem; font-weight:800; color:var(--text-main, #ffffff); font-family:var(--font-mono, monospace);">+91 XXXXXXXXXX</div>
-              <div style="font-size:0.78rem; color:var(--text-muted, #a1a1aa); margin-top:2px;">Unified Lead Timeline & Call History</div>
+              <div id="lead-detail-phone" style="font-size:1.25rem; font-weight:800; color:var(--text-main, #ffffff); font-family:var(--font-mono, monospace);">+91 XXXXXXXXXX</div>
+              <div id="lead-detail-subtitle" style="font-size:0.8rem; color:var(--text-muted, #a1a1aa); margin-top:2px;">Unified Lead Timeline & Call History Log</div>
             </div>
           </div>
           <button onclick="event.preventDefault(); event.stopPropagation(); window.closeLeadDetailModal();" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color, #27272a); color:var(--text-muted, #a1a1aa); width:34px; height:34px; border-radius:10px; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center;">✕</button>
@@ -767,6 +767,7 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
   }
 
   const phoneEl = document.getElementById('lead-detail-phone');
+  const subtitleEl = document.getElementById('lead-detail-subtitle');
   const sentimentEl = document.getElementById('lead-detail-sentiment');
   const urgencyEl = document.getElementById('lead-detail-urgency');
   const callCountEl = document.getElementById('lead-detail-call-count');
@@ -776,7 +777,17 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
   const btnCall = document.getElementById('btn-lead-detail-call');
   const btnDone = document.getElementById('btn-lead-detail-done');
 
-  if (phoneEl) phoneEl.innerText = card.phone;
+  // Display BOTH Name and Phone Number inside the Modal Header
+  if (phoneEl) {
+    phoneEl.innerText = card.contactName ? card.contactName : card.phone;
+  }
+  if (subtitleEl) {
+    if (card.contactName) {
+      subtitleEl.innerHTML = `<span style="color:var(--color-cyan, #06b6d4); font-weight:700;">📞 ${card.phone}</span> • Unified Lead Timeline & Call History Log`;
+    } else {
+      subtitleEl.innerText = 'Unified Lead Timeline & Call History Log';
+    }
+  }
 
   if (sentimentEl) {
     sentimentEl.innerText = card.sentiment;
@@ -816,7 +827,17 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
         const dirBadge = isInc 
           ? `<span style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">⬇ Incoming Call</span>`
           : `<span style="background: rgba(6,182,212,0.15); color: #06b6d4; border: 1px solid rgba(6,182,212,0.3); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">⬆ Outbound Call</span>`;
-        const durText = typeof formatDuration === 'function' ? formatDuration(cLog.duration || 0) : (cLog.duration || 0) + 's';
+        
+        let durText = '0s';
+        if (cLog.duration !== undefined && cLog.duration !== null && !isNaN(cLog.duration) && Number(cLog.duration) > 0) {
+          const dSec = Math.round(Number(cLog.duration));
+          durText = dSec >= 60 ? `${Math.floor(dSec / 60)}m ${dSec % 60}s` : `${dSec}s`;
+        } else if (cLog.startedAt && cLog.endedAt) {
+          const dSec = Math.max(0, Math.round((new Date(cLog.endedAt).getTime() - new Date(cLog.startedAt).getTime()) / 1000));
+          durText = dSec >= 60 ? `${Math.floor(dSec / 60)}m ${dSec % 60}s` : `${dSec}s`;
+        } else {
+          durText = 'Recorded';
+        }
         
         return `
           <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #27272a); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
