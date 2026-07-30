@@ -4116,7 +4116,9 @@ app.get('/api/admin/pending-requests', (req, res) => {
   const currentReseller = getResellerFromHost(host);
 
   const pendingMap = new Map();
+  const seenEmails = new Set();
 
+  // 1. Collect from clientsDb (highest priority)
   for (const client of clientsDb.values()) {
     if (client.status === 'number_requested' || (client.status === 'pending_number' && client.kyc_details && client.requested_number)) {
       if (client.phone_number && client.phone_number.trim() !== '') continue;
@@ -4124,6 +4126,10 @@ app.get('/api/admin/pending-requests', (req, res) => {
       if (!isMainPlatform && currentReseller) {
         if (itemResellerId !== currentReseller.id) continue;
       }
+
+      const clientEmail = (client.email || (client.kyc_details && client.kyc_details.email) || '').toLowerCase().trim();
+      if (clientEmail) seenEmails.add(clientEmail);
+
       pendingMap.set(client.id, {
         id: client.id,
         name: client.name,
@@ -4137,6 +4143,7 @@ app.get('/api/admin/pending-requests', (req, res) => {
     }
   }
 
+  // 2. Collect from pendingRequests Map (only if not already present in clientsDb)
   if (typeof pendingRequests !== 'undefined') {
     for (const reqItem of pendingRequests.values()) {
       if (reqItem.status && reqItem.status !== 'pending') continue;
@@ -4144,18 +4151,26 @@ app.get('/api/admin/pending-requests', (req, res) => {
       if (!isMainPlatform && currentReseller) {
         if (itemResellerId !== currentReseller.id) continue;
       }
-      if (!pendingMap.has(reqItem.id)) {
-        pendingMap.set(reqItem.id, {
-          id: reqItem.id,
-          name: reqItem.clientName || 'Client',
-          email: reqItem.kyc_details?.email || '',
-          phone_number: '',
-          requested_number: reqItem.number || 'Virtual Mobile',
-          reseller_id: itemResellerId,
-          reseller_name: reqItem.reseller_name || null,
-          kyc_details: reqItem.kyc_details || {}
-        });
+
+      const reqEmail = (reqItem.kyc_details?.email || reqItem.email || '').toLowerCase().trim();
+      const reqClientId = reqItem.clientId;
+
+      // Skip if this request belongs to a client already added to pendingMap
+      if (pendingMap.has(reqItem.id) || (reqClientId && pendingMap.has(reqClientId)) || (reqEmail && seenEmails.has(reqEmail))) {
+        continue;
       }
+
+      if (reqEmail) seenEmails.add(reqEmail);
+      pendingMap.set(reqItem.id, {
+        id: reqItem.id,
+        name: reqItem.clientName || 'Client',
+        email: reqItem.kyc_details?.email || '',
+        phone_number: '',
+        requested_number: reqItem.number || 'Virtual Mobile',
+        reseller_id: itemResellerId,
+        reseller_name: reqItem.reseller_name || null,
+        kyc_details: reqItem.kyc_details || {}
+      });
     }
   }
 
@@ -4662,7 +4677,7 @@ app.post('/api/client/request-number', express.json({ limit: '50mb' }), (req, re
     saveClients();
   }
 
-  const reqId = Date.now().toString();
+  const reqId = targetClient ? targetClient.id : Date.now().toString();
   pendingRequests.set(reqId, {
     id: reqId,
     clientId: targetClient ? targetClient.id : (clientId || 'guest'),
