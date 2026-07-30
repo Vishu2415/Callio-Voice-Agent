@@ -4125,14 +4125,22 @@ app.post('/api/client/request-number', (req, res) => {
 
 // 5. Get Pending Requests (Admin)
 app.get('/api/admin/pending-requests', (req, res) => {
-  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const host = getRealHostFromRequest(req);
+  const isMainPlatform = isMainPlatformHost(host);
   const currentReseller = getResellerFromHost(host);
 
   const pending = [];
   for (const client of clientsDb.values()) {
-    if (client.status === 'number_requested') {
-      if (currentReseller && client.reseller_id !== currentReseller.id) continue;
-      pending.push(client);
+    if (client.status === 'number_requested' || (client.status === 'pending_number' && client.kyc_details)) {
+      if (!isMainPlatform && currentReseller) {
+        // Whitelabel reseller admin ONLY sees requests belonging to their own clients!
+        if (client.reseller_id === currentReseller.id || (client.kyc_details && client.kyc_details.reseller_id === currentReseller.id)) {
+          pending.push(client);
+        }
+      } else {
+        // Main callio.in Super Admin sees ALL requests (both Super Admin clients & Whitelabel reseller clients)!
+        pending.push(client);
+      }
     }
   }
   res.json({ success: true, requests: pending });
@@ -4598,15 +4606,34 @@ app.post('/api/admin/remove-client-number', express.json(), (req, res) => {
 
 // Client - Submit Virtual Number KYC Request
 app.post('/api/client/request-number', (req, res) => {
-  const { company, person, email, phone, number_type, use_case, userId } = req.body || {};
+  const { company, person, email, phone, number_type, use_case, document_url, userId } = req.body || {};
   const clientId = userId || (req.user ? req.user.id : null);
+
+  const host = getRealHostFromRequest(req);
+  const currentReseller = getResellerFromHost(host);
 
   if (clientId) {
     const client = clientsDb.get(clientId);
     if (client) {
-      client.status = 'pending_number';
-      client.requested_number = `${number_type || 'Virtual Number'} (${company || 'KYC Request'})`;
-      client.kyc_details = { company, person, email, phone, number_type, use_case, submittedAt: new Date().toISOString() };
+      client.status = 'number_requested';
+      client.requested_number = `${number_type || 'Virtual Mobile'}`;
+      if (currentReseller && !client.reseller_id) {
+        client.reseller_id = currentReseller.id;
+        client.reseller_name = currentReseller.name;
+      }
+      client.kyc_details = {
+        company: company || client.name,
+        person: person || client.name,
+        email: email || client.email,
+        phone: phone || client.phone_number || '',
+        number_type: number_type || 'Indian Virtual Mobile (+91)',
+        use_case: use_case || 'Outbound Sales & Telemarketing',
+        document_url: document_url || null,
+        domain: host,
+        reseller_id: currentReseller ? currentReseller.id : (client.reseller_id || null),
+        reseller_name: currentReseller ? currentReseller.name : (client.reseller_name || null),
+        submittedAt: new Date().toISOString()
+      };
       clientsDb.set(clientId, client);
       saveClients();
     }
@@ -4619,7 +4646,9 @@ app.post('/api/client/request-number', (req, res) => {
     clientName: company || person || 'Client',
     number: number_type || 'Virtual Mobile',
     status: 'pending',
-    kyc_details: { company, person, email, phone, use_case },
+    reseller_id: currentReseller ? currentReseller.id : null,
+    reseller_name: currentReseller ? currentReseller.name : null,
+    kyc_details: { company, person, email, phone, use_case, number_type, document_url, domain: host },
     timestamp: new Date().toISOString()
   });
   savePendingRequests();

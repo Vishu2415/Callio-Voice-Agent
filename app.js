@@ -7544,25 +7544,52 @@ async function fetchAdminRequests() {
     
     data.requests.forEach(req => {
       const tr = document.createElement('tr');
-      const initials = req.name.split(/\s+/).filter(Boolean).map(n => n[0]).join('').substring(0, 2);
+      const kyc = req.kyc_details || {};
+      const compName = kyc.company || req.name || 'Client';
+      const personName = kyc.person || req.name || '';
+      const emailStr = kyc.email || req.email || '';
+      const phoneStr = kyc.phone || req.phone_number || '';
+      const numType = kyc.number_type || req.requested_number || 'Virtual Mobile';
+      const useCase = kyc.use_case || 'Sales & Support';
+      const docUrl = kyc.document_url || null;
+      const resellerName = req.reseller_name || kyc.reseller_name || null;
+
+      const docHtml = docUrl
+        ? `<a href="${docUrl}" target="_blank" download="KYC_Document" class="badge" style="background: rgba(6,182,212,0.15); color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.3); font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; text-decoration: none; font-weight: bold;">📄 View KYC Doc</a>`
+        : `<span style="color: var(--text-muted); font-size: 0.75rem; font-style: italic;">No Doc Attached</span>`;
+
+      const resellerBadge = resellerName
+        ? `<span class="badge" style="background: rgba(192,132,252,0.15); color: #c084fc; border: 1px solid rgba(192,132,252,0.3); font-size: 0.7rem; padding: 3px 8px; border-radius: 6px; font-weight: bold;">🏷️ ${escapeHtml(resellerName)}</span>`
+        : `<span class="badge" style="background: rgba(255,107,74,0.1); color: var(--color-coral); border: 1px solid rgba(255,107,74,0.2); font-size: 0.7rem; padding: 3px 8px; border-radius: 6px; font-weight: 500;">🌐 Main Platform</span>`;
+
       tr.innerHTML = `
         <td>
-          <div class="client-info-cell">
-            <div class="client-avatar-circle">${initials}</div>
-            <div class="client-meta-details">
-              <span class="client-meta-name">${escapeHtml(req.name)}</span>
-              <span class="client-meta-email">${escapeHtml(req.email)}</span>
-            </div>
+          <div class="client-meta-details">
+            <span class="client-meta-name" style="font-weight: 700; color: var(--text-main); font-size: 0.9rem;">${escapeHtml(compName)}</span>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">Contact: ${escapeHtml(personName)}</span>
           </div>
         </td>
-        <td class="phone">${escapeHtml(req.requested_number)}</td>
         <td>
-          <span class="badge" style="background: rgba(255,152,0,0.1); color: #ff9800; border: 1px solid rgba(255,152,0,0.2); margin: 0; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 500;">Pending</span>
+          <div class="client-meta-details">
+            <span style="font-size: 0.82rem; color: var(--color-cyan); font-weight: 600;">${escapeHtml(emailStr)}</span>
+            <span style="font-size: 0.78rem; color: var(--text-muted); font-family: monospace;">${escapeHtml(phoneStr)}</span>
+          </div>
+        </td>
+        <td>
+          <div class="client-meta-details">
+            <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-main);">${escapeHtml(numType)}</span>
+            <span style="font-size: 0.75rem; color: var(--color-coral);">${escapeHtml(useCase)}</span>
+          </div>
+        </td>
+        <td>${docHtml}</td>
+        <td>${resellerBadge}</td>
+        <td>
+          <span class="badge" style="background: rgba(255,152,0,0.1); color: #ff9800; border: 1px solid rgba(255,152,0,0.2); margin: 0; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">Pending</span>
         </td>
         <td style="text-align: right;">
-          <div style="display: flex; gap: 8px; justify-content: flex-end;">
-            <button onclick="handleAdminDecision('${req.id}', 'approve')" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: var(--color-green); border-color: var(--color-green); color: #000; font-weight: 600;">Approve</button>
-            <button onclick="handleAdminDecision('${req.id}', 'reject')" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.8rem; background: var(--color-red); border-color: var(--color-red); color: #fff; font-weight: 600;">Reject</button>
+          <div style="display: flex; gap: 6px; justify-content: flex-end;">
+            <button onclick="window.openAssignNumberModal('${req.id}', '${escapeHtml(compName)}')" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.75rem; background: var(--color-green); border-color: var(--color-green); color: #000; font-weight: 700;">Approve &amp; Assign</button>
+            <button onclick="handleAdminDecision('${req.id}', 'reject')" class="btn btn-danger" style="padding: 5px 10px; font-size: 0.75rem; background: var(--color-red); border-color: var(--color-red); color: #fff; font-weight: 600;">Reject</button>
           </div>
         </td>
       `;
@@ -10266,6 +10293,19 @@ window.submitKycNumberRequest = async function(event) {
   const phone = document.getElementById('kyc-phone')?.value.trim() || '';
   const numberType = document.getElementById('kyc-number-type')?.value || '';
   const useCase = document.getElementById('kyc-use-case')?.value || '';
+  const fileInput = document.getElementById('kyc-document-file');
+
+  let documentUrl = null;
+  if (fileInput && fileInput.files && fileInput.files[0]) {
+    try {
+      documentUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(fileInput.files[0]);
+      });
+    } catch(e) { console.error('Error reading document file:', e); }
+  }
 
   try {
     const res = await fetch('/api/client/request-number', {
@@ -10278,6 +10318,7 @@ window.submitKycNumberRequest = async function(event) {
         phone,
         number_type: numberType,
         use_case: useCase,
+        document_url: documentUrl,
         userId: typeof loggedInUser !== 'undefined' && loggedInUser ? loggedInUser.id : null
       })
     });
@@ -10285,6 +10326,7 @@ window.submitKycNumberRequest = async function(event) {
     if (data.success) {
       alert('✅ Your Virtual Number & KYC request has been submitted to the admin for verification and number allocation!');
       if (typeof closeNumbersModal === 'function') closeNumbersModal();
+      if (typeof fetchAdminRequests === 'function') fetchAdminRequests();
     } else {
       alert('Error: ' + (data.error || 'Failed to submit request.'));
     }
