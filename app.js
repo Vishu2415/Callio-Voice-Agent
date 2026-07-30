@@ -5902,13 +5902,11 @@ function applyUserRole(user) {
     // Populate branding settings form for admin/reseller
     if (typeof window.loadBrandingToForm === 'function') window.loadBrandingToForm();
     
-    // Show settings and provider selection for admin/reseller
-    const settingsBtn = document.getElementById('btn-toggle-settings');
-    if (settingsBtn) settingsBtn.style.display = 'flex';
-    const adminSettingsOnly = document.getElementById('admin-settings-only');
-    if (adminSettingsOnly) adminSettingsOnly.style.display = 'block';
+    // Show provider selection ONLY for Super Admin (callio.in main admin)
+    const isWL = typeof window.isWhitelabelDomain === 'function' ? window.isWhitelabelDomain() : false;
+    const isSuperAdmin = (user && user.role === 'admin' && !isWL);
     const providerGroup = document.getElementById('quick-call-provider-group');
-    if (providerGroup) providerGroup.style.display = 'block';
+    if (providerGroup) providerGroup.style.display = isSuperAdmin ? 'block' : 'none';
 
     // Set 2 columns layout for settings tab
     const settingsLayout = document.querySelector('#tab-settings .premium-split-layout');
