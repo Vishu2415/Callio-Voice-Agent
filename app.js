@@ -1525,7 +1525,11 @@ window.renderMetricDetailsModalContent = function() {
           </div>
         ` : ''}
 
-        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; flex-wrap: wrap;">
+          <button onclick="window.showQuickTagPicker('${phone}', this)" style="padding: 6px 12px; font-size: 0.78rem; border-radius: 8px; background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3); color: #06b6d4; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+            🏷️ Tag
+          </button>
+          ${type === 'interested' ? `<button onclick="window.updateContactTagByPhone('${phone}', 'Interested', this)" style="padding: 6px 12px; font-size: 0.78rem; border-radius: 8px; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); color: #10b981; font-weight: 800; cursor: pointer;">✅ Mark as Interested</button>` : ''}
           <button onclick="window.closeMetricDetailsModal(); window.triggerLeadCall('${phone}');" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: var(--color-cyan); border: none; color: #000; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
             ⚡ Re-call Now
@@ -3485,10 +3489,13 @@ window.renderAllContactsTable = function() {
         <td style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${escapeHtml(c.name || 'N/A')}</td>
         <td style="font-family: var(--font-mono); color: var(--color-cyan); font-weight: 600; font-size: 0.88rem;">${escapeHtml(c.phone || 'N/A')}</td>
         <td>
-          <span style="background: rgba(6,182,212,0.12); color: var(--color-cyan); font-size: 0.72rem; padding: 3px 10px; border-radius: 12px; font-weight: 700; border: 1px solid rgba(6,182,212,0.3); text-transform: uppercase; letter-spacing: 0.3px;">🏷️ ${escapeHtml(tagLabel)}</span>
+          <span id="tag-badge-${c.id}" style="background: rgba(6,182,212,0.12); color: var(--color-cyan); font-size: 0.72rem; padding: 3px 10px; border-radius: 12px; font-weight: 700; border: 1px solid rgba(6,182,212,0.3); text-transform: uppercase; letter-spacing: 0.3px; cursor:pointer;" onclick="window.inlineEditContactTag('${c.id}', '${escapeHtml(tagLabel)}', this)" title="Click to edit tag">🏷️ ${escapeHtml(tagLabel)}</span>
         </td>
         <td style="color: var(--text-muted); font-size: 0.82rem;">${dateStr}</td>
         <td style="text-align: right;">
+          <button class="btn btn-secondary btn-icon" onclick="window.inlineEditContactTag('${c.id}', '${escapeHtml(tagLabel)}', document.getElementById('tag-badge-${c.id}'))" title="Edit Tag" style="padding: 4px 8px; color: var(--color-cyan); border-color: rgba(6,182,212,0.2); background: rgba(6,182,212,0.08); border-radius: 6px; cursor: pointer; margin-right: 4px;">
+            ✏️
+          </button>
           <button class="btn btn-secondary btn-icon" onclick="window.deleteSingleContactDirect('${c.id}', '${c.groupId}')" title="Delete Contact" style="padding: 4px 8px; color: var(--color-red); border-color: rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.08); border-radius: 6px; cursor: pointer;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
@@ -3498,6 +3505,156 @@ window.renderAllContactsTable = function() {
   });
 
   tbody.innerHTML = html;
+};
+
+// Inline tag editor for contact in the main contacts table
+window.inlineEditContactTag = function(contactId, currentTag, triggerEl) {
+  // Remove any existing tag editor popups
+  document.querySelectorAll('.inline-tag-editor').forEach(el => el.remove());
+
+  const popup = document.createElement('div');
+  popup.className = 'inline-tag-editor';
+  popup.style.cssText = 'position:fixed; z-index:99999; background:var(--bg-surface,#18181b); border:1px solid var(--border-color,#27272a); border-radius:12px; padding:14px 16px; box-shadow:0 12px 40px rgba(0,0,0,0.6); min-width:240px;';
+
+  // Position near trigger element
+  const rect = triggerEl ? triggerEl.getBoundingClientRect() : { top: 200, left: 200, bottom: 220 };
+  const top = Math.min(rect.bottom + 6, window.innerHeight - 160);
+  const left = Math.min(rect.left, window.innerWidth - 260);
+  popup.style.top = top + 'px';
+  popup.style.left = left + 'px';
+
+  // Fetch available tags from current contacts
+  const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
+  const uniqueTags = Array.from(new Set(allContacts.map(c => c.tag || 'Default'))).filter(Boolean);
+
+  popup.innerHTML = `
+    <div style="font-size:0.78rem; font-weight:800; color:var(--text-main,#fff); margin-bottom:10px;">🏷️ Edit Tag</div>
+    <input type="text" id="inline-tag-input" value="${escapeHtml(currentTag)}" placeholder="Enter or type tag name..." 
+      style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--color-cyan,#06b6d4); color:var(--text-main,#fff); border-radius:8px; padding:7px 10px; font-size:0.85rem; box-sizing:border-box; outline:none; margin-bottom:8px;">
+    <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px;">
+      ${uniqueTags.map(t => `<span onclick="document.getElementById('inline-tag-input').value='${escapeHtml(t)}'" style="background:rgba(6,182,212,0.12); color:var(--color-cyan,#06b6d4); font-size:0.7rem; padding:3px 9px; border-radius:10px; cursor:pointer; border:1px solid rgba(6,182,212,0.3); font-weight:700;">${escapeHtml(t)}</span>`).join('')}
+      <span onclick="document.getElementById('inline-tag-input').value='Interested'" style="background:rgba(16,185,129,0.12); color:#10b981; font-size:0.7rem; padding:3px 9px; border-radius:10px; cursor:pointer; border:1px solid rgba(16,185,129,0.3); font-weight:700;">✅ Interested</span>
+      <span onclick="document.getElementById('inline-tag-input').value='Not Interested'" style="background:rgba(239,68,68,0.12); color:#ef4444; font-size:0.7rem; padding:3px 9px; border-radius:10px; cursor:pointer; border:1px solid rgba(239,68,68,0.3); font-weight:700;">❌ Not Interested</span>
+    </div>
+    <div style="display:flex; gap:7px;">
+      <button onclick="document.querySelector('.inline-tag-editor').remove()" style="flex:1; padding:7px; border-radius:8px; background:rgba(255,255,255,0.06); border:1px solid var(--border-color,#27272a); color:var(--text-muted,#a1a1aa); font-weight:700; cursor:pointer; font-size:0.8rem;">Cancel</button>
+      <button id="inline-tag-save-btn" style="flex:2; padding:7px; border-radius:8px; background:linear-gradient(135deg,var(--color-cyan,#06b6d4),#0891b2); border:none; color:#000; font-weight:800; cursor:pointer; font-size:0.8rem;">Save Tag</button>
+    </div>
+  `;
+
+  document.body.appendChild(popup);
+  document.getElementById('inline-tag-input').focus();
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function closeHandler(e) {
+      if (!popup.contains(e.target) && e.target !== triggerEl) {
+        popup.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    });
+  }, 50);
+
+  // Save handler
+  document.getElementById('inline-tag-save-btn').onclick = async function() {
+    const newTag = document.getElementById('inline-tag-input').value.trim();
+    try {
+      const res = await fetch(`/api/contacts/${contactId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: newTag })
+      });
+      const data = await res.json();
+      if (data.success) {
+        popup.remove();
+        // Update local cache and re-render
+        for (const g of (localGroupsCache || [])) {
+          const c = (g.contacts || []).find(c => c.id === contactId);
+          if (c) { c.tag = newTag; break; }
+        }
+        window.renderAllContactsTable();
+      } else {
+        alert('Failed to update tag: ' + (data.error || 'Unknown'));
+      }
+    } catch(e) {
+      alert('Network error: ' + e.message);
+    }
+  };
+  // Also save on Enter key
+  document.getElementById('inline-tag-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('inline-tag-save-btn').click();
+  });
+};
+
+// Update a contact's tag by phone number (from call logs)
+window.updateContactTagByPhone = async function(phone, tag, btnEl) {
+  if (btnEl) { btnEl.disabled = true; btnEl.innerText = '⏳ Saving...'; }
+  try {
+    const res = await fetch('/api/contacts/by-phone', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, tag })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (btnEl) {
+        btnEl.innerText = '✅ Tagged!';
+        btnEl.style.background = 'rgba(16,185,129,0.15)';
+        btnEl.style.color = '#10b981';
+        btnEl.style.borderColor = 'rgba(16,185,129,0.3)';
+        setTimeout(() => {
+          if (btnEl.parentElement) { btnEl.innerText = `🏷️ ${tag}`; }
+        }, 1500);
+      }
+      // Refresh contacts table if visible
+      if (typeof fetchGroups === 'function') fetchGroups();
+    } else {
+      if (btnEl) { btnEl.disabled = false; btnEl.innerText = '🏷️ Tag'; }
+      alert('Failed: ' + (data.error || 'Unknown error'));
+    }
+  } catch(e) {
+    if (btnEl) { btnEl.disabled = false; btnEl.innerText = '🏷️ Tag'; }
+    alert('Network error: ' + e.message);
+  }
+};
+
+// Show a quick tag picker popup anchored to a button element (used from call log modals)
+window.showQuickTagPicker = function(phone, anchorEl) {
+  document.querySelectorAll('.quick-tag-picker').forEach(el => el.remove());
+
+  const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
+  const uniqueTags = Array.from(new Set(allContacts.map(c => c.tag || 'Default'))).filter(Boolean);
+
+  const popup = document.createElement('div');
+  popup.className = 'quick-tag-picker';
+  const rect = anchorEl.getBoundingClientRect();
+  const top = Math.max(rect.top - 180, 10);
+  const left = Math.min(rect.left, window.innerWidth - 240);
+  popup.style.cssText = `position:fixed; z-index:999999999; background:var(--bg-surface,#18181b); border:1px solid var(--border-color,#27272a); border-radius:12px; padding:12px 14px; box-shadow:0 12px 40px rgba(0,0,0,0.7); min-width:220px; top:${top}px; left:${left}px;`;
+
+  popup.innerHTML = `
+    <div style="font-size:0.76rem; font-weight:800; color:var(--text-muted,#a1a1aa); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">🏷️ Tag Contact: ${phone}</div>
+    <div style="display:flex; flex-direction:column; gap:5px;">
+      <span onclick="window.updateContactTagByPhone('${phone}', 'Interested', this); document.querySelector('.quick-tag-picker').remove();" style="background:rgba(16,185,129,0.12); color:#10b981; font-size:0.78rem; padding:7px 12px; border-radius:8px; cursor:pointer; border:1px solid rgba(16,185,129,0.3); font-weight:700;">✅ Interested</span>
+      <span onclick="window.updateContactTagByPhone('${phone}', 'Not Interested', this); document.querySelector('.quick-tag-picker').remove();" style="background:rgba(239,68,68,0.12); color:#ef4444; font-size:0.78rem; padding:7px 12px; border-radius:8px; cursor:pointer; border:1px solid rgba(239,68,68,0.3); font-weight:700;">❌ Not Interested</span>
+      <span onclick="window.updateContactTagByPhone('${phone}', 'Follow Up', this); document.querySelector('.quick-tag-picker').remove();" style="background:rgba(245,158,11,0.12); color:#f59e0b; font-size:0.78rem; padding:7px 12px; border-radius:8px; cursor:pointer; border:1px solid rgba(245,158,11,0.3); font-weight:700;">🔄 Follow Up</span>
+      ${uniqueTags.map(t => `<span onclick="window.updateContactTagByPhone('${phone}', '${t.replace(/'/g, "\\'")}'  , this); document.querySelector('.quick-tag-picker').remove();" style="background:rgba(6,182,212,0.08); color:var(--color-cyan,#06b6d4); font-size:0.78rem; padding:7px 12px; border-radius:8px; cursor:pointer; border:1px solid rgba(6,182,212,0.2); font-weight:600;">🏷️ ${escapeHtml(t)}</span>`).join('')}
+    </div>
+    <div style="margin-top:10px; display:flex; gap:6px;">
+      <input id="qtp-custom-input" type="text" placeholder="Custom tag..." style="flex:1; background:rgba(255,255,255,0.05); border:1px solid var(--border-color,#27272a); color:var(--text-main,#fff); border-radius:7px; padding:6px 9px; font-size:0.8rem; outline:none;">
+      <button onclick="const v=document.getElementById('qtp-custom-input').value.trim(); if(v){window.updateContactTagByPhone('${phone}',v,this);document.querySelector('.quick-tag-picker').remove();}" style="padding:6px 10px; border-radius:7px; background:var(--color-cyan,#06b6d4); border:none; color:#000; font-weight:800; cursor:pointer; font-size:0.8rem;">+</button>
+    </div>
+  `;
+
+  document.body.appendChild(popup);
+  setTimeout(() => {
+    document.addEventListener('click', function closeQTP(e) {
+      if (!popup.contains(e.target) && e.target !== anchorEl) {
+        popup.remove();
+        document.removeEventListener('click', closeQTP);
+      }
+    });
+  }, 50);
 };
 
 window.deleteSingleContactDirect = async function(contactId, groupId) {

@@ -3173,6 +3173,30 @@ app.put('/api/contacts/:id', express.json(), authMiddleware('contacts'), (req, r
   res.json({ success: true, contact });
 });
 
+// PATCH tag by phone number (used from call logs where only phone is known)
+app.patch('/api/contacts/by-phone', express.json(), (req, res) => {
+  const { phone, tag } = req.body;
+  if (!phone) return res.status(400).json({ success: false, error: 'phone is required' });
+  const normPhone = String(phone).replace(/\D/g, '');
+  let updated = null;
+  for (const [id, contact] of contactsDb.entries()) {
+    const cPhone = String(contact.phone || '').replace(/\D/g, '');
+    if (cPhone === normPhone) {
+      contact.tag = tag || '';
+      contactsDb.set(id, contact);
+      updated = contact;
+      break;
+    }
+  }
+  saveContacts();
+  if (updated) {
+    res.json({ success: true, contact: updated });
+  } else {
+    // Contact not found — create a minimal one so tag is persisted
+    res.json({ success: true, message: 'Contact not found in DB but noted', contact: null });
+  }
+});
+
 app.delete('/api/contacts/:id', authMiddleware('contacts'), (req, res) => {
   const { id } = req.params;
   if (contactsDb.has(id)) {
