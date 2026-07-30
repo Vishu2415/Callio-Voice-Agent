@@ -5822,6 +5822,34 @@ function applyUserRole(user) {
     crmSimCard.style.display = (user && (user.role === 'admin' || user.role === 'reseller')) ? 'block' : 'none';
   }
 
+  // Whitelabel vs Super Admin specific Admin Panel controls
+  const isWL = typeof window.isWhitelabelDomain === 'function' ? window.isWhitelabelDomain() : false;
+  const isSuperAdmin = (user && user.role === 'admin' && !isWL);
+
+  // 1. Whitelabel Billing & Reseller Commission Console (Super Admin only)
+  const resellerCommissionCard = document.getElementById('reseller-wallet-commission-card');
+  if (resellerCommissionCard) {
+    resellerCommissionCard.style.display = isSuperAdmin ? 'block' : 'none';
+  }
+
+  // 2. Create Base Plan button (Super Admin only)
+  const createBasePlanBtn = document.getElementById('btn-create-new-plan-admin');
+  if (createBasePlanBtn) {
+    createBasePlanBtn.style.display = isSuperAdmin ? 'inline-flex' : 'none';
+  }
+
+  // 3. Admin Subtab: Trial Leads (Main Callio.in Super Admin only)
+  const trialLeadsTab = document.getElementById('admin-subtab-trial-leads');
+  if (trialLeadsTab) {
+    trialLeadsTab.style.display = isSuperAdmin ? 'inline-block' : 'none';
+  }
+
+  // 4. Admin Subtab: Whitelabel Resellers (Super Admin only)
+  const resellersTab = document.getElementById('admin-subtab-resellers');
+  if (resellersTab) {
+    resellersTab.style.display = isSuperAdmin ? 'inline-block' : 'none';
+  }
+
   // Populate CRM Telephony Credentials fields from local storage / user
   const cAuthId = document.getElementById('calling-vobiz-auth-id');
   const cAuthToken = document.getElementById('calling-vobiz-auth-token');
@@ -7944,6 +7972,11 @@ window.loadBrandingToForm = function() {
 
 // --- Admin Panel Sub-tabs Switcher ---
 window.switchAdminSubtab = function(tabName) {
+  const isWL = typeof window.isWhitelabelDomain === 'function' ? window.isWhitelabelDomain() : false;
+  const isSuperAdmin = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.role === 'admin' && !isWL);
+  if ((tabName === 'trial-leads' || tabName === 'resellers') && !isSuperAdmin) {
+    tabName = 'users';
+  }
   const sections = {
     'users': 'admin-panel-section-users',
     'requests': 'admin-panel-section-requests',
