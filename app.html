@@ -1931,9 +1931,15 @@
                 </div>
               </div>
               
-              <div class="form-group" style="margin-bottom: 20px;">
+              <div class="form-group" style="margin-bottom: 15px;">
                 <label for="branding-copyright">Copyright Text</label>
                 <input type="text" id="branding-copyright" placeholder="© 2026 Brand. All rights reserved.">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label for="branding-demo-prompt">🎤 Live Demo Widget System Prompt (For Public / Landing Page Demo Calls)</label>
+                <textarea id="branding-demo-prompt" rows="3" placeholder="e.g. You are an AI Voice Assistant for Growvo. Politely answer visitor questions about our services in warm, friendly Hinglish..." style="width: 100%; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 10px; padding: 10px 12px; font-size: 0.85rem; outline: none; box-sizing: border-box; resize: vertical; line-height: 1.4;"></textarea>
+                <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">This prompt controls the AI persona and instructions when website visitors test the Live Talk / Phone Simulator widget on your domain.</span>
               </div>
               
               <button type="submit" class="settings-modern-btn" style="width: 100%; border-radius: 12px; font-weight: 700; background: var(--grad-coral); border: none; color: white;">
@@ -2776,7 +2782,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=20260730_v36"></script>
+  <script type="module" src="app.js?v=20260730_v37"></script>
   <!-- Today's Calls & Summaries Modal -->
   <div id="today-calls-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="width: 90%; max-width: 700px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 25px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh;">

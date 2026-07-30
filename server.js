@@ -242,7 +242,8 @@ function resolveBranding(host) {
       secondaryColor: b.secondaryColor || '#ae3115',
       supportEmail: b.supportEmail || reseller.email || '',
       supportPhone: b.supportPhone || '',
-      copyrightText: b.copyrightText || `© ${new Date().getFullYear()} ${appName}. All rights reserved.`
+      copyrightText: b.copyrightText || `© ${new Date().getFullYear()} ${appName}. All rights reserved.`,
+      demoSystemPrompt: b.demoSystemPrompt || reseller.demoSystemPrompt || ''
     };
   }
 
@@ -1711,7 +1712,7 @@ app.get('/api/public/branding', (req, res) => {
 });
 
 app.post('/api/admin/branding', (req, res) => {
-  const { id, customDomain, subdomain, appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText } = req.body;
+  const { id, customDomain, subdomain, appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText, demoSystemPrompt } = req.body;
   const host = req.headers.host || req.headers.origin || req.headers.referer || '';
   let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
   if (cleanHost.startsWith('www.')) cleanHost = cleanHost.substring(4);
@@ -1727,7 +1728,9 @@ app.post('/api/admin/branding', (req, res) => {
       primaryColor: primaryColor || currentReseller.branding?.primaryColor || '#FF6B4A',
       secondaryColor: secondaryColor || currentReseller.branding?.secondaryColor || '#ae3115',
       supportEmail: supportEmail !== undefined ? supportEmail : currentReseller.branding?.supportEmail,
-      copyrightText: copyrightText !== undefined ? copyrightText : currentReseller.branding?.copyrightText
+      supportPhone: supportPhone !== undefined ? supportPhone : currentReseller.branding?.supportPhone,
+      copyrightText: copyrightText !== undefined ? copyrightText : currentReseller.branding?.copyrightText,
+      demoSystemPrompt: demoSystemPrompt !== undefined ? demoSystemPrompt : (currentReseller.branding?.demoSystemPrompt || '')
     };
     resellersDb.set(currentReseller.id, currentReseller);
     saveResellers();
@@ -1754,7 +1757,8 @@ app.post('/api/admin/branding', (req, res) => {
     secondaryColor: secondaryColor || '#ae3115',
     supportEmail: supportEmail || '',
     supportPhone: supportPhone || '',
-    copyrightText: copyrightText || '© 2026 Callio. All rights reserved.'
+    copyrightText: copyrightText || '© 2026 Callio. All rights reserved.',
+    demoSystemPrompt: demoSystemPrompt !== undefined ? demoSystemPrompt : ''
   };
 
   if (targetDomain.includes('callio') || targetDomain.includes('localhost') || targetDomain === 'default') {
@@ -5594,8 +5598,17 @@ wss.on('connection', (ws, req) => {
       console.log(`[Browser Trial WS] Trial limits OFF. IP ${ip} connecting freely.`);
     }
 
+    const host = req.headers.host || req.headers.origin || '';
+    const hostBranding = resolveBranding(host);
+    const domainDemoPrompt = hostBranding ? hostBranding.demoSystemPrompt : '';
+
     const queryVoice = urlObj.searchParams.get('voice') || 'Aoede';
-    const queryInstruction = urlObj.searchParams.get('prompt') || defaultCallConfig.systemInstruction || 'You are a helpful assistant.';
+    const rawUserPrompt = urlObj.searchParams.get('prompt') || '';
+    const queryInstruction = (rawUserPrompt && rawUserPrompt.trim().length > 0)
+      ? rawUserPrompt.trim()
+      : ((domainDemoPrompt && domainDemoPrompt.trim().length > 0) 
+          ? domainDemoPrompt.trim() 
+          : (defaultCallConfig.systemInstruction || 'You are a helpful assistant.'));
 
     const femaleVoices = ['Aoede', 'Kore', 'Puck', 'Leda', 'Callirrhoe', 'Autonoe', 'Despina', 'Erinome', 'Laomedeia', 'Achernar', 'Pulcherrima', 'Vindemiatrix', 'Sulafat'];
     const queryGender = femaleVoices.includes(queryVoice) ? 'female' : 'male';

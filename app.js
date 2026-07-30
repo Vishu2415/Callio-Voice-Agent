@@ -8415,6 +8415,8 @@ window.loadBrandingToForm = function() {
   document.getElementById('branding-support-email').value = branding.supportEmail || '';
   document.getElementById('branding-support-phone').value = branding.supportPhone || '';
   document.getElementById('branding-copyright').value = branding.copyrightText || '';
+  const demoPromptEl = document.getElementById('branding-demo-prompt');
+  if (demoPromptEl) demoPromptEl.value = branding.demoSystemPrompt || '';
 };
 
 // --- Admin Panel Sub-tabs Switcher ---
@@ -9976,6 +9978,7 @@ window.saveBrandingSettings = async function(event) {
   const supportEmail = document.getElementById('branding-support-email').value.trim();
   const supportPhone = document.getElementById('branding-support-phone').value.trim();
   const copyrightText = document.getElementById('branding-copyright').value.trim();
+  const demoSystemPrompt = document.getElementById('branding-demo-prompt')?.value.trim() || '';
 
   try {
     const res = await fetch('/api/admin/branding', {
@@ -9985,7 +9988,7 @@ window.saveBrandingSettings = async function(event) {
         'X-Tenant-Id': window.BrandingContext ? window.BrandingContext.id : ''
       },
       body: JSON.stringify({
-        id, customDomain, subdomain, appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText
+        id, customDomain, subdomain, appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText, demoSystemPrompt
       })
     });
     const data = await res.json();
