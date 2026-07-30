@@ -1541,28 +1541,43 @@ window.renderMetricDetailsModalContent = function() {
 
   bodyEl.innerHTML = html;
 
-  // Show/hide broadcast button based on type (completed or failed only)
+  // Extract unique phones from filtered calls
+  const uniquePhones = Array.from(new Set(filteredCalls.map(c => c.phone || c.to || c.from || '').filter(p => p && String(p).trim().length > 0)));
+  window._metricModalFilteredPhones = uniquePhones.slice(0, 100);
+
+  // Show/hide broadcast buttons (header & footer) for all call list types
   const broadcastBtn = document.getElementById('metric-modal-broadcast-btn');
-  if (broadcastBtn) {
-    if ((type === 'completed' || type === 'failed') && filteredCalls.length > 0) {
+  const headerBroadcastBtn = document.getElementById('metric-modal-header-broadcast-btn');
+
+  if (uniquePhones.length > 0) {
+    if (broadcastBtn) {
       broadcastBtn.style.display = 'flex';
-      broadcastBtn.title = `Broadcast to ${Math.min(filteredCalls.length, 50)} contacts`;
-    } else {
-      broadcastBtn.style.display = 'none';
+      broadcastBtn.innerHTML = `📣 Broadcast to These Contacts (${uniquePhones.length})`;
+      broadcastBtn.title = `Start broadcast call to ${uniquePhones.length} contacts`;
     }
+    if (headerBroadcastBtn) {
+      headerBroadcastBtn.style.display = 'flex';
+      headerBroadcastBtn.innerHTML = `📣 Broadcast (${uniquePhones.length})`;
+      headerBroadcastBtn.title = `Start broadcast call to ${uniquePhones.length} contacts`;
+    }
+  } else {
+    if (broadcastBtn) broadcastBtn.style.display = 'none';
+    if (headerBroadcastBtn) headerBroadcastBtn.style.display = 'none';
   }
-  // Store filtered phones for broadcast
-  window._metricModalFilteredPhones = filteredCalls.slice(0, 50).map(c => c.phone || c.to || c.from || '').filter(Boolean);
 };
 
-// Broadcast all contacts shown in the metric modal (completed/failed)
+// Broadcast all contacts shown in the metric modal (completed/failed/interested/total)
 window.broadcastFilteredMetricContacts = async function() {
   const phones = window._metricModalFilteredPhones || [];
-  if (!phones.length) { alert('No contacts to broadcast.'); return; }
+  if (!phones.length) { alert('No contacts found to broadcast.'); return; }
 
-  // Build agent-selection popup
+  // Build label based on modal type
   const type = window.currentMetricModalType || 'contacts';
-  const label = type === 'failed' ? 'Failed/Rejected Contacts Re-broadcast' : 'Completed Contacts Re-broadcast';
+  let label = 'Re-broadcast Calls';
+  if (type === 'failed') label = 'Failed/Rejected Contacts Re-broadcast';
+  else if (type === 'completed') label = 'Completed Contacts Re-broadcast';
+  else if (type === 'interested') label = 'Interested Leads Re-broadcast';
+  else if (type === 'total') label = 'Total Calls Re-broadcast';
 
   let popup = document.getElementById('broadcast-agent-quick-popup');
   if (!popup) {

@@ -2776,7 +2776,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=20260730_v35"></script>
+  <script type="module" src="app.js?v=20260730_v36"></script>
   <!-- Today's Calls & Summaries Modal -->
   <div id="today-calls-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="width: 90%; max-width: 700px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 25px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh;">
@@ -3183,104 +3183,6 @@
     </div>
   </div>
 
-  <!-- Dashboard Metrics Detail Modal (Opens when metric cards are clicked) -->
-  <div id="dashboard-metric-detail-modal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); z-index: 999999; align-items: center; justify-content: center;">
-    <div class="modal-content" style="max-width: 800px; width: 92%; max-height: 88vh; display: flex; flex-direction: column; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 20px; padding: 24px; box-shadow: 0 24px 70px rgba(0,0,0,0.7); box-sizing: border-box; position: relative;">
-      
-      <!-- Modal Header -->
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div id="metric-modal-icon" style="width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(6, 182, 212, 0.15); color: var(--color-cyan); font-size: 1.3rem; flex-shrink: 0;">
-            📞
-          </div>
-          <div>
-            <h3 id="metric-modal-title" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.3px;">Call Details</h3>
-            <p id="metric-modal-subtitle" style="margin: 4px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Detailed view of call activity.</p>
-          </div>
-        </div>
-        <button onclick="event.preventDefault(); event.stopPropagation(); window.closeMetricDetailsModal();" class="btn-icon-close" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Quick Filter & Search Header -->
-      <div style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;">
-        <input type="text" id="metric-modal-search" placeholder="Search by phone number, reason or notes..." oninput="window.renderMetricDetailsModalContent()" style="flex: 1; min-width: 200px; padding: 8px 14px; font-size: 0.82rem; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
-        <div id="metric-modal-badge" style="padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 800; background: rgba(6,182,212,0.12); color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.3);">
-          Total: 0
-        </div>
-      </div>
-
-      <!-- Content Container -->
-      <div id="metric-modal-body" style="overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; max-height: 60vh;">
-        <!-- Dynamic call list or analytical breakdown inserted here -->
-      </div>
-    </div>
-  </div>
-
-  <script>
-    function makeAppLogoTransparent(imgElement) {
-      const img = new Image();
-      img.src = imgElement.src;
-      img.onload = function() {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        try {
-          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imgData.data;
-          for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i+1];
-            const b = data[i+2];
-            if (r > 220 && g > 220 && b > 220) {
-              data[i+3] = 0; // set alpha to transparent
-            }
-          }
-          ctx.putImageData(imgData, 0, 0);
-          imgElement.src = canvas.toDataURL();
-        } catch (e) {
-          console.warn("Could not modify app logo transparency dynamically:", e);
-        }
-      };
-    }
-
-    window.addEventListener('DOMContentLoaded', () => {
-      document.querySelectorAll('.app-logo-img').forEach(img => {
-        makeAppLogoTransparent(img);
-      });
-
-      // Mouse movement parallax effect for auth overlay right panel
-      const authRightPanel = document.getElementById('auth-right-section');
-      if (authRightPanel) {
-        authRightPanel.addEventListener('mousemove', (e) => {
-          const rect = authRightPanel.getBoundingClientRect();
-          const x = e.clientX - rect.left - rect.width / 2;
-          const y = e.clientY - rect.top - rect.height / 2;
-          
-          const moveX = x / 40;
-          const moveY = y / 40;
-          
-          const cards = authRightPanel.querySelectorAll('.perspective-1000');
-          cards.forEach(card => {
-            card.style.transform = `rotateY(${moveX}deg) rotateX(${-moveY}deg) translateZ(10px)`;
-          });
-        });
-        authRightPanel.addEventListener('mouseleave', () => {
-          const cards = authRightPanel.querySelectorAll('.perspective-1000');
-          cards.forEach(card => {
-            card.style.transform = 'rotateY(0deg) rotateX(0deg) translateZ(0px)';
-          });
-        });
-      }
-    });
-  </script>
-
   <!-- ========== DASHBOARD METRIC DETAILS MODAL ========== -->
   <div id="dashboard-metric-detail-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:999999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(6px);" onclick="if(event.target===this) window.closeMetricDetailsModal()">
     <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:20px; width:760px; max-width:95vw; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.5); overflow:hidden;">
@@ -3291,6 +3193,7 @@
           <div id="metric-modal-title" style="font-size:1.15rem; font-weight:800; color:var(--text-main); margin-bottom:2px;">Call Details</div>
           <div id="metric-modal-subtitle" style="font-size:0.78rem; color:var(--text-muted); line-height:1.4;">Detailed call breakdown</div>
         </div>
+        <button id="metric-modal-header-broadcast-btn" onclick="event.preventDefault(); event.stopPropagation(); window.broadcastFilteredMetricContacts();" style="display:none; background:linear-gradient(135deg,#7c3aed,#4f46e5); color:white; border:none; padding:7px 15px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.78rem; align-items:center; gap:6px; box-shadow:0 4px 14px rgba(124,58,237,0.35);">📣 Broadcast All</button>
         <span id="metric-modal-badge" style="background:rgba(6,182,212,0.1); color:var(--color-cyan); border:1px solid rgba(6,182,212,0.3); padding:4px 12px; border-radius:100px; font-size:0.75rem; font-weight:700; white-space:nowrap;">Count: 0</span>
         <button onclick="window.closeMetricDetailsModal()" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-muted); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; flex-shrink:0;">✕</button>
       </div>
@@ -3303,9 +3206,12 @@
         <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading...</div>
       </div>
       <!-- Footer -->
-      <div style="padding:14px 24px; border-top:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; background:rgba(0,0,0,0.1);">
+      <div style="padding:14px 24px; border-top:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; background:rgba(0,0,0,0.2); gap:10px; flex-wrap:wrap;">
         <span style="font-size:0.78rem; color:var(--text-muted);">Click "Re-call Now" to quickly start a call</span>
-        <button onclick="window.closeMetricDetailsModal()" style="background:linear-gradient(135deg,var(--color-primary),#ae3115); color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.85rem;">Close</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="metric-modal-broadcast-btn" onclick="event.preventDefault(); event.stopPropagation(); window.broadcastFilteredMetricContacts();" style="display:none; background:linear-gradient(135deg,#7c3aed,#4f46e5); color:white; border:none; padding:8px 18px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.82rem; align-items:center; gap:6px; box-shadow:0 4px 14px rgba(124,58,237,0.35);">📣 Broadcast to These Contacts</button>
+          <button onclick="event.preventDefault(); event.stopPropagation(); window.closeMetricDetailsModal();" style="background:linear-gradient(135deg,var(--color-primary),#ae3115); color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.85rem;">Close</button>
+        </div>
       </div>
     </div>
   </div>
