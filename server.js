@@ -338,6 +338,11 @@ function saveCrmRules() { saveDatabase(CRM_RULES_DB_FILE, crmRulesDb); }
 function loadCrmLogs() { loadDatabase(CRM_LOGS_DB_FILE, crmLogsDb); }
 function saveCrmLogs() { saveDatabase(CRM_LOGS_DB_FILE, crmLogsDb); }
 
+const PENDING_REQUESTS_FILE = './pending_requests_db.json';
+const pendingRequests = new Map();
+function loadPendingRequests() { loadDatabase(PENDING_REQUESTS_FILE, pendingRequests); }
+function savePendingRequests() { saveDatabase(PENDING_REQUESTS_FILE, pendingRequests); }
+
 function normalizePhoneKey(phoneStr) {
   if (!phoneStr) return '';
   let digits = String(phoneStr).replace(/\D/g, '');
@@ -557,6 +562,7 @@ loadGroups();
 loadCrmRules();
 loadCrmLogs();
 loadClients();
+loadPendingRequests();
 loadCallbacks();
 loadPlans();
 loadTrialLimits();
@@ -4642,47 +4648,67 @@ app.post('/api/client/request-number', (req, res) => {
   const host = getRealHostFromRequest(req);
   const currentReseller = getResellerFromHost(host);
 
-  if (clientId) {
-    const client = clientsDb.get(clientId);
-    if (client) {
-      client.status = 'number_requested';
-      client.requested_number = `${number_type || 'Virtual Mobile'}`;
-      if (currentReseller && !client.reseller_id) {
-        client.reseller_id = currentReseller.id;
-        client.reseller_name = currentReseller.name;
+  let targetClient = clientId ? clientsDb.get(clientId) : null;
+  if (!targetClient && email) {
+    for (const c of clientsDb.values()) {
+      if (c.email && c.email.toLowerCase() === email.toLowerCase()) {
+        targetClient = c;
+        break;
       }
-      client.kyc_details = {
-        company: company || client.name,
-        person: person || client.name,
-        email: email || client.email,
-        phone: phone || client.phone_number || '',
-        number_type: number_type || 'Indian Virtual Mobile (+91)',
-        use_case: use_case || 'Outbound Sales & Telemarketing',
-        document_url: document_url || null,
-        domain: host,
-        reseller_id: currentReseller ? currentReseller.id : (client.reseller_id || null),
-        reseller_name: currentReseller ? currentReseller.name : (client.reseller_name || null),
-        submittedAt: new Date().toISOString()
-      };
-      clientsDb.set(clientId, client);
-      saveClients();
     }
+  }
+
+  if (targetClient) {
+    targetClient.status = 'number_requested';
+    targetClient.requested_number = `${number_type || 'Virtual Mobile'}`;
+    if (currentReseller && !targetClient.reseller_id) {
+      targetClient.reseller_id = currentReseller.id;
+      targetClient.reseller_name = currentReseller.name;
+    }
+    targetClient.kyc_details = {
+      company: company || targetClient.name,
+      person: person || targetClient.name,
+      email: email || targetClient.email,
+      phone: phone || targetClient.phone_number || '',
+      number_type: number_type || 'Indian Virtual Mobile (+91)',
+      use_case: use_case || 'Outbound Sales & Telemarketing',
+      document_url: document_url || null,
+      domain: host,
+      reseller_id: currentReseller ? currentReseller.id : (targetClient.reseller_id || null),
+      reseller_name: currentReseller ? currentReseller.name : (targetClient.reseller_name || null),
+      submittedAt: new Date().toISOString()
+    };
+    clientsDb.set(targetClient.id, targetClient);
+    saveClients();
   }
 
   const reqId = Date.now().toString();
   pendingRequests.set(reqId, {
     id: reqId,
-    clientId: clientId || 'guest',
+    clientId: targetClient ? targetClient.id : (clientId || 'guest'),
     clientName: company || person || 'Client',
     number: number_type || 'Virtual Mobile',
     status: 'pending',
-    reseller_id: currentReseller ? currentReseller.id : null,
-    reseller_name: currentReseller ? currentReseller.name : null,
-    kyc_details: { company, person, email, phone, use_case, number_type, document_url, domain: host },
+    reseller_id: currentReseller ? currentReseller.id : (targetClient ? targetClient.reseller_id : null),
+    reseller_name: currentReseller ? currentReseller.name : (targetClient ? targetClient.reseller_name : null),
+    kyc_details: {
+      company: company || (targetClient ? targetClient.name : 'Client'),
+      person: person || (targetClient ? targetClient.name : 'Client'),
+      email: email || (targetClient ? targetClient.email : ''),
+      phone: phone || (targetClient ? targetClient.phone_number : ''),
+      use_case,
+      number_type,
+      document_url,
+      domain: host,
+      reseller_id: currentReseller ? currentReseller.id : (targetClient ? targetClient.reseller_id : null),
+      reseller_name: currentReseller ? currentReseller.name : (targetClient ? targetClient.reseller_name : null),
+      submittedAt: new Date().toISOString()
+    },
     timestamp: new Date().toISOString()
   });
   savePendingRequests();
 
+  console.log(`[KYC Request] New number request submitted by ${company || person} (${email})`);
   res.json({ success: true, message: 'KYC & Virtual Number request submitted successfully.' });
 });
 
