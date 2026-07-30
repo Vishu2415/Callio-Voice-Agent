@@ -263,37 +263,143 @@ window.triggerLeadCall = function(phone) {
   logSuccess(`Lead selected: ${phone}. Switched to Quick Call dialer.`);
 };
 
-window.dismissLeadCard = function(btn) {
-  const card = btn.closest('.action-lead-card');
-  if (card) {
-    const cardId = card.dataset.id;
-    if (cardId) {
-      const storageKey = typeof loggedInUser !== 'undefined' && loggedInUser 
-        ? `dismissed_leads_${loggedInUser.id || loggedInUser.username || 'default'}` 
-        : 'dismissed_leads';
-        
-      let dismissed = [];
+// Trigger Call Back with Agent selector popup (used by AI lead cards)
+window.triggerCallBackWithAgent = function(phone) {
+  const cleanPhone = phone ? phone.replace(/[^0-9+]/g, '') : '';
+  if (!cleanPhone) return;
+
+  // Build the agent-select popup
+  let popup = document.getElementById('callback-agent-popup');
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.id = 'callback-agent-popup';
+    popup.style.cssText = 'display:none; position:fixed !important; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); z-index:999999999; align-items:center; justify-content:center; backdrop-filter:blur(6px);';
+    popup.innerHTML = `
+      <div style="background:var(--bg-surface,#18181b); border:1px solid var(--border-color,#27272a); border-radius:20px; padding:28px 28px 22px; width:360px; max-width:94vw; box-shadow:0 24px 60px rgba(0,0,0,0.7); position:relative;">
+        <div style="font-size:1.05rem; font-weight:800; color:var(--text-main,#fff); margin-bottom:4px;">📞 Initiate Callback</div>
+        <div id="callback-popup-phone" style="font-size:0.82rem; color:var(--color-cyan,#06b6d4); font-family:var(--font-mono,monospace); margin-bottom:18px; font-weight:700;"></div>
+        <label style="font-size:0.78rem; color:var(--text-muted,#a1a1aa); font-weight:700; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:6px;">Select AI Agent</label>
+        <select id="callback-agent-select" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border-color,#27272a); color:var(--text-main,#fff); border-radius:10px; padding:10px 12px; font-size:0.88rem; box-sizing:border-box; outline:none; cursor:pointer; margin-bottom:18px;">
+          <option value="">-- Loading agents... --</option>
+        </select>
+        <div style="display:flex; gap:10px;">
+          <button onclick="document.getElementById('callback-agent-popup').style.display='none';" style="flex:1; padding:10px; border-radius:10px; background:rgba(255,255,255,0.06); border:1px solid var(--border-color,#27272a); color:var(--text-muted,#a1a1aa); font-weight:700; cursor:pointer; font-size:0.85rem;">Cancel</button>
+          <button id="callback-start-btn" style="flex:2; padding:10px; border-radius:10px; background:linear-gradient(135deg,#ff5f52,#e11d48); border:none; color:#fff; font-weight:800; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; justify-content:center; gap:7px; box-shadow:0 4px 14px rgba(225,29,72,0.3);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            Call Now
+          </button>
+        </div>
+      </div>
+    `;
+    popup.onclick = function(e) { if (e.target === popup) popup.style.display = 'none'; };
+    document.body.appendChild(popup);
+  }
+
+  // Set phone label
+  const phoneLabel = popup.querySelector('#callback-popup-phone');
+  if (phoneLabel) phoneLabel.innerText = cleanPhone;
+
+  // Populate agent dropdown
+  const agentSel = popup.querySelector('#callback-agent-select');
+  if (agentSel) {
+    agentSel.innerHTML = '<option value="">-- Loading... --</option>';
+    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser) ? (loggedInUser.id || '') : '';
+    fetch(`/api/agents?clientId=${clientId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.agents && d.agents.length > 0) {
+          agentSel.innerHTML = '<option value="">-- Select Agent --</option>' +
+            d.agents.map(a => `<option value="${a.id}">${a.name} (${a.voice || 'Default'})</option>`).join('');
+          // Auto-select first agent
+          if (d.agents.length === 1) agentSel.value = d.agents[0].id;
+        } else {
+          agentSel.innerHTML = '<option value="">No agents found. Create one first.</option>';
+        }
+      })
+      .catch(() => { agentSel.innerHTML = '<option value="">Failed to load agents</option>'; });
+  }
+
+  // Wire up Call Now button
+  const startBtn = popup.querySelector('#callback-start-btn');
+  if (startBtn) {
+    startBtn.onclick = async function() {
+      const agentId = agentSel ? agentSel.value : '';
+      if (!agentId) { alert('Please select an agent first.'); return; }
+      startBtn.disabled = true;
+      startBtn.innerHTML = '⏳ Calling...';
       try {
-        dismissed = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      } catch (e) {
-        dismissed = [];
+        const publicUrl = document.getElementById('public-url')?.value || '';
+        const payload = {
+          agentId,
+          targetType: 'custom',
+          targetLabel: `Callback: ${cleanPhone}`,
+          mode: 'now',
+          publicUrl,
+          clientId: (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.id : null,
+          customPhones: [cleanPhone]
+        };
+        const res = await fetch('/api/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        popup.style.display = 'none';
+        if (data.success) {
+          alert(`✅ Callback initiated for ${cleanPhone}!`);
+        } else {
+          alert('Failed to start call: ' + (data.error || 'Unknown error'));
+        }
+      } catch(e) {
+        alert('Network error: ' + e.message);
+      } finally {
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Call Now';
       }
-      if (!dismissed.includes(cardId)) {
-        dismissed.push(cardId);
-        localStorage.setItem(storageKey, JSON.stringify(dismissed));
-      }
-    }
-    
-    card.style.opacity = '0';
-    card.style.transform = 'scale(0.9)';
+    };
+  }
+
+  popup.style.display = 'flex';
+};
+
+// Dismiss by card ID string (works even if card is not in DOM)
+window.dismissLeadCardById = function(cardId) {
+  if (!cardId) return;
+  const storageKey = typeof loggedInUser !== 'undefined' && loggedInUser 
+    ? `dismissed_leads_${loggedInUser.id || loggedInUser.username || 'default'}` 
+    : 'dismissed_leads';
+  let dismissed = [];
+  try { dismissed = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch(e) { dismissed = []; }
+  if (!dismissed.includes(String(cardId))) {
+    dismissed.push(String(cardId));
+    localStorage.setItem(storageKey, JSON.stringify(dismissed));
+  }
+  // Remove from DOM if present
+  const cardOnDom = document.querySelector(`.action-lead-card[data-id="${cardId}"]`);
+  if (cardOnDom) {
+    cardOnDom.style.opacity = '0';
+    cardOnDom.style.transform = 'scale(0.9)';
+    cardOnDom.style.transition = 'all 0.2s';
     setTimeout(() => {
-      card.remove();
+      cardOnDom.remove();
       const container = document.getElementById('ai-action-cards-container');
       if (container && container.querySelectorAll('.action-lead-card').length === 0) {
         showEmptyState(container);
       }
     }, 200);
   }
+};
+
+window.dismissLeadCard = function(btn) {
+  if (typeof btn === 'string') { window.dismissLeadCardById(btn); return; }
+  const card = btn && btn.closest ? btn.closest('.action-lead-card') : null;
+  if (card) {
+    const cardId = card.dataset.id;
+    window.dismissLeadCardById(cardId);
+    return;
+  }
+  // Fallback if btn element doesn't have a parent card — just log
+  console.warn('[dismissLeadCard] Could not find parent .action-lead-card for button');
 };
 
 function showEmptyState(container) {
@@ -729,11 +835,11 @@ function createActionCardElement(card, isModal = false) {
     </div>
     
     <div style="display: flex; gap: 8px; margin-top: auto; flex-shrink: 0;">
-      <button class="btn btn-primary" onclick="window.triggerLeadCall('${card.phone}'); event.stopPropagation();" style="flex: 1; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--color-primary, #ff5f52), #e11d48); border: none; color: #ffffff; font-weight: 700; font-size: 0.76rem; display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25); transition: all 0.2s;">
+      <button class="btn btn-primary" onclick="window.triggerCallBackWithAgent('${card.phone}'); event.stopPropagation();" style="flex: 1; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--color-primary, #ff5f52), #e11d48); border: none; color: #ffffff; font-weight: 700; font-size: 0.76rem; display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25); transition: all 0.2s;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         ${card.actionText}
       </button>
-      <button class="btn btn-secondary btn-done" onclick="window.dismissLeadCard('${card.id}'); event.stopPropagation();" style="height: 32px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-muted); font-weight: 600; font-size: 0.76rem; padding: 0 12px; cursor: pointer; transition: all 0.2s;">
+      <button class="btn btn-secondary btn-done" onclick="window.dismissLeadCardById('${card.id}'); event.stopPropagation();" style="height: 32px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-muted); font-weight: 600; font-size: 0.76rem; padding: 0 12px; cursor: pointer; transition: all 0.2s;">
         Done
       </button>
     </div>
@@ -947,18 +1053,14 @@ window.openLeadDetailModal = function(cardId, cardFallback = null) {
   if (btnCall) {
     btnCall.onclick = () => {
       window.closeLeadDetailModal();
-      window.triggerLeadCall(card.phone);
+      window.triggerCallBackWithAgent(card.phone);
     };
   }
 
   if (btnDone) {
     btnDone.onclick = () => {
       window.closeLeadDetailModal();
-      const cardOnDom = document.querySelector(`.action-lead-card[data-id="${cardId}"]`);
-      if (cardOnDom) {
-        const doneBtn = cardOnDom.querySelector('button.btn-secondary');
-        if (doneBtn) window.dismissLeadCard(doneBtn);
-      }
+      window.dismissLeadCardById(cardId);
     };
   }
 
@@ -1078,9 +1180,12 @@ window.openMetricDetailsModal = function(type) {
         <div id="metric-modal-body" style="flex:1; overflow-y:auto; padding:14px 24px 20px 24px; display:flex; flex-direction:column; gap:10px; min-height:200px;">
           <div style="text-align:center; padding:40px; color:var(--text-muted, #a1a1aa);">Loading...</div>
         </div>
-        <div style="padding:14px 24px; border-top:1px solid var(--border-color, #27272a); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; background:rgba(0,0,0,0.2);">
+        <div style="padding:14px 24px; border-top:1px solid var(--border-color, #27272a); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; background:rgba(0,0,0,0.2); gap:10px; flex-wrap:wrap;">
           <span style="font-size:0.78rem; color:var(--text-muted, #a1a1aa);">Click "Re-call Now" to quickly start a call</span>
-          <button onclick="event.preventDefault(); event.stopPropagation(); window.closeMetricDetailsModal();" style="background:linear-gradient(135deg,var(--color-primary, #ea580c),#ae3115); color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.85rem;">Close</button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="metric-modal-broadcast-btn" onclick="event.preventDefault(); event.stopPropagation(); window.broadcastFilteredMetricContacts();" style="display:none; background:linear-gradient(135deg,#7c3aed,#4f46e5); color:white; border:none; padding:8px 18px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.82rem; display:flex; align-items:center; gap:6px;">📣 Broadcast to These Contacts</button>
+            <button onclick="event.preventDefault(); event.stopPropagation(); window.closeMetricDetailsModal();" style="background:linear-gradient(135deg,var(--color-primary, #ea580c),#ae3115); color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.85rem;">Close</button>
+          </div>
         </div>
       </div>
     `;
@@ -1431,6 +1536,117 @@ window.renderMetricDetailsModalContent = function() {
   });
 
   bodyEl.innerHTML = html;
+
+  // Show/hide broadcast button based on type (completed or failed only)
+  const broadcastBtn = document.getElementById('metric-modal-broadcast-btn');
+  if (broadcastBtn) {
+    if ((type === 'completed' || type === 'failed') && filteredCalls.length > 0) {
+      broadcastBtn.style.display = 'flex';
+      broadcastBtn.title = `Broadcast to ${Math.min(filteredCalls.length, 50)} contacts`;
+    } else {
+      broadcastBtn.style.display = 'none';
+    }
+  }
+  // Store filtered phones for broadcast
+  window._metricModalFilteredPhones = filteredCalls.slice(0, 50).map(c => c.phone || c.to || c.from || '').filter(Boolean);
+};
+
+// Broadcast all contacts shown in the metric modal (completed/failed)
+window.broadcastFilteredMetricContacts = async function() {
+  const phones = window._metricModalFilteredPhones || [];
+  if (!phones.length) { alert('No contacts to broadcast.'); return; }
+
+  // Build agent-selection popup
+  const type = window.currentMetricModalType || 'contacts';
+  const label = type === 'failed' ? 'Failed/Rejected Contacts Re-broadcast' : 'Completed Contacts Re-broadcast';
+
+  let popup = document.getElementById('broadcast-agent-quick-popup');
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.id = 'broadcast-agent-quick-popup';
+    popup.style.cssText = 'display:none; position:fixed !important; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:9999999999; align-items:center; justify-content:center; backdrop-filter:blur(6px);';
+    popup.innerHTML = `
+      <div style="background:var(--bg-surface,#18181b); border:1px solid var(--border-color,#27272a); border-radius:20px; padding:28px 28px 22px; width:380px; max-width:94vw; box-shadow:0 24px 60px rgba(0,0,0,0.7);">
+        <div style="font-size:1.05rem; font-weight:800; color:var(--text-main,#fff); margin-bottom:4px;">📣 Broadcast to Contacts</div>
+        <div id="baq-subtitle" style="font-size:0.82rem; color:var(--text-muted,#a1a1aa); margin-bottom:18px;"></div>
+        <label style="font-size:0.78rem; color:var(--text-muted,#a1a1aa); font-weight:700; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:6px;">Select AI Agent</label>
+        <select id="baq-agent-select" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border-color,#27272a); color:var(--text-main,#fff); border-radius:10px; padding:10px 12px; font-size:0.88rem; box-sizing:border-box; outline:none; cursor:pointer; margin-bottom:18px;">
+          <option value="">-- Loading agents... --</option>
+        </select>
+        <div style="display:flex; gap:10px;">
+          <button onclick="document.getElementById('broadcast-agent-quick-popup').style.display='none';" style="flex:1; padding:10px; border-radius:10px; background:rgba(255,255,255,0.06); border:1px solid var(--border-color,#27272a); color:var(--text-muted,#a1a1aa); font-weight:700; cursor:pointer; font-size:0.85rem;">Cancel</button>
+          <button id="baq-start-btn" style="flex:2; padding:10px; border-radius:10px; background:linear-gradient(135deg,#7c3aed,#4f46e5); border:none; color:#fff; font-weight:800; cursor:pointer; font-size:0.85rem;">📣 Start Broadcast</button>
+        </div>
+      </div>
+    `;
+    popup.onclick = function(e) { if (e.target === popup) popup.style.display = 'none'; };
+    document.body.appendChild(popup);
+  }
+
+  const subtitleEl = popup.querySelector('#baq-subtitle');
+  if (subtitleEl) subtitleEl.innerText = `${phones.length} contacts · ${label}`;
+
+  const agentSel = popup.querySelector('#baq-agent-select');
+  if (agentSel) {
+    agentSel.innerHTML = '<option value="">-- Loading... --</option>';
+    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser) ? (loggedInUser.id || '') : '';
+    fetch(`/api/agents?clientId=${clientId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.agents && d.agents.length > 0) {
+          agentSel.innerHTML = '<option value="">-- Select Agent --</option>' +
+            d.agents.map(a => `<option value="${a.id}">${a.name} (${a.voice || 'Default'})</option>`).join('');
+          if (d.agents.length === 1) agentSel.value = d.agents[0].id;
+        } else {
+          agentSel.innerHTML = '<option value="">No agents found</option>';
+        }
+      })
+      .catch(() => { agentSel.innerHTML = '<option value="">Failed to load agents</option>'; });
+  }
+
+  const startBtn = popup.querySelector('#baq-start-btn');
+  if (startBtn) {
+    startBtn.onclick = async function() {
+      const agentId = agentSel ? agentSel.value : '';
+      if (!agentId) { alert('Please select an agent first.'); return; }
+      if (!confirm(`Start broadcast to ${phones.length} contacts?`)) return;
+      startBtn.disabled = true;
+      startBtn.innerText = '⏳ Starting...';
+      try {
+        const publicUrl = document.getElementById('public-url')?.value || '';
+        const payload = {
+          agentId,
+          targetType: 'custom',
+          targetLabel: label,
+          mode: 'now',
+          publicUrl,
+          clientId: (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.id : null,
+          customPhones: phones
+        };
+        const res = await fetch('/api/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        popup.style.display = 'none';
+        window.closeMetricDetailsModal();
+        if (data.success) {
+          alert(`✅ Broadcast started for ${phones.length} contacts!`);
+          if (typeof window.fetchRecentBroadcasts === 'function') window.fetchRecentBroadcasts();
+        } else {
+          alert('Failed to start broadcast: ' + (data.error || 'Unknown error'));
+        }
+      } catch(e) {
+        alert('Network error: ' + e.message);
+      } finally {
+        startBtn.disabled = false;
+        startBtn.innerText = '📣 Start Broadcast';
+      }
+    };
+  }
+
+  popup.style.display = 'flex';
 };
 
 window.filterActionCardsModal = function(filter, btnEl) {

@@ -3578,7 +3578,7 @@ async function executeBroadcastCalls(broadcastId, agent, contacts, reqBody = {})
 }
 
 app.post('/api/broadcast', async (req, res) => {
-  const { agentId, targetType, targetLabel, mode, scheduledAt, publicUrl, clientId } = req.body;
+  const { agentId, targetType, targetLabel, mode, scheduledAt, publicUrl, clientId, customPhones } = req.body;
   
   if (!agentId) {
     return res.status(400).json({ success: false, error: 'agentId is required' });
@@ -3588,17 +3588,28 @@ app.post('/api/broadcast', async (req, res) => {
   if (!agent) return res.status(404).json({ success: false, error: 'Agent not found' });
 
   // Resolve contacts to dial
-  let allContacts = Array.from(contactsDb.values());
-  if (clientId && clientId !== 'admin') {
-    allContacts = allContacts.filter(c => c.clientId === clientId);
-  }
+  let contacts = [];
 
-  let contacts = allContacts;
-  if (targetType && targetType.startsWith('tag_')) {
-    const tagName = targetType.replace('tag_', '').toLowerCase();
-    contacts = allContacts.filter(c => (c.tag || 'Default').toLowerCase() === tagName);
-  } else if (targetType && targetType !== 'all') {
-    contacts = allContacts.filter(c => c.groupId === targetType);
+  // If customPhones is provided (array of phone strings), use those directly
+  if (Array.isArray(customPhones) && customPhones.length > 0) {
+    contacts = customPhones.filter(p => p && String(p).trim().length > 0).map(p => ({
+      phone: String(p).trim(),
+      name: String(p).trim(),
+      clientId: clientId || null
+    }));
+  } else {
+    let allContacts = Array.from(contactsDb.values());
+    if (clientId && clientId !== 'admin') {
+      allContacts = allContacts.filter(c => c.clientId === clientId);
+    }
+
+    contacts = allContacts;
+    if (targetType && targetType.startsWith('tag_')) {
+      const tagName = targetType.replace('tag_', '').toLowerCase();
+      contacts = allContacts.filter(c => (c.tag || 'Default').toLowerCase() === tagName);
+    } else if (targetType && targetType !== 'all') {
+      contacts = allContacts.filter(c => c.groupId === targetType);
+    }
   }
 
   if (contacts.length === 0) {
