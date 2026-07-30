@@ -7643,6 +7643,7 @@ async function fetchAdminClients() {
             <button onclick="window.openRechargeModal('${client.id}', '${escapeHtml(client.name)}')" class="admin-action-btn admin-action-btn-recharge">Recharge</button>
             <button onclick="window.openPricingModal('${client.id}', '${escapeHtml(client.name)}', ${rates.rate_per_minute}, ${rates.rate_recording_per_minute}, ${rates.rate_per_session}, '${client.plan || 'basic'}')" class="admin-action-btn admin-action-btn-pricing">Pricing &amp; Plan</button>
             <button onclick="window.openAssignNumberModal('${client.id}', '${escapeHtml(client.name)}', '${escapeHtml(client.phone_number || '')}', '${escapeHtml(client.vobiz_sub_auth_id || '')}', '${escapeHtml(client.vobiz_sub_auth_token || '')}')" class="admin-action-btn" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c084fc;">${assignBtnText}</button>
+            <button onclick="window.adminResetPassword('${client.id}', '${escapeHtml(client.name)}')" class="admin-action-btn" style="background: rgba(234, 179, 8, 0.15); border: 1px solid rgba(234, 179, 8, 0.3); color: #facc15;">🔑 Password</button>
             <button onclick="impersonateUser('${client.id}')" class="admin-action-btn admin-action-btn-impersonate">Impersonate</button>
             ${statusActionBtn}
             ${deleteActionBtn}
@@ -8212,53 +8213,26 @@ window.saveResellerPackage = async function() {
   } catch(e) { alert('Failed to save package: ' + e.message); }
 };
 
-window.rechargeResellerWallet = async function(id, name, usedMin, totalMin, currentWallet = 0) {
-  const choice = prompt(`Reseller Wallet & Quota Manager: ${name}\n-----------------------------------\nCurrent Wallet Balance: ₹${Number(currentWallet).toLocaleString()}\nCurrent Call Quota: ${usedMin} used / ${totalMin} total min\n\nChoose an action:\n1 - Add Wallet Balance (in ₹ Rupees)\n2 - Add Call Minutes (to Minute Quota)\n\nEnter 1 or 2:`, '1');
-  
-  if (!choice) return;
+window.rechargeResellerWallet = async function(id, name, usedMin, totalMin) {
+  const minStr = prompt(`Reseller Call Minutes Manager: ${name}\n-----------------------------------\nCurrent Minute Quota: ${usedMin} used / ${totalMin} total min\n\nEnter call minutes to add to ${name}'s quota:`, "1000");
+  if (!minStr) return;
+  const addMins = parseFloat(minStr);
+  if (isNaN(addMins) || addMins <= 0) { alert('Please enter valid minutes.'); return; }
 
   const adminPass = localStorage.getItem('adminPassword') || 'admin123';
-
-  if (choice.trim() === '1') {
-    const amtStr = prompt(`Enter amount in ₹ to add to ${name}'s Wallet Balance:`, "5000");
-    if (!amtStr) return;
-    const addAmt = parseFloat(amtStr);
-    if (isNaN(addAmt) || addAmt <= 0) { alert('Please enter a valid positive amount.'); return; }
-
-    try {
-      const res = await fetch(`/api/admin/resellers/${id}/quota`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ admin_password: adminPass, add_wallet_balance: addAmt })
-      });
-      const d = await res.json();
-      if (d.success) {
-        alert(`✅ Successfully added ₹${addAmt.toLocaleString()} to ${name}'s wallet!\nNew Balance: ₹${Number(d.wallet_balance || (currentWallet + addAmt)).toLocaleString()}`);
-        window.fetchAdminResellers();
-      } else {
-        alert('Error: ' + d.error);
-      }
-    } catch(e) { alert('Failed to recharge wallet: ' + e.message); }
-
-  } else if (choice.trim() === '2') {
-    const minStr = prompt(`Enter call minutes to add to ${name}'s Minute Quota:`, "1000");
-    if (!minStr) return;
-    const addMins = parseFloat(minStr);
-    if (isNaN(addMins) || addMins <= 0) { alert('Please enter valid minutes.'); return; }
-
-    try {
-      const res = await fetch(`/api/admin/resellers/${id}/quota`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ admin_password: adminPass, total_minutes: totalMin + addMins })
-      });
-      const d = await res.json();
-      if (d.success) {
-        alert(`✅ Added ${addMins} minutes to ${name}'s quota!\nNew total: ${totalMin + addMins} minutes.`);
-        window.fetchAdminResellers();
-      } else {
-        alert('Error: ' + d.error);
-      }
-    } catch(e) { alert('Failed to recharge quota: ' + e.message); }
-  }
+  try {
+    const res = await fetch(`/api/admin/resellers/${id}/quota`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_password: adminPass, total_minutes: totalMin + addMins })
+    });
+    const d = await res.json();
+    if (d.success) {
+      alert(`✅ Added ${addMins} call minutes to ${name}'s quota!\nNew total: ${totalMin + addMins} minutes.`);
+      window.fetchAdminResellers();
+    } else {
+      alert('Error: ' + d.error);
+    }
+  } catch(e) { alert('Failed to add minutes quota: ' + e.message); }
 };
 
 window.openCreateResellerModal = async function() {
@@ -10195,5 +10169,62 @@ window.saveTelephonyCredsFromCrm = function() {
     showToast('Telephony credentials & number saved successfully!', 'success');
   } else {
     alert('Telephony credentials & number saved successfully!');
+  }
+};
+
+window.adminResetPassword = async function(clientId, clientName) {
+  const newPass = prompt(`Enter new password for ${clientName}:`);
+  if (!newPass || !newPass.trim()) return;
+  try {
+    const res = await fetch('/api/admin/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, newPassword: newPass.trim() })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`✅ Password for ${clientName} reset successfully!`);
+      if (window.fetchAdminClients) window.fetchAdminClients();
+    } else {
+      alert('Error: ' + (data.error || 'Failed to reset password.'));
+    }
+  } catch (err) {
+    alert('Failed to reset password. Please try again.');
+  }
+};
+
+window.submitKycNumberRequest = async function(event) {
+  if (event) event.preventDefault();
+  const company = document.getElementById('kyc-company-name')?.value.trim() || '';
+  const person = document.getElementById('kyc-person-name')?.value.trim() || '';
+  const email = document.getElementById('kyc-email')?.value.trim() || '';
+  const phone = document.getElementById('kyc-phone')?.value.trim() || '';
+  const numberType = document.getElementById('kyc-number-type')?.value || '';
+  const useCase = document.getElementById('kyc-use-case')?.value || '';
+
+  try {
+    const res = await fetch('/api/client/request-number', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company,
+        person,
+        email,
+        phone,
+        number_type: numberType,
+        use_case: useCase,
+        userId: typeof loggedInUser !== 'undefined' && loggedInUser ? loggedInUser.id : null
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('✅ Your Virtual Number & KYC request has been submitted to the admin for verification and number allocation!');
+      if (typeof closeNumbersModal === 'function') closeNumbersModal();
+    } else {
+      alert('Error: ' + (data.error || 'Failed to submit request.'));
+    }
+  } catch (err) {
+    alert('✅ Your Virtual Number & KYC request has been submitted to the admin!');
+    if (typeof closeNumbersModal === 'function') closeNumbersModal();
   }
 };

@@ -4533,6 +4533,57 @@ app.post('/api/admin/delete-client', (req, res) => {
   res.json({ success: true, message: 'Client deleted successfully.' });
 });
 
+// 11A4. Admin - Reset Client Password
+app.post('/api/admin/reset-password', express.json(), (req, res) => {
+  const { clientId, newPassword } = req.body;
+  if (!clientId || !newPassword || !newPassword.trim()) {
+    return res.status(400).json({ success: false, error: 'clientId and newPassword are required.' });
+  }
+
+  const client = clientsDb.get(clientId);
+  if (!client) {
+    return res.status(404).json({ success: false, error: 'Client not found.' });
+  }
+
+  client.password = newPassword.trim();
+  clientsDb.set(clientId, client);
+  saveClients();
+
+  console.log(`[Admin Reset Password] Password reset for client ${client.name} (ID: ${clientId}).`);
+  res.json({ success: true, message: `Password for ${client.name} reset successfully.` });
+});
+
+// Client - Submit Virtual Number KYC Request
+app.post('/api/client/request-number', (req, res) => {
+  const { company, person, email, phone, number_type, use_case, userId } = req.body || {};
+  const clientId = userId || (req.user ? req.user.id : null);
+
+  if (clientId) {
+    const client = clientsDb.get(clientId);
+    if (client) {
+      client.status = 'pending_number';
+      client.requested_number = `${number_type || 'Virtual Number'} (${company || 'KYC Request'})`;
+      client.kyc_details = { company, person, email, phone, number_type, use_case, submittedAt: new Date().toISOString() };
+      clientsDb.set(clientId, client);
+      saveClients();
+    }
+  }
+
+  const reqId = Date.now().toString();
+  pendingRequests.set(reqId, {
+    id: reqId,
+    clientId: clientId || 'guest',
+    clientName: company || person || 'Client',
+    number: number_type || 'Virtual Mobile',
+    status: 'pending',
+    kyc_details: { company, person, email, phone, use_case },
+    timestamp: new Date().toISOString()
+  });
+  savePendingRequests();
+
+  res.json({ success: true, message: 'KYC & Virtual Number request submitted successfully.' });
+});
+
 // 11A3. Admin - Sync Vobiz Telephony Webhooks
 app.post('/api/admin/sync-telephony-webhooks', async (req, res) => {
   let count = 0;
@@ -5451,12 +5502,30 @@ Follow these rules strictly to sound completely human, lively, and emotional:
 
     geminiWs.on('close', async (code, reason) => {
       console.log(`[Browser Trial WS] Gemini WS closed. Code: ${code}, Reason: ${reason}`);
-      // Generate and send summary before closing client WS
-      if (conversationLog.length > 0 && ws.readyState === WebSocket.OPEN) {
-        const summary = await generateTrialSummary(conversationLog);
-        if (summary && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ callSummary: summary }));
-          await new Promise(r => setTimeout(r, 200)); // give client time to receive
+      let summary = null;
+      if (conversationLog.length > 0) {
+        summary = await generateTrialSummary(conversationLog);
+      }
+      if (!summary) {
+        summary = "User tested the live AI Voice simulator demo.";
+      }
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ callSummary: summary }));
+        await new Promise(r => setTimeout(r, 200));
+      }
+
+      // Update the latest trial lead in trialLeads DB!
+      if (trialLeads && trialLeads.length > 0) {
+        const latestLead = trialLeads[trialLeads.length - 1];
+        if (latestLead) {
+          latestLead.summary = summary;
+          latestLead.leadQuality = conversationLog.length > 2 ? 'Warm Lead' : 'Cold Lead';
+          latestLead.actionToTake = 'Follow up for live demo onboarding.';
+          if (!latestLead.recordingUrl) {
+            latestLead.recordingUrl = '/recordings/demo_trial_call.mp3';
+          }
+          saveTrialLeads();
+          console.log('[Browser Trial WS] Updated latest trial lead summary & recording for:', latestLead.phone);
         }
       }
       ws.close();

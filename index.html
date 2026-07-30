@@ -1410,6 +1410,20 @@
         processorNode.onaudioprocess = (e) => {
           if (!isConnected) return;
           const inputBuffer = e.inputBuffer.getChannelData(0);
+
+          // Calculate user mic speech volume level (RMS) for barge-in interruption
+          let sum = 0;
+          for (let i = 0; i < inputBuffer.length; i++) {
+            sum += inputBuffer[i] * inputBuffer[i];
+          }
+          const rms = Math.sqrt(sum / inputBuffer.length);
+
+          // If user starts speaking while AI is playing, immediately cut off AI audio playback!
+          if (rms > 0.035 && scheduledSources.length > 0) {
+            clearPlaybackQueue();
+            scheduledSources = [];
+          }
+
           const downsampled = downsampleBuffer(inputBuffer, audioContext.sampleRate, 16000);
           const pcmBuffer = floatTo16BitPCM(downsampled);
           const base64Data = arrayBufferToBase64(pcmBuffer);
