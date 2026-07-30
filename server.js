@@ -4129,21 +4129,51 @@ app.get('/api/admin/pending-requests', (req, res) => {
   const isMainPlatform = isMainPlatformHost(host);
   const currentReseller = getResellerFromHost(host);
 
-  const pending = [];
+  const pendingMap = new Map();
+
   for (const client of clientsDb.values()) {
-    if (client.status === 'number_requested' || (client.status === 'pending_number' && client.kyc_details)) {
+    if (client.status === 'number_requested' || (client.status === 'pending_number' && client.kyc_details && client.requested_number)) {
+      if (client.phone_number && client.phone_number.trim() !== '') continue;
+      const itemResellerId = client.reseller_id || (client.kyc_details && client.kyc_details.reseller_id) || null;
       if (!isMainPlatform && currentReseller) {
-        // Whitelabel reseller admin ONLY sees requests belonging to their own clients!
-        if (client.reseller_id === currentReseller.id || (client.kyc_details && client.kyc_details.reseller_id === currentReseller.id)) {
-          pending.push(client);
-        }
-      } else {
-        // Main callio.in Super Admin sees ALL requests (both Super Admin clients & Whitelabel reseller clients)!
-        pending.push(client);
+        if (itemResellerId !== currentReseller.id) continue;
+      }
+      pendingMap.set(client.id, {
+        id: client.id,
+        name: client.name,
+        email: client.email,
+        phone_number: client.phone_number || '',
+        requested_number: client.requested_number || 'Virtual Mobile',
+        reseller_id: itemResellerId,
+        reseller_name: client.reseller_name || (client.kyc_details && client.kyc_details.reseller_name) || null,
+        kyc_details: client.kyc_details || {}
+      });
+    }
+  }
+
+  if (typeof pendingRequests !== 'undefined') {
+    for (const reqItem of pendingRequests.values()) {
+      if (reqItem.status && reqItem.status !== 'pending') continue;
+      const itemResellerId = reqItem.reseller_id || (reqItem.kyc_details && reqItem.kyc_details.reseller_id) || null;
+      if (!isMainPlatform && currentReseller) {
+        if (itemResellerId !== currentReseller.id) continue;
+      }
+      if (!pendingMap.has(reqItem.id)) {
+        pendingMap.set(reqItem.id, {
+          id: reqItem.id,
+          name: reqItem.clientName || 'Client',
+          email: reqItem.kyc_details?.email || '',
+          phone_number: '',
+          requested_number: reqItem.number || 'Virtual Mobile',
+          reseller_id: itemResellerId,
+          reseller_name: reqItem.reseller_name || null,
+          kyc_details: reqItem.kyc_details || {}
+        });
       }
     }
   }
-  res.json({ success: true, requests: pending });
+
+  res.json({ success: true, requests: Array.from(pendingMap.values()) });
 });
 
 // 6. Get All Clients (Admin)
