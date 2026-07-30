@@ -7833,6 +7833,38 @@ window.submitAssignNumberUpdate = async function(event) {
   } catch (err) {
     alert(`Error: ${err.message}`);
   }
+window.removeAssignedNumberFromClient = async function() {
+  const clientId = document.getElementById('assign-number-client-id').value;
+  const clientName = document.getElementById('assign-number-client-name').value;
+  const currentNum = document.getElementById('assign-number-new-input').value.trim();
+
+  if (!currentNum) {
+    alert(`No phone number is currently assigned to ${clientName}.`);
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to remove/revoke the virtual number (${currentNum}) from ${clientName}?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/admin/remove-client-number', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`✅ Virtual number removed successfully from ${clientName}!`);
+      document.getElementById('assign-number-new-input').value = '';
+      window.closeAssignNumberModal();
+      if (typeof fetchAdminClients === 'function') fetchAdminClients();
+    } else {
+      alert(`Error: ${data.error || 'Failed to remove number.'}`);
+    }
+  } catch (err) {
+    alert(`Error removing number: ${err.message}`);
+  }
 };
 
 

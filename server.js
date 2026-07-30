@@ -4553,6 +4553,28 @@ app.post('/api/admin/reset-password', express.json(), (req, res) => {
   res.json({ success: true, message: `Password for ${client.name} reset successfully.` });
 });
 
+// 11A5. Admin - Remove / Revoke Client Virtual Number
+app.post('/api/admin/remove-client-number', express.json(), (req, res) => {
+  const { clientId } = req.body;
+  if (!clientId) {
+    return res.status(400).json({ success: false, error: 'clientId is required.' });
+  }
+
+  const client = clientsDb.get(clientId);
+  if (!client) {
+    return res.status(404).json({ success: false, error: 'Client not found.' });
+  }
+
+  client.phone_number = null;
+  client.status = 'pending_number';
+  client.requested_number = null;
+  clientsDb.set(clientId, client);
+  saveClients();
+
+  console.log(`[Admin Remove Number] Virtual number removed from client ${client.name} (ID: ${clientId}).`);
+  res.json({ success: true, message: `Virtual number removed from ${client.name}.` });
+});
+
 // Client - Submit Virtual Number KYC Request
 app.post('/api/client/request-number', (req, res) => {
   const { company, person, email, phone, number_type, use_case, userId } = req.body || {};
