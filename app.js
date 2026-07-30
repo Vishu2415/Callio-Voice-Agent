@@ -10285,6 +10285,49 @@ window.adminResetPassword = async function(clientId, clientName) {
   }
 };
 
+window.compressKycDocumentFile = function(file) {
+  return new Promise((resolve) => {
+    if (!file) return resolve(null);
+    // If image file, resize/compress via canvas for fast upload
+    if (file.type && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.onerror = () => resolve(e.target.result);
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    } else {
+      // PDF or other documents
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    }
+  });
+};
+
 window.submitKycNumberRequest = async function(event) {
   if (event) event.preventDefault();
   const company = document.getElementById('kyc-company-name')?.value.trim() || '';
@@ -10297,14 +10340,14 @@ window.submitKycNumberRequest = async function(event) {
 
   let documentUrl = null;
   if (fileInput && fileInput.files && fileInput.files[0]) {
+    const rawFile = fileInput.files[0];
+    if (rawFile.size > 20 * 1024 * 1024) {
+      alert('File size exceeds 20MB. Please choose a smaller document file.');
+      return;
+    }
     try {
-      documentUrl = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(fileInput.files[0]);
-      });
-    } catch(e) { console.error('Error reading document file:', e); }
+      documentUrl = await window.compressKycDocumentFile(rawFile);
+    } catch(e) { console.error('Error compressing file:', e); }
   }
 
   try {
@@ -10331,7 +10374,6 @@ window.submitKycNumberRequest = async function(event) {
       alert('Error: ' + (data.error || 'Failed to submit request.'));
     }
   } catch (err) {
-    alert('✅ Your Virtual Number & KYC request has been submitted to the admin!');
-    if (typeof closeNumbersModal === 'function') closeNumbersModal();
+    alert('Error submitting request: ' + err.message);
   }
 };

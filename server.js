@@ -1522,8 +1522,8 @@ function getIncomingCallConfig(query = {}, fromNum = '', clientId = '', toNum = 
 
 
 const app = express();
-app.use(express.urlencoded({ limit: '25mb', extended: true }));
-app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
 
 
 // CORS Middleware to allow requests from the SaaS platform
@@ -4641,7 +4641,7 @@ app.post('/api/admin/remove-client-number', express.json(), (req, res) => {
 });
 
 // Client - Submit Virtual Number KYC Request
-app.post('/api/client/request-number', (req, res) => {
+app.post('/api/client/request-number', express.json({ limit: '50mb' }), (req, res) => {
   const { company, person, email, phone, number_type, use_case, document_url, userId } = req.body || {};
   const clientId = userId || (req.user ? req.user.id : null);
 
