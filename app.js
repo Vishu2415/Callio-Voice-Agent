@@ -5810,6 +5810,24 @@ function applyUserRole(user) {
     const brandingCard = document.getElementById('admin-branding-settings');
     if (brandingCard) brandingCard.style.display = 'none';
   }
+
+  // Handle Admin Plan Configurator & CRM Simulator visibility
+  const adminBillingCard = document.getElementById('admin-billing-card');
+  if (adminBillingCard) {
+    adminBillingCard.style.display = (user && user.role === 'admin') ? 'flex' : 'none';
+  }
+
+  const crmSimCard = document.getElementById('crm-simulator-card');
+  const crmContainer = document.getElementById('crm-unlocked-content');
+  if (crmSimCard) {
+    if (user && (user.role === 'admin' || user.role === 'reseller')) {
+      crmSimCard.style.display = 'block';
+      if (crmContainer) crmContainer.style.gridTemplateColumns = '1fr 1fr';
+    } else {
+      crmSimCard.style.display = 'none';
+      if (crmContainer) crmContainer.style.gridTemplateColumns = '1fr';
+    }
+  }
   
   // Handle Impersonation Banner visibility
   const impersonationBanner = document.getElementById('impersonation-banner');
