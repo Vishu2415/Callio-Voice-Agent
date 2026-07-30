@@ -1183,7 +1183,7 @@ window.openMetricDetailsModal = function(type) {
         <div style="padding:14px 24px; border-top:1px solid var(--border-color, #27272a); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; background:rgba(0,0,0,0.2); gap:10px; flex-wrap:wrap;">
           <span style="font-size:0.78rem; color:var(--text-muted, #a1a1aa);">Click "Re-call Now" to quickly start a call</span>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button id="metric-modal-broadcast-btn" onclick="event.preventDefault(); event.stopPropagation(); window.broadcastFilteredMetricContacts();" style="display:none; background:linear-gradient(135deg,#7c3aed,#4f46e5); color:white; border:none; padding:8px 18px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.82rem; display:flex; align-items:center; gap:6px;">📣 Broadcast to These Contacts</button>
+            <button id="metric-modal-broadcast-btn" onclick="event.preventDefault(); event.stopPropagation(); window.broadcastFilteredMetricContacts();" style="display:none; background:linear-gradient(135deg,#7c3aed,#4f46e5); color:white; border:none; padding:8px 18px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.82rem; align-items:center; gap:6px;">📣 Broadcast to These Contacts</button>
             <button onclick="event.preventDefault(); event.stopPropagation(); window.closeMetricDetailsModal();" style="background:linear-gradient(135deg,var(--color-primary, #ea580c),#ae3115); color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.85rem;">Close</button>
           </div>
         </div>
