@@ -4109,26 +4109,6 @@ app.get('/api/client/available-numbers', async (req, res) => {
   res.json({ success: true, numbers: mockNumbers });
 });
 
-// 4. Request Number Endpoint
-app.post('/api/client/request-number', (req, res) => {
-  const { clientId, number } = req.body;
-  if (!clientId || !number) {
-    return res.status(400).json({ success: false, error: 'clientId and number are required.' });
-  }
-
-  const client = clientsDb.get(clientId);
-  if (!client) {
-    return res.status(404).json({ success: false, error: 'Client not found.' });
-  }
-
-  client.status = 'number_requested';
-  client.requested_number = number;
-  clientsDb.set(clientId, client);
-  saveClients();
-
-  res.json({ success: true, client });
-});
-
 // 5. Get Pending Requests (Admin)
 app.get('/api/admin/pending-requests', (req, res) => {
   const host = getRealHostFromRequest(req);
