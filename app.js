@@ -7833,6 +7833,8 @@ window.submitAssignNumberUpdate = async function(event) {
   } catch (err) {
     alert(`Error: ${err.message}`);
   }
+};
+
 window.removeAssignedNumberFromClient = async function() {
   const clientId = document.getElementById('assign-number-client-id').value;
   const clientName = document.getElementById('assign-number-client-name').value;
