@@ -473,6 +473,12 @@ function loadClients() {
       client.status = 'active';
       dirty = true;
     }
+    // Auto-fix password hashing if any plain-text password exists
+    if (client.password && client.password.length < 30) {
+      console.log(`[Startup Fix] Hashing plain-text password for client ${client.name} (${client.email})`);
+      client.password = hashPassword(client.password);
+      dirty = true;
+    }
   }
   if (dirty) {
     saveClients();
@@ -3849,7 +3855,13 @@ app.post('/api/auth/login', (req, res) => {
 
   // 2. Reseller Admin login check (Strict Domain Isolation)
   for (const reseller of resellersDb.values()) {
-    if (reseller.email.toLowerCase() === email.toLowerCase() && reseller.password === hashedPassword) {
+    const isResellerPassMatch = (reseller.password === hashedPassword || reseller.password === password);
+    if (reseller.email.toLowerCase() === email.toLowerCase() && isResellerPassMatch) {
+      if (reseller.password !== hashedPassword) {
+        reseller.password = hashedPassword;
+        resellersDb.set(reseller.id, reseller);
+        saveResellers();
+      }
       if (reseller.status === 'suspended') {
         return res.status(401).json({ success: false, error: 'Invalid email or password.' });
       }
@@ -3876,7 +3888,13 @@ app.post('/api/auth/login', (req, res) => {
 
   // 3. Client login check (Strict Portal Domain Isolation)
   for (const client of clientsDb.values()) {
-    if (client.email.toLowerCase() === email.toLowerCase() && client.password === hashedPassword) {
+    const isClientPassMatch = (client.password === hashedPassword || client.password === password);
+    if (client.email.toLowerCase() === email.toLowerCase() && isClientPassMatch) {
+      if (client.password !== hashedPassword) {
+        client.password = hashedPassword;
+        clientsDb.set(client.id, client);
+        saveClients();
+      }
       if (client.status === 'suspended') {
         return res.status(401).json({ success: false, error: 'Invalid email or password.' });
       }
@@ -4504,6 +4522,9 @@ app.post('/api/admin/update-client', (req, res) => {
   }
   if (vobiz_sub_auth_id !== undefined) client.vobiz_sub_auth_id = vobiz_sub_auth_id;
   if (vobiz_sub_auth_token !== undefined) client.vobiz_sub_auth_token = vobiz_sub_auth_token;
+  if (req.body.password && req.body.password.trim() !== '') {
+    client.password = hashPassword(req.body.password.trim());
+  }
 
   clientsDb.set(clientId, client);
   saveClients();
@@ -4545,7 +4566,7 @@ app.post('/api/admin/reset-password', express.json(), (req, res) => {
     return res.status(404).json({ success: false, error: 'Client not found.' });
   }
 
-  client.password = newPassword.trim();
+  client.password = hashPassword(newPassword.trim());
   clientsDb.set(clientId, client);
   saveClients();
 
