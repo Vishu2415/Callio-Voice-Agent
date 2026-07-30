@@ -4199,27 +4199,60 @@ app.get('/api/admin/clients', (req, res) => {
 });
 
 
-// 7. Approve Request Endpoint (Admin)
+// 7. Approve / Reject Request Endpoint (Admin)
 app.post('/api/admin/approve-request', async (req, res) => {
   const { clientId, action } = req.body;
   if (!clientId || !action) {
     return res.status(400).json({ success: false, error: 'clientId and action are required.' });
   }
 
+  let found = false;
+
+  // 1. Resolve client from clientsDb
   const client = clientsDb.get(clientId);
-  if (!client) {
-    return res.status(404).json({ success: false, error: 'Client not found.' });
+  if (client) found = true;
+
+  // 2. Resolve from pendingRequests Map (guest / orphan requests)
+  let pendingReqItem = null;
+  if (typeof pendingRequests !== 'undefined') {
+    if (pendingRequests.has(clientId)) {
+      pendingReqItem = pendingRequests.get(clientId);
+      found = true;
+    } else {
+      // Search by matching clientId field inside the pending item
+      for (const pReq of pendingRequests.values()) {
+        if (pReq.clientId === clientId || pReq.id === clientId) {
+          pendingReqItem = pReq;
+          found = true;
+          break;
+        }
+      }
+    }
   }
 
+  if (!found) {
+    return res.status(404).json({ success: false, error: 'Request / Client not found.' });
+  }
+
+  // --- REJECT ---
   if (action === 'reject') {
-    client.status = 'pending_number';
-    client.requested_number = null;
-    clientsDb.set(clientId, client);
-    saveClients();
+    if (client) {
+      client.status = 'active';
+      client.requested_number = null;
+      client.kyc_details = null;
+      clientsDb.set(clientId, client);
+      saveClients();
+    }
+    if (pendingReqItem && typeof pendingRequests !== 'undefined') {
+      const keyToDelete = pendingReqItem.id || clientId;
+      pendingRequests.delete(keyToDelete);
+      savePendingRequests();
+    }
     return res.json({ success: true, message: 'Request rejected.' });
   }
 
-  const numberToBuy = client.requested_number;
+  // --- APPROVE ---
+  const numberToBuy = (client && client.requested_number) || (pendingReqItem && pendingReqItem.requested_number);
   if (!numberToBuy) {
     return res.status(400).json({ success: false, error: 'No number requested by this client.' });
   }
@@ -4242,7 +4275,7 @@ app.post('/api/admin/approve-request', async (req, res) => {
       });
 
       if (buyRes.ok) {
-        console.log(`[Vobiz API] Number purchased: ${numberToBuy}. Assigning to sub-account: ${client.vobiz_sub_auth_id}`);
+        console.log(`[Vobiz API] Number purchased: ${numberToBuy}. Assigning to sub-account: ${client && client.vobiz_sub_auth_id}`);
         const assignUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Number/${numberToBuy}/Assign/`;
         await fetch(assignUrl, {
           method: 'POST',
@@ -4251,7 +4284,7 @@ app.post('/api/admin/approve-request', async (req, res) => {
             'X-Auth-Token': masterAuthToken.trim(),
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ sub_auth_id: client.vobiz_sub_auth_id })
+          body: JSON.stringify({ sub_auth_id: client && client.vobiz_sub_auth_id })
         });
 
         const publicUrl = defaultCallConfig.publicUrl || '';
@@ -4275,14 +4308,25 @@ app.post('/api/admin/approve-request', async (req, res) => {
     }
   }
 
-  console.log(`[Admin Approval] Approving client ${clientId} for number ${numberToBuy}`);
-  client.status = 'active';
-  client.phone_number = numberToBuy;
-  client.requested_number = null;
-  clientsDb.set(clientId, client);
-  saveClients();
+  // Update clientsDb if client exists
+  if (client) {
+    console.log(`[Admin Approval] Approving client ${clientId} for number ${numberToBuy}`);
+    client.status = 'active';
+    client.phone_number = numberToBuy;
+    client.requested_number = null;
+    clientsDb.set(clientId, client);
+    saveClients();
+  }
 
-  res.json({ success: true, client });
+  // Update pendingRequests if pending item exists
+  if (pendingReqItem && typeof pendingRequests !== 'undefined') {
+    const keyToUpdate = pendingReqItem.id || clientId;
+    pendingReqItem.status = 'approved';
+    pendingRequests.set(keyToUpdate, pendingReqItem);
+    savePendingRequests();
+  }
+
+  res.json({ success: true, client: client || pendingReqItem });
 });
 
 // 8. Client Dashboard Data
