@@ -258,17 +258,15 @@
       display: none !important;
     }
     html[data-user-role="client"] #crm-unlocked-content,
-    html[data-user-role="guest"] #crm-unlocked-content {
-      grid-template-columns: 1fr !important;
+    html[data-user-role="guest"] #crm-unlocked-content,
+    html[data-user-role="admin"] #crm-unlocked-content {
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)) !important;
     }
     html[data-user-role="admin"] #admin-billing-card {
       display: flex !important;
     }
     html[data-user-role="admin"] #crm-simulator-card {
       display: block !important;
-    }
-    html[data-user-role="admin"] #crm-unlocked-content {
-      grid-template-columns: 1fr 1fr !important;
     }
 
     /* Admin role specific visibility */
@@ -1347,6 +1345,33 @@
             <button id="btn-save-crm-rule" class="btn btn-primary" style="width: 100%; font-size: 1rem; margin-top: 10px;">Save Automation Rule</button>
           </div>
           
+          <!-- Telephony Credentials & Number Setup Card -->
+          <div class="form-card" id="crm-telephony-credentials-card">
+            <h3>⚙️ Telephony Credentials &amp; Number</h3>
+            <p style="margin-bottom: 20px; color: var(--text-muted); font-size: 0.88rem;">
+              Configure your One-Time Telephony Provider credentials and Callio Virtual Number.
+            </p>
+            
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label style="font-size: 0.8rem; font-weight: 600;">Callio Auth ID</label>
+              <input type="text" id="calling-vobiz-auth-id" placeholder="Callio Auth ID (Optional)" style="font-size: 0.85rem;">
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label style="font-size: 0.8rem; font-weight: 600;">Callio Auth Token</label>
+              <input type="password" id="calling-vobiz-auth-token" placeholder="Callio Auth Token (Optional)" style="font-size: 0.85rem;" autocomplete="current-password">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+              <label style="font-size: 0.8rem; font-weight: 600;">Callio Caller ID (Virtual Number)</label>
+              <input type="text" id="calling-vobiz-caller-id" placeholder="e.g. +91XXXXXXXXXX" style="font-size: 0.85rem;">
+            </div>
+
+            <button type="button" id="btn-save-telephony-creds" onclick="window.saveTelephonyCredsFromCrm &amp;&amp; window.saveTelephonyCredsFromCrm()" class="btn btn-secondary" style="width: 100%; font-size: 0.95rem; background: rgba(255,107,74,0.1); border: 1px solid rgba(255,107,74,0.3); color: #FF6B4A; font-weight: 700; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,107,74,0.2)'" onmouseout="this.style.background='rgba(255,107,74,0.1)'">
+              💾 Save Telephony Credentials
+            </button>
+          </div>
+
           <!-- Webhook Simulator Card -->
           <div class="form-card" id="crm-simulator-card">
             <h3>Simulate CRM Webhook Event</h3>
@@ -2706,7 +2731,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=20260730_v23"></script>
+  <script type="module" src="app.js?v=20260730_v24"></script>
   <!-- Today's Calls & Summaries Modal -->
   <div id="today-calls-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="width: 90%; max-width: 700px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 25px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh;">

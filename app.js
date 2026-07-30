@@ -5818,16 +5818,17 @@ function applyUserRole(user) {
   }
 
   const crmSimCard = document.getElementById('crm-simulator-card');
-  const crmContainer = document.getElementById('crm-unlocked-content');
   if (crmSimCard) {
-    if (user && (user.role === 'admin' || user.role === 'reseller')) {
-      crmSimCard.style.display = 'block';
-      if (crmContainer) crmContainer.style.gridTemplateColumns = '1fr 1fr';
-    } else {
-      crmSimCard.style.display = 'none';
-      if (crmContainer) crmContainer.style.gridTemplateColumns = '1fr';
-    }
+    crmSimCard.style.display = (user && (user.role === 'admin' || user.role === 'reseller')) ? 'block' : 'none';
   }
+
+  // Populate CRM Telephony Credentials fields from local storage / user
+  const cAuthId = document.getElementById('calling-vobiz-auth-id');
+  const cAuthToken = document.getElementById('calling-vobiz-auth-token');
+  const cCallerId = document.getElementById('calling-vobiz-caller-id');
+  if (cAuthId && localStorage.getItem('vobiz_auth_id')) cAuthId.value = localStorage.getItem('vobiz_auth_id');
+  if (cAuthToken && localStorage.getItem('vobiz_auth_token')) cAuthToken.value = localStorage.getItem('vobiz_auth_token');
+  if (cCallerId) cCallerId.value = localStorage.getItem('vobiz_caller_id') || (user && user.phone_number ? user.phone_number : '');
   
   // Handle Impersonation Banner visibility
   const impersonationBanner = document.getElementById('impersonation-banner');
@@ -10173,3 +10174,26 @@ window.toggleCallingCredentials = function() {
   updateUptime();
   window._adminUptimeInterval = window.setInterval(updateUptime, 1000);
 })();
+
+window.saveTelephonyCredsFromCrm = function() {
+  const authId = document.getElementById('calling-vobiz-auth-id')?.value.trim() || '';
+  const authToken = document.getElementById('calling-vobiz-auth-token')?.value.trim() || '';
+  const callerId = document.getElementById('calling-vobiz-caller-id')?.value.trim() || '';
+  
+  localStorage.setItem('vobiz_auth_id', authId);
+  localStorage.setItem('vobiz_auth_token', authToken);
+  localStorage.setItem('vobiz_caller_id', callerId);
+
+  const elVobizAuthId = document.getElementById('vobiz-auth-id');
+  const elVobizAuthToken = document.getElementById('vobiz-auth-token');
+  const elVobizCallerId = document.getElementById('vobiz-caller-id');
+  if (elVobizAuthId) elVobizAuthId.value = authId;
+  if (elVobizAuthToken) elVobizAuthToken.value = authToken;
+  if (elVobizCallerId) elVobizCallerId.value = callerId;
+
+  if (typeof showToast === 'function') {
+    showToast('Telephony credentials & number saved successfully!', 'success');
+  } else {
+    alert('Telephony credentials & number saved successfully!');
+  }
+};
