@@ -5966,7 +5966,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     const instantGreetingRule = `\n\n[CRITICAL INSTANT GREETING RULE]: As soon as the call connects, IMMEDIATELY speak your opening greeting within 0.5 seconds! Do NOT delay or wait. Speak your opening hello instantly.`;
     const finalInstruction = `${systemInstruction}${greetingInstruction}${toolRule}${instantGreetingRule}\n\n[CRITICAL GRAMMAR RULE]: ${genderRule}`;
     
-    let resolvedModel = 'gemini-2.0-flash-exp';
+    let resolvedModel = model || 'gemini-3.1-flash-live-preview';
     console.log(`[WebSocket Stream Setup] Voice: ${voice}, CustomerName: "${cleanName}", Model: ${resolvedModel}, Instruction: ${finalInstruction.substring(0, 75)}...`);
 
     const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
