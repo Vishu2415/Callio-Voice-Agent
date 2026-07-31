@@ -1012,6 +1012,49 @@ async function fetchVobizRecording(callSid) {
   console.log(`[Vobiz Recording] ❌ No recording found for call ${callSid} after all retries.`);
 }
 
+function generateLocalTranscriptSummary(transcriptTurns) {
+  if (!Array.isArray(transcriptTurns) || transcriptTurns.length === 0) {
+    return "No conversation occurred during the call.";
+  }
+
+  const userMessages = transcriptTurns.filter(t => t && t.role === 'user').map(t => t.text).join(' ');
+  const lowerUser = userMessages.toLowerCase();
+
+  let verdict = 'COMPLETED';
+  let intent = 'General Discussion';
+  let action = 'Follow up with lead';
+
+  const isBooking = lowerUser.includes('appointment') || lowerUser.includes('book') || lowerUser.includes('slot') || lowerUser.includes('time') || lowerUser.includes('kal') || lowerUser.includes('baje');
+  const isPrice = lowerUser.includes('price') || lowerUser.includes('rate') || lowerUser.includes('cost') || lowerUser.includes('kitna') || lowerUser.includes('charge');
+  const isInterested = lowerUser.includes('interested') || lowerUser.includes('haan') || lowerUser.includes('yes') || isBooking || lowerUser.includes('achha') || lowerUser.includes('thik');
+  const isNotInterested = lowerUser.includes('not interested') || lowerUser.includes('nahi chahiye') || lowerUser.includes('cut the call') || lowerUser.includes('mat karo');
+
+  if (isNotInterested) {
+    verdict = 'NOT INTERESTED';
+    intent = 'Customer requested no further contact or declined offer.';
+    action = 'Mark lead as not interested';
+  } else if (isBooking) {
+    verdict = 'INTERESTED';
+    intent = 'Customer inquired about appointment booking & available time slots.';
+    action = 'Confirm appointment booking details';
+  } else if (isPrice) {
+    verdict = 'INTERESTED';
+    intent = 'Customer requested pricing and service structure.';
+    action = 'Send pricing details and follow up';
+  } else if (isInterested) {
+    verdict = 'INTERESTED';
+    intent = 'Customer expressed positive interest in the discussion.';
+    action = 'Follow up with lead';
+  }
+
+  const userSentences = userMessages.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 5).slice(0, 3);
+  let highlights = userSentences.length > 0 
+    ? userSentences.map(s => `- User noted: "${s}"`).join('\n') 
+    : `- Exchanged ${transcriptTurns.length} conversational turns.`;
+
+  return `**VERDICT:** ${verdict}\n\n**Key Points:**\n- ${intent}\n${highlights}\n\n**Next Action:** ${action}`;
+}
+
 async function generateCallSummaryBackend(callSid) {
   const callState = activeCalls.get(callSid);
   if (!callState) return;
@@ -1061,11 +1104,8 @@ ${formattedTranscript}`;
     }
 
     if (!rawSummaryText) {
-      console.warn(`[Summary Engine] Gemini API returned empty for call ${callSid}. Constructing clean transcript summary fallback...`);
-      const turns = callState.transcript.length;
-      const isInterested = formattedTranscript.toLowerCase().includes('yes') || formattedTranscript.toLowerCase().includes('haan') || formattedTranscript.toLowerCase().includes('appointment') || formattedTranscript.toLowerCase().includes('interested');
-      const verdict = isInterested ? 'INTERESTED' : 'COMPLETED';
-      rawSummaryText = `**VERDICT:** ${verdict}\n\n**Key Points:**\n- Completed voice call session (${turns} conversational turns exchanged).\n- Voice audio stream recorded and saved.\n\n**Next Action:** Follow up with customer.`;
+      console.warn(`[Summary Engine] Gemini API returned empty for call ${callSid}. Generating smart local transcript summary...`);
+      rawSummaryText = generateLocalTranscriptSummary(callState.transcript);
     }
 
     let extractedName = null;
