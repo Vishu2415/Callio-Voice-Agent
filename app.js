@@ -1546,18 +1546,38 @@ window.renderMetricDetailsModalContent = function() {
   }
 };
 
-// Broadcast all contacts shown in the metric modal (completed/failed/interested/total)
-window.broadcastFilteredMetricContacts = async function() {
-  const phones = window._metricModalFilteredPhones || [];
+window.broadcastTodayCallsPageContacts = function() {
+  let phones = [];
+  if (Array.isArray(window._todayCallsPageFilteredPhones) && window._todayCallsPageFilteredPhones.length > 0) {
+    phones = window._todayCallsPageFilteredPhones;
+  } else if (Array.isArray(window.lastDashboardCalls)) {
+    phones = Array.from(new Set(window.lastDashboardCalls.map(c => c.phone || c.to || c.from || '').filter(p => p && String(p).trim().length > 0)));
+  } else if (Array.isArray(window.callsCache)) {
+    phones = Array.from(new Set(window.callsCache.map(c => c.phone || c.to || c.from || '').filter(p => p && String(p).trim().length > 0)));
+  }
+
+  if (!phones.length) {
+    alert('No call records found to broadcast.');
+    return;
+  }
+
+  window.broadcastFilteredMetricContacts(phones, 'Call History Contacts');
+};
+
+// Broadcast all contacts shown in the metric modal or custom list
+window.broadcastFilteredMetricContacts = async function(customPhoneList = null, customLabel = null) {
+  const phones = customPhoneList || window._metricModalFilteredPhones || [];
   if (!phones.length) { alert('No contacts found to broadcast.'); return; }
 
-  // Build label based on modal type
+  // Build label based on modal type or customLabel
   const type = window.currentMetricModalType || 'contacts';
-  let label = 'Re-broadcast Calls';
-  if (type === 'failed') label = 'Failed/Rejected Contacts Re-broadcast';
-  else if (type === 'completed') label = 'Completed Contacts Re-broadcast';
-  else if (type === 'interested') label = 'Interested Leads Re-broadcast';
-  else if (type === 'total') label = 'Total Calls Re-broadcast';
+  let label = customLabel || 'Re-broadcast Calls';
+  if (!customLabel) {
+    if (type === 'failed') label = 'Failed/Rejected Contacts Re-broadcast';
+    else if (type === 'completed') label = 'Completed Contacts Re-broadcast';
+    else if (type === 'interested') label = 'Interested Leads Re-broadcast';
+    else if (type === 'total') label = 'Total Calls Re-broadcast';
+  }
 
   let popup = document.getElementById('broadcast-agent-quick-popup');
   if (!popup) {

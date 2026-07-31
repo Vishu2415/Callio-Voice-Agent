@@ -808,10 +808,15 @@
               <h2 class="tab-title" style="margin: 0;">📞 Today's Calls & Connection History</h2>
               <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Complete real-time record of all incoming & outgoing call connections, durations, and call statuses.</p>
             </div>
-            <button onclick="if (window.fetchClientDashboardData) window.fetchClientDashboardData();" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.82rem; border-radius: 10px; cursor: pointer; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main);">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 15px; height: 15px;"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-              Refresh Calls
-            </button>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <button onclick="window.broadcastTodayCallsPageContacts &amp;&amp; window.broadcastTodayCallsPageContacts()" class="btn" style="display: flex; align-items: center; gap: 6px; padding: 8px 18px; font-size: 0.82rem; border-radius: 10px; cursor: pointer; background: linear-gradient(135deg, #7c3aed, #4f46e5); border: none; color: #ffffff; font-weight: 700; box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);">
+                📣 Start Broadcast
+              </button>
+              <button onclick="if (window.fetchClientDashboardData) window.fetchClientDashboardData();" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.82rem; border-radius: 10px; cursor: pointer; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 15px; height: 15px;"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                Refresh Calls
+              </button>
+            </div>
           </div>
 
           <!-- Summary Metric Cards Bar -->
@@ -2838,7 +2843,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=20260731_v47"></script>
+  <script type="module" src="app.js?v=20260731_v48"></script>
   <!-- Today's Calls & Summaries Modal -->
   <div id="today-calls-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="width: 90%; max-width: 700px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 25px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh;">
