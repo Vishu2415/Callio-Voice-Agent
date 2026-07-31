@@ -7018,6 +7018,23 @@ window.navigateToTodayCallsPage = function() {
   window.renderTodayCallsPageTable();
 };
 
+window.openMetricDetailsModal = function(filterType) {
+  window.navigateToTodayCallsPage();
+  if (filterType && typeof window.filterTodayCallsPage === 'function') {
+    const filterMap = {
+      'total': 'all',
+      'completed': 'completed',
+      'failed': 'failed',
+      'interested': 'all',
+      'pickup': 'all',
+      'active': 'all'
+    };
+    const targetFilter = filterMap[filterType] || 'all';
+    const btn = document.querySelector(`.btn-filter-calls[onclick*="${targetFilter}"]`);
+    window.filterTodayCallsPage(targetFilter, btn);
+  }
+};
+
 window.navigateToAISummariesPage = function() {
   window.switchFullPageTab('tab-ai-summaries');
   window.renderAISummariesPageTable();
