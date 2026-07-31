@@ -1946,15 +1946,29 @@ Output JSON format:`;
       parsed = JSON.parse(jsonText);
     } catch (e) {
       console.warn('[Trial Summary] JSON parsing failed, trying raw text extraction:', jsonText);
-      // Fallback if model returned plain bullet points
-      if (jsonText.includes('*')) {
-        parsed.summary = jsonText;
+      // Fallback regex extraction if Gemini returned unescaped JSON text
+      const sumMatch = jsonText.match(/"summary"\s*:\s*"([\s\S]*?)"\s*,\s*"leadQuality"/i) 
+                    || jsonText.match(/"summary"\s*:\s*"([\s\S]*?)"/i);
+      const qualMatch = jsonText.match(/"leadQuality"\s*:\s*"([\s\S]*?)"/i);
+      const actMatch = jsonText.match(/"actionToTake"\s*:\s*"([\s\S]*?)"/i);
+
+      if (sumMatch && sumMatch[1]) {
+        parsed.summary = sumMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+      } else if (jsonText.includes('*')) {
+        parsed.summary = jsonText.replace(/^{\s*"summary"\s*:\s*"/i, '').replace(/"\s*}\s*$/i, '');
       }
+
+      if (qualMatch && qualMatch[1]) parsed.leadQuality = qualMatch[1];
+      if (actMatch && actMatch[1]) parsed.actionToTake = actMatch[1];
     }
 
-    // Convert newlines to HTML line breaks for rendering in the innerHTML container
-    if (parsed.summary) {
-      parsed.summary = parsed.summary.replace(/\n/g, '<br>');
+    // Clean any remaining JSON syntax wrappers or keys from summary string
+    if (parsed.summary && typeof parsed.summary === 'string') {
+      let s = parsed.summary.trim();
+      if (s.startsWith('{')) s = s.replace(/^{\s*"summary"\s*:\s*"?/i, '');
+      if (s.endsWith('}')) s = s.replace(/"?\s*}\s*$/i, '');
+      if (s.includes('"leadQuality"')) s = s.replace(/",?\s*"leadQuality"[\s\S]*$/i, '');
+      parsed.summary = s.replace(/\\n/g, '\n').replace(/\n/g, '<br>');
     }
 
     // Link summary, quality and action back to the corresponding lead
@@ -2060,7 +2074,7 @@ app.post('/api/trial-lead', express.json(), (req, res) => {
   res.json({ success: true, leadId: newLead.id });
 });
 
-// GET: retrieve trial leads sorted by timestamp desc (tenant-isolated for whitelabel admins)
+// GET: retrieve trial leads sorted by timestamp desc (tenant-isolated for whitelabel admins & callio admin)
 app.get('/api/admin/trial-leads', (req, res) => {
   const host = req.headers.host || req.headers.origin || req.headers.referer || '';
   const reseller = getResellerFromHost(host);
@@ -2068,7 +2082,7 @@ app.get('/api/admin/trial-leads', (req, res) => {
   let list = [...trialLeads];
 
   if (reseller) {
-    // Whitelabel Reseller Admin Panel — show ONLY trial leads for this reseller's domain/tenant
+    // Whitelabel Reseller Admin Panel (e.g. growvo.in) — show ONLY trial leads for this reseller's domain/tenant
     const rId = String(reseller.id || '').toLowerCase();
     const rDom = String(reseller.domain || reseller.subdomain || '').toLowerCase().replace(/^www\./, '');
 
@@ -2076,6 +2090,13 @@ app.get('/api/admin/trial-leads', (req, res) => {
       const lTenant = String(l.tenantId || '').toLowerCase();
       const lDomain = String(l.domain || '').toLowerCase().replace(/^www\./, '');
       return lTenant === rId || (rDom && lDomain.includes(rDom));
+    });
+  } else {
+    // Main Callio Super Admin Panel (e.g. callio.in) — show ONLY Callio's own trial leads (exclude reseller leads)
+    list = list.filter(l => {
+      const lTenant = String(l.tenantId || '').toLowerCase();
+      const lDomain = String(l.domain || '').toLowerCase().replace(/^www\./, '');
+      return !lTenant || lTenant === 'default' || lDomain.includes('callio') || lDomain.includes('localhost');
     });
   }
 

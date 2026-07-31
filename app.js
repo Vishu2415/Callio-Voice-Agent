@@ -8877,9 +8877,21 @@ window.fetchTrialLeads = async function() {
         const tr = document.createElement('tr');
         const dt = new Date(lead.timestamp).toLocaleString();
         
+        // Clean summary string if raw JSON leaked
+        let cleanSum = lead.summary || '';
+        if (cleanSum.startsWith('{') || cleanSum.includes('"summary":')) {
+          cleanSum = cleanSum.replace(/^{\s*"summary"\s*:\s*"?/i, '')
+                             .replace(/^"summary"\s*:\s*"/i, '')
+                             .replace(/",?\s*"leadQuality"[\s\S]*$/i, '')
+                             .replace(/"\s*}\s*$/i, '')
+                             .replace(/\\n/g, '\n')
+                             .replace(/\\"/g, '"')
+                             .replace(/\n/g, '<br>');
+        }
+
         // Render call summary cleanly with tooltips
-        const summaryHtml = lead.summary
-          ? `<div style="max-height: 100px; overflow-y: auto; font-size: 0.78rem; line-height: 1.4; color: var(--on-surface);" title="${lead.summary.replace(/<br>/g, '\n')}">${lead.summary}</div>`
+        const summaryHtml = cleanSum
+          ? `<div style="max-height: 100px; overflow-y: auto; font-size: 0.78rem; line-height: 1.4; color: var(--on-surface);" title="${cleanSum.replace(/<br>/g, '\n')}">${cleanSum}</div>`
           : `<span style="color: var(--text-muted); font-style: italic; font-size: 0.75rem;">Pending call / No summary</span>`;
           
         // Render lead status / quality
