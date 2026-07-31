@@ -505,57 +505,6 @@ window.populateAIActionPlanner = function() {
   const container = document.getElementById('ai-action-cards-container');
   if (!container) return;
   
-  const mockLeads = [
-    {
-      id: 'mock_1',
-      contactName: 'Thanos',
-      phone: '8630301466',
-      urgency: 'URGENT',
-      sentiment: 'INTERESTED',
-      color: '#10b981', // green
-      sentimentBg: 'rgba(16, 185, 129, 0.12)',
-      sentimentBorder: 'rgba(16, 185, 129, 0.3)',
-      urgencyColor: '#ef4444', // red
-      urgencyBg: 'rgba(239, 68, 68, 0.15)',
-      urgencyBorder: 'rgba(239, 68, 68, 0.25)',
-      summary: 'User wants to reschedule today\'s appointment. Agent found no immediate slot.',
-      actionToTake: 'Re-attempt contact at a different time.',
-      actionText: 'Call Back'
-    },
-    {
-      id: 'mock_2',
-      contactName: '8384828654',
-      phone: '8384828654',
-      urgency: 'MEDIUM',
-      sentiment: 'NEUTRAL',
-      color: '#f59e0b', // orange
-      sentimentBg: 'rgba(245, 158, 11, 0.12)',
-      sentimentBorder: 'rgba(245, 158, 11, 0.3)',
-      urgencyColor: '#f97316', // orange
-      urgencyBg: 'rgba(249, 115, 22, 0.15)',
-      urgencyBorder: 'rgba(249, 115, 22, 0.25)',
-      summary: 'No conversation occurred during the call.',
-      actionToTake: 'Follow up with lead',
-      actionText: 'Call Back'
-    },
-    {
-      id: 'mock_3',
-      contactName: 'Callback Customer',
-      phone: '8273176799',
-      urgency: 'URGENT',
-      sentiment: 'INTERESTED',
-      color: '#10b981', // green
-      sentimentBg: 'rgba(16, 185, 129, 0.12)',
-      sentimentBorder: 'rgba(16, 185, 129, 0.3)',
-      urgencyColor: '#ef4444', // red
-      urgencyBg: 'rgba(239, 68, 68, 0.15)',
-      urgencyBorder: 'rgba(239, 68, 68, 0.25)',
-      summary: 'User wants to book an appointment. User asked about slot availability.',
-      actionToTake: 'Do not contact user for this specific offer.',
-      actionText: 'Call Back'
-    }
-  ];
-  
   const cardsData = [];
   
   // Helper: detect virtual/system numbers that should NOT appear as customer contacts
@@ -713,14 +662,7 @@ window.populateAIActionPlanner = function() {
 
     cardsData.push(...Array.from(leadMap.values()));
   }
-  
-  // Fill with mock leads if we have less than 3
-  if (cardsData.length < 3) {
-    const needed = 3 - cardsData.length;
-    for (let i = 0; i < needed; i++) {
-      if (mockLeads[i]) cardsData.push(mockLeads[i]);
-    }
-  }
+
   
   // Store all active cards globally for modal view
   window.allActiveActionCards = cardsData;

@@ -1046,27 +1046,22 @@ Rules:
 Transcript:
 ${formattedTranscript}`;
 
-  console.log(`[Summary Engine] Generating summary & name extraction for call ${callSid} using gemini-2.5-flash...`);
+  console.log(`[Summary Engine] Generating summary & name extraction for call ${callSid}...`);
   
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }]
-      })
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const rawSummaryText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    let rawSummaryText = null;
+    const models = ['gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro'];
+    for (const model of models) {
+      console.log(`[Summary Engine] Attempting summary generation with model: ${model}`);
+      rawSummaryText = await callGeminiGenerateContent(model, prompt);
       if (rawSummaryText) {
-        let extractedName = null;
+        console.log(`[Summary Engine] Summary successfully generated using model: ${model}`);
+        break;
+      }
+    }
+
+    if (rawSummaryText) {
+      let extractedName = null;
 
         // 1. Try extracting name from Gemini response
         const nameMatch = rawSummaryText.match(/\*\*(?:CUSTOMER_NAME|Customer Name):\*\*\s*([^\n]+)/i) || 
@@ -1166,14 +1161,9 @@ ${formattedTranscript}`;
         console.log(`[Summary Engine] Summary & Contact extraction completed successfully for call ${callSid}.`);
         scheduleSaveCalls();
       } else {
-        callState.summary = "Failed to parse summary response from Gemini.";
+        callState.summary = "Failed to generate summary due to API error.";
+        scheduleSaveCalls();
       }
-    } else {
-      const errorText = await response.text();
-      callState.summary = "Failed to generate summary due to API error.";
-      console.error(`[Summary Engine Error] Gemini API status ${response.status}: ${errorText}`);
-      scheduleSaveCalls();
-    }
   } catch (err) {
     callState.summary = "Failed to generate summary due to system exception.";
     console.error(`[Summary Engine Exception] for call ${callSid}:`, err.message);
@@ -2888,7 +2878,11 @@ app.post('/make-call', async (req, res) => {
 // GET /calls - Retrieve all active/past calls state list
 app.get('/calls', (req, res) => {
   const { clientId } = req.query;
+  const host = req.headers.host || req.headers['x-forwarded-host'] || '';
+  const reseller = getResellerFromHost(host);
+
   let list = Array.from(activeCalls.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
   if (clientId && clientId !== 'admin') {
     const client = clientsDb.get(clientId);
     const clientPhone = client?.phone_number;
@@ -2901,7 +2895,22 @@ app.get('/calls', (req, res) => {
       }
       return false;
     });
+  } else if (reseller) {
+    // Whitelabel Reseller Admin: Only return calls belonging to clients under this reseller
+    const resellerClientIds = new Set();
+    for (const [cId, c] of clientsDb.entries()) {
+      if (c.reseller_id === reseller.id) resellerClientIds.add(cId);
+    }
+    list = list.filter(c => c.clientId && resellerClientIds.has(c.clientId));
+  } else if (host.toLowerCase().includes('callio.in')) {
+    // Callio Main Super Admin: Exclude reseller-owned client calls
+    const resellerClientIds = new Set();
+    for (const [cId, c] of clientsDb.entries()) {
+      if (c.reseller_id) resellerClientIds.add(cId);
+    }
+    list = list.filter(c => !c.clientId || !resellerClientIds.has(c.clientId));
   }
+
   res.json({ success: true, calls: list });
 });
 
