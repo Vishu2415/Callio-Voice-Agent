@@ -63,6 +63,17 @@ html[data-theme="light"] textarea {
   color: #0f172a !important;
   border: 1px solid rgba(0, 0, 0, 0.12) !important;
 }
+
+select option {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  padding: 8px 12px !important;
+}
+
+html[data-theme="light"] select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
 html[data-theme="light"] input::placeholder,
 html[data-theme="light"] textarea::placeholder {
   color: #94a3b8 !important;
@@ -373,7 +384,7 @@ html[data-theme="light"] .app-logo-img.brand-logo {
   box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  max-width: fit-content;
+  max-width: calc(100vw - 320px);
   min-width: 0;
   flex-shrink: 1;
   margin: 0 auto;
@@ -4253,9 +4264,9 @@ body.light-theme .input-action-btn:hover,
    ================================================================ */
 @media (max-width: 1400px) {
   .glass-navbar .nav-btn {
-    padding: 5px 9px !important;
+    padding: 4px 8px !important;
     font-size: 0.76rem !important;
-    gap: 0.3rem !important;
+    gap: 0.25rem !important;
   }
   .glass-navbar .nav-btn svg {
     width: 13px !important;
@@ -4267,10 +4278,10 @@ body.light-theme .input-action-btn:hover,
   }
   .vb-grid {
     grid-template-columns: repeat(6, 1fr) !important;
-    gap: 1rem !important;
+    gap: 0.85rem !important;
   }
   .vb-metric {
-    grid-column: span 2 !important;
+    grid-column: span 1 !important;
   }
   .vb-grid > .vb-card {
     grid-column: span 3 !important;
@@ -4280,6 +4291,12 @@ body.light-theme .input-action-btn:hover,
   }
   .vb-bar-panel, #dashboard-spacing-card {
     grid-column: 1 / -1 !important;
+  }
+}
+
+@media (max-width: 1200px) {
+  .vb-metric {
+    grid-column: span 2 !important;
   }
 }
 
