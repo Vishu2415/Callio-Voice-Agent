@@ -1230,6 +1230,7 @@
     let conversationMessages = []; // collect chat turns for summary
     let scheduledSources = []; // track active playout sources to stop them on interruption
     let activeTrialPhone = ''; // track active trial call phone number to link summary
+    let activeTrialLeadId = ''; // track active trial lead ID for exact matching
     let mediaRecorder = null;
     let recordedChunks = [];
 
@@ -1243,6 +1244,7 @@
       const phone = phoneInput ? phoneInput.value.trim() : '';
       const prompt = promptInput ? promptInput.value.trim() : '';
       activeTrialPhone = phone;
+      activeTrialLeadId = '';
 
       errorDiv.style.display = 'none';
 
@@ -1268,7 +1270,15 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, phone, voice: selectedVoice, prompt })
-      }).catch(err => console.error('Failed to save trial lead:', err));
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.leadId) {
+          activeTrialLeadId = data.leadId;
+          console.log('[Trial Lead] Lead registered with ID:', activeTrialLeadId);
+        }
+      })
+      .catch(err => console.error('Failed to save trial lead:', err));
 
       document.getElementById('lp-trial-form').style.display = 'none';
       document.getElementById('lp-trial-active-call').style.display = 'flex';

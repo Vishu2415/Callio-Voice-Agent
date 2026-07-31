@@ -1958,20 +1958,25 @@ Output JSON format:`;
     }
 
     // Link summary, quality and action back to the corresponding lead
-    if (phone) {
-      const leadIndex = trialLeads.findIndex(l => cleanAndComparePhone(l.phone, phone));
-      if (leadIndex !== -1) {
-        trialLeads[leadIndex].summary = parsed.summary;
-        trialLeads[leadIndex].leadQuality = parsed.leadQuality || 'Cold Lead';
-        trialLeads[leadIndex].actionToTake = parsed.actionToTake || 'No action needed.';
-        if (!trialLeads[leadIndex].recordingUrl) {
-          trialLeads[leadIndex].recordingUrl = '/recordings/demo_trial_call.mp3';
-        }
-        saveTrialLeads();
-        console.log(`[Trial Summary] Lead updated with summary, quality and action for phone: ${phone}`);
-      } else {
-        console.warn(`[Trial Summary] Lead not found for phone: ${phone}`);
-      }
+    const leadId = req.body.leadId;
+    let targetLead = null;
+
+    if (leadId) {
+      targetLead = trialLeads.find(l => l.id === leadId);
+    }
+    if (!targetLead && phone) {
+      // Find LATEST lead matching phone number (search from end)
+      targetLead = [...trialLeads].reverse().find(l => cleanAndComparePhone(l.phone, phone));
+    }
+
+    if (targetLead) {
+      targetLead.summary = parsed.summary;
+      targetLead.leadQuality = parsed.leadQuality || 'Cold Lead';
+      targetLead.actionToTake = parsed.actionToTake || 'No action needed.';
+      saveTrialLeads();
+      console.log(`[Trial Summary] Lead ${targetLead.id || targetLead.phone} updated with summary, quality: ${targetLead.leadQuality}`);
+    } else {
+      console.warn(`[Trial Summary] Lead not found for phone: ${phone}, leadId: ${leadId}`);
     }
 
     res.json(parsed);
@@ -1984,8 +1989,9 @@ Output JSON format:`;
 // POST: upload a recording for a trial call lead
 app.post('/api/upload-trial-recording', express.raw({ type: 'audio/webm', limit: '20mb' }), (req, res) => {
   const phone = req.query.phone;
-  if (!phone) {
-    return res.status(400).json({ error: 'Phone query parameter is required.' });
+  const leadId = req.query.leadId;
+  if (!phone && !leadId) {
+    return res.status(400).json({ error: 'Phone or leadId parameter is required.' });
   }
   const buffer = req.body;
   if (!buffer || buffer.length === 0) {
@@ -1997,18 +2003,25 @@ app.post('/api/upload-trial-recording', express.raw({ type: 'audio/webm', limit:
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  const safePhone = phone.replace(/\D/g, '');
-  const filename = `trial-${safePhone}.webm`;
+  const safePhone = (phone || 'trial').replace(/\D/g, '');
+  const filename = `trial-${safePhone}-${Date.now()}.webm`;
   const localPath = path.join(dir, filename);
 
   try {
     fs.writeFileSync(localPath, buffer);
     
-    const leadIndex = trialLeads.findIndex(l => cleanAndComparePhone(l.phone, phone));
-    if (leadIndex !== -1) {
-      trialLeads[leadIndex].recordingUrl = `/recordings/${filename}`;
+    let targetLead = null;
+    if (leadId) {
+      targetLead = trialLeads.find(l => l.id === leadId);
+    }
+    if (!targetLead && phone) {
+      targetLead = [...trialLeads].reverse().find(l => cleanAndComparePhone(l.phone, phone));
+    }
+
+    if (targetLead) {
+      targetLead.recordingUrl = `/recordings/${filename}`;
       saveTrialLeads();
-      console.log(`[Trial Recording] Recording saved to: ${localPath}`);
+      console.log(`[Trial Recording] Attached recording ${filename} to lead ${targetLead.id || targetLead.phone}`);
     }
     
     res.json({ success: true, url: `/recordings/${filename}` });
@@ -2018,27 +2031,55 @@ app.post('/api/upload-trial-recording', express.raw({ type: 'audio/webm', limit:
   }
 });
 
-// POST: submit a trial call lead (saves to trial_leads_db.json)
+// POST: submit a trial call lead (saves to trial_leads_db.json with tenant isolation)
 app.post('/api/trial-lead', express.json(), (req, res) => {
   const { name, phone, voice, prompt } = req.body;
   if (!name || !phone) {
     return res.status(400).json({ error: 'Name and Phone Number are required.' });
   }
+
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const reseller = getResellerFromHost(host);
+  const tenantId = reseller ? reseller.id : 'default';
+  const domain = reseller ? (reseller.domain || reseller.subdomain || reseller.name) : 'callio.in';
+
   const newLead = {
+    id: `lead_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    tenantId,
+    domain,
     name,
     phone,
     voice: voice || 'Aoede',
     prompt: prompt || '',
     timestamp: new Date().toISOString()
   };
+
   trialLeads.push(newLead);
   saveTrialLeads();
-  res.json({ success: true });
+  console.log(`[Trial Lead] Saved new trial lead for tenant [${tenantId} / ${domain}]: ${name} (${phone}), leadId: ${newLead.id}`);
+  res.json({ success: true, leadId: newLead.id });
 });
 
-// GET: retrieve all trial leads sorted by timestamp desc (for admin view)
+// GET: retrieve trial leads sorted by timestamp desc (tenant-isolated for whitelabel admins)
 app.get('/api/admin/trial-leads', (req, res) => {
-  const sorted = [...trialLeads].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const reseller = getResellerFromHost(host);
+
+  let list = [...trialLeads];
+
+  if (reseller) {
+    // Whitelabel Reseller Admin Panel — show ONLY trial leads for this reseller's domain/tenant
+    const rId = String(reseller.id || '').toLowerCase();
+    const rDom = String(reseller.domain || reseller.subdomain || '').toLowerCase().replace(/^www\./, '');
+
+    list = list.filter(l => {
+      const lTenant = String(l.tenantId || '').toLowerCase();
+      const lDomain = String(l.domain || '').toLowerCase().replace(/^www\./, '');
+      return lTenant === rId || (rDom && lDomain.includes(rDom));
+    });
+  }
+
+  const sorted = list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   res.json({ success: true, leads: sorted });
 });
 

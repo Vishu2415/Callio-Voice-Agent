@@ -6226,10 +6226,10 @@ function applyUserRole(user) {
     createBasePlanBtn.style.display = isSuperAdmin ? 'inline-flex' : 'none';
   }
 
-  // 3. Admin Subtab: Trial Leads (Main Callio.in Super Admin only)
+  // 3. Admin Subtab: Trial Leads (Visible for all Admins & Whitelabel Reseller Admins)
   const trialLeadsTab = document.getElementById('admin-subtab-trial-leads');
   if (trialLeadsTab) {
-    trialLeadsTab.style.display = isSuperAdmin ? 'inline-block' : 'none';
+    trialLeadsTab.style.display = 'inline-block';
   }
 
   // 4. Admin Subtab: Whitelabel Resellers (Super Admin only)
@@ -8423,7 +8423,7 @@ window.loadBrandingToForm = function() {
 window.switchAdminSubtab = function(tabName) {
   const isWL = typeof window.isWhitelabelDomain === 'function' ? window.isWhitelabelDomain() : false;
   const isSuperAdmin = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.role === 'admin' && !isWL);
-  if ((tabName === 'trial-leads' || tabName === 'resellers') && !isSuperAdmin) {
+  if (tabName === 'resellers' && !isSuperAdmin) {
     tabName = 'users';
   }
   const sections = {
