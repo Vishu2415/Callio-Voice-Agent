@@ -243,7 +243,8 @@ function logSuccess(msg) {
 }
 
 // --- Live Call Monitor & AI Action Planner Helpers ---
-window.triggerLeadCall = function(phone) {
+window.triggerLeadCall = async function(phone) {
+  if (!phone) return;
   const cleanPhone = phone.replace(/[^0-9+]/g, '');
   
   // 1. Fill Quick Call phone number input
@@ -251,16 +252,47 @@ window.triggerLeadCall = function(phone) {
   if (quickCallInput) {
     quickCallInput.value = cleanPhone;
     quickCallInput.dispatchEvent(new Event('input'));
-    quickCallInput.focus();
   }
   
-  // 2. Switch to the Quick Call tab
-  const quickCallTab = document.getElementById('nav-quick-call');
-  if (quickCallTab) {
-    quickCallTab.click();
+  const confirmCall = confirm(`📞 Place AI Voice Call to ${cleanPhone} now?`);
+  if (!confirmCall) {
+    const quickCallTab = document.getElementById('nav-quick-call');
+    if (quickCallTab) quickCallTab.click();
+    return;
   }
-  
-  logSuccess(`Lead selected: ${phone}. Switched to Quick Call dialer.`);
+
+  // Directly trigger outbound call via /make-call
+  const publicUrl = window.location.origin;
+  const u = typeof loggedInUser !== 'undefined' ? loggedInUser : null;
+  const clientId = u ? (u.id || u._id) : null;
+  const callerIdEl = document.getElementById('calling-vobiz-caller-id');
+  const vobizCallerId = (callerIdEl && callerIdEl.value.trim()) ? callerIdEl.value.trim() : (u ? u.phone_number : '');
+
+  const payload = {
+    provider: 'vobiz',
+    to: cleanPhone,
+    publicUrl: publicUrl,
+    vobizCallerId: vobizCallerId,
+    clientId: clientId,
+    client_id: clientId,
+    recordCall: true
+  };
+
+  try {
+    const response = await fetch('/make-call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (data.success) {
+      alert(`✅ Outbound call to ${cleanPhone} initiated successfully!`);
+    } else {
+      alert(`❌ Call failed: ${data.error || 'Unknown error'}`);
+    }
+  } catch (error) {
+    alert(`❌ Network error: ${error.message}`);
+  }
 };
 
 // Trigger Call Back with Agent selector popup (used by AI lead cards)

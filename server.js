@@ -2679,15 +2679,22 @@ app.post('/make-call', async (req, res) => {
     console.log(`[Vobiz REST API] Attempting outbound call to: ${normalizedTo} (Name: ${name}) via CallerId: ${activeVobizCallerId}`);
     
     try {
-      let callbackUrl = publicUrl.trim().replace(/^http:\/\//i, 'https://');
+      let callbackUrl = (defaultCallConfig.publicUrl || publicUrl || 'https://callio.in').trim().replace(/^http:\/\//i, 'https://');
       if (!callbackUrl.startsWith('https://')) {
         callbackUrl = `https://${callbackUrl}`;
       }
       
+      let cleanCallerId = activeVobizCallerId.trim().replace(/[\s\-\(\)\+]/g, '');
+      if (cleanCallerId.startsWith('0')) {
+        cleanCallerId = '91' + cleanCallerId.substring(1);
+      } else if (cleanCallerId.length === 10) {
+        cleanCallerId = '91' + cleanCallerId;
+      }
+
       const answerUrl = `${callbackUrl}/incoming-call-vobiz?voice=${encodeURIComponent(activeVoice || 'Aoede')}${activeClientId ? `&client_id=${activeClientId}` : ''}`;
       
       const bodyPayload = {
-        from: activeVobizCallerId.trim().replace(/[\s\-\(\)\+]/g, ''),
+        from: cleanCallerId,
         to: normalizedTo,
         answer_url: answerUrl,
         answer_method: 'POST'
