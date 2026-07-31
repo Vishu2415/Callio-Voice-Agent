@@ -4842,8 +4842,9 @@ app.post('/api/admin/remove-client-number', express.json(), (req, res) => {
 
 // Client - Submit Virtual Number KYC Request
 app.post('/api/client/request-number', express.json({ limit: '50mb' }), (req, res) => {
-  const { company, person, email, phone, number_type, use_case, document_url, userId } = req.body || {};
+  const { company, person, email, phone, number_type, use_case, document_url, document_urls, userId } = req.body || {};
   const clientId = userId || (req.user ? req.user.id : null);
+  const docList = Array.isArray(document_urls) && document_urls.length > 0 ? document_urls : (document_url ? [document_url] : []);
 
   const host = getRealHostFromRequest(req);
   const currentReseller = getResellerFromHost(host);
@@ -4858,6 +4859,9 @@ app.post('/api/client/request-number', express.json({ limit: '50mb' }), (req, re
     }
   }
 
+  const finalEmail = email || (targetClient ? targetClient.email : '');
+  const finalPhone = phone || (targetClient ? targetClient.phone_number : '');
+
   if (targetClient) {
     targetClient.status = 'number_requested';
     targetClient.requested_number = `${number_type || 'Virtual Mobile'}`;
@@ -4868,11 +4872,12 @@ app.post('/api/client/request-number', express.json({ limit: '50mb' }), (req, re
     targetClient.kyc_details = {
       company: company || targetClient.name,
       person: person || targetClient.name,
-      email: email || targetClient.email,
-      phone: phone || targetClient.phone_number || '',
-      number_type: number_type || 'Indian Virtual Mobile (+91)',
-      use_case: use_case || 'Outbound Sales & Telemarketing',
-      document_url: document_url || null,
+      email: finalEmail,
+      phone: finalPhone,
+      number_type: number_type || 'Indian Virtual Mobile',
+      use_case: use_case || 'Select All (Sales, Support, Surveys, Reminders)',
+      document_urls: docList,
+      document_url: docList[0] || document_url || null,
       domain: host,
       reseller_id: currentReseller ? currentReseller.id : (targetClient.reseller_id || null),
       reseller_name: currentReseller ? currentReseller.name : (targetClient.reseller_name || null),
@@ -4894,11 +4899,12 @@ app.post('/api/client/request-number', express.json({ limit: '50mb' }), (req, re
     kyc_details: {
       company: company || (targetClient ? targetClient.name : 'Client'),
       person: person || (targetClient ? targetClient.name : 'Client'),
-      email: email || (targetClient ? targetClient.email : ''),
-      phone: phone || (targetClient ? targetClient.phone_number : ''),
+      email: finalEmail,
+      phone: finalPhone,
       use_case,
       number_type,
-      document_url,
+      document_urls: docList,
+      document_url: docList[0] || document_url || null,
       domain: host,
       reseller_id: currentReseller ? currentReseller.id : (targetClient ? targetClient.reseller_id : null),
       reseller_name: currentReseller ? currentReseller.name : (targetClient ? targetClient.reseller_name : null),

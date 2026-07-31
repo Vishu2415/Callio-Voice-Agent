@@ -7956,11 +7956,17 @@ async function fetchAdminRequests() {
       const phoneStr = kyc.phone || req.phone_number || '';
       const numType = kyc.number_type || req.requested_number || 'Virtual Mobile';
       const useCase = kyc.use_case || 'Sales & Support';
-      const docUrl = kyc.document_url || null;
-      const resellerName = req.reseller_name || kyc.reseller_name || null;
+      let docUrls = [];
+      if (Array.isArray(kyc.document_urls) && kyc.document_urls.length > 0) {
+        docUrls = kyc.document_urls;
+      } else if (Array.isArray(kyc.document_url) && kyc.document_url.length > 0) {
+        docUrls = kyc.document_url;
+      } else if (kyc.document_url && typeof kyc.document_url === 'string') {
+        docUrls = [kyc.document_url];
+      }
 
-      const docHtml = docUrl
-        ? `<a href="${docUrl}" target="_blank" download="KYC_Document" class="badge" style="background: rgba(6,182,212,0.15); color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.3); font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; text-decoration: none; font-weight: bold;">📄 View KYC Doc</a>`
+      const docHtml = docUrls.length > 0
+        ? docUrls.map((url, idx) => `<a href="${url}" target="_blank" download="KYC_Doc_${idx+1}" class="badge" style="background: rgba(6,182,212,0.15); color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.3); font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-right: 4px; display: inline-block; margin-bottom: 4px;">📄 Doc #${idx+1}</a>`).join('')
         : `<span style="color: var(--text-muted); font-size: 0.75rem; font-style: italic;">No Doc Attached</span>`;
 
       const resellerBadge = resellerName
@@ -10748,27 +10754,63 @@ window.compressKycDocumentFile = function(file) {
   });
 };
 
+window.updateKycFileListDisplay = function(input) {
+  const countEl = document.getElementById('kyc-file-count');
+  const listEl = document.getElementById('kyc-file-list');
+  if (!input || !input.files || input.files.length === 0) {
+    if (countEl) countEl.textContent = 'No files chosen';
+    if (listEl) listEl.innerHTML = '';
+    return;
+  }
+
+  const files = Array.from(input.files);
+  if (countEl) countEl.textContent = `${files.length} file${files.length > 1 ? 's' : ''} selected`;
+
+  if (listEl) {
+    listEl.innerHTML = files.map((f) => `
+      <span style="font-size: 0.72rem; background: rgba(6,182,212,0.12); color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.3); padding: 3px 8px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+        📄 ${f.name} (${Math.round(f.size / 1024)} KB)
+      </span>
+    `).join('');
+  }
+};
+
 window.submitKycNumberRequest = async function(event) {
   if (event) event.preventDefault();
   const company = document.getElementById('kyc-company-name')?.value.trim() || '';
   const person = document.getElementById('kyc-person-name')?.value.trim() || '';
-  const email = document.getElementById('kyc-email')?.value.trim() || '';
-  const phone = document.getElementById('kyc-phone')?.value.trim() || '';
-  const numberType = document.getElementById('kyc-number-type')?.value || '';
-  const useCase = document.getElementById('kyc-use-case')?.value || '';
+  const numberType = document.getElementById('kyc-number-type')?.value || 'Indian Virtual Mobile';
+  const useCase = document.getElementById('kyc-use-case')?.value || 'Select All (Sales, Support, Surveys, Reminders)';
   const fileInput = document.getElementById('kyc-document-file');
 
-  let documentUrl = null;
-  if (fileInput && fileInput.files && fileInput.files[0]) {
-    const rawFile = fileInput.files[0];
-    if (rawFile.size > 20 * 1024 * 1024) {
-      alert('File size exceeds 20MB. Please choose a smaller document file.');
+  const files = fileInput && fileInput.files ? Array.from(fileInput.files) : [];
+  if (files.length === 0) {
+    alert('Please upload at least one KYC document (GST, Address Proof, Aadhaar, or PAN).');
+    return;
+  }
+
+  const documentUrls = [];
+  for (const f of files) {
+    if (f.size > 25 * 1024 * 1024) {
+      alert(`File "${f.name}" size exceeds 25MB. Please choose a smaller file.`);
       return;
     }
     try {
-      documentUrl = await window.compressKycDocumentFile(rawFile);
-    } catch(e) { console.error('Error compressing file:', e); }
+      const url = await window.compressKycDocumentFile(f);
+      if (url) documentUrls.push(url);
+    } catch(e) {
+      console.error('Error compressing file:', e);
+    }
   }
+
+  if (documentUrls.length === 0) {
+    alert('Please select valid KYC document files to upload.');
+    return;
+  }
+
+  const userObj = (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser : {};
+  const userEmail = userObj.email || '';
+  const userPhone = userObj.phone_number || userObj.phone || '';
 
   try {
     const res = await fetch('/api/client/request-number', {
@@ -10777,17 +10819,18 @@ window.submitKycNumberRequest = async function(event) {
       body: JSON.stringify({
         company,
         person,
-        email,
-        phone,
+        email: userEmail,
+        phone: userPhone,
         number_type: numberType,
         use_case: useCase,
-        document_url: documentUrl,
-        userId: typeof loggedInUser !== 'undefined' && loggedInUser ? loggedInUser.id : null
+        document_urls: documentUrls,
+        document_url: documentUrls[0] || null,
+        userId: userObj.id || null
       })
     });
     const data = await res.json();
     if (data.success) {
-      alert('✅ Your Virtual Number & KYC request has been submitted to the admin for verification and number allocation!');
+      alert(`✅ Your Virtual Number & KYC request (${documentUrls.length} document${documentUrls.length > 1 ? 's' : ''} uploaded) has been submitted to the admin for verification!`);
       if (typeof closeNumbersModal === 'function') closeNumbersModal();
       if (typeof fetchAdminRequests === 'function') fetchAdminRequests();
     } else {
