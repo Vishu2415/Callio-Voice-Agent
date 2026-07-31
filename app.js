@@ -1302,12 +1302,18 @@ window.renderMetricDetailsModalContent = function() {
         .then(res => res.json())
         .then(data => {
           window._fetchingModalCalls = false;
-          if (data.success && Array.isArray(data.calls)) {
-            window.callsCache = data.calls;
-            window.lastDashboardCalls = data.calls;
-            callsCache = data.calls;
-            try { localStorage.setItem('callio_calls_cache', JSON.stringify(data.calls)); } catch(e){}
+          const callArray = Array.isArray(data) ? data : (data && Array.isArray(data.calls) ? data.calls : []);
+          if (callArray.length > 0) {
+            window.callsCache = callArray;
+            window.lastDashboardCalls = callArray;
+            callsCache = callArray;
+            try { localStorage.setItem('callio_calls_cache', JSON.stringify(callArray)); } catch(e){}
             window.renderMetricDetailsModalContent();
+          } else {
+            const bodyEl = document.getElementById('metric-modal-body');
+            if (bodyEl) {
+              bodyEl.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">No records found.</div>`;
+            }
           }
         })
         .catch(e => { window._fetchingModalCalls = false; });
