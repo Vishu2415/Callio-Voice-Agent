@@ -2032,8 +2032,8 @@ app.post('/api/trial-summary', express.json(), async (req, res) => {
   }
   const transcript = messages.map(m => `${m.role}: ${m.text}`).join('\n');
   const reqHost = getRealHostFromRequest(req);
-  const reqReseller = getResellerFromHost(reqHost);
-  const brandName = reqReseller ? (reqReseller.brand_name || 'Callio') : 'Callio';
+  const reqBranding = resolveBranding(reqHost);
+  const brandName = (reqBranding && (reqBranding.brandName || reqBranding.brand_name || reqBranding.appName)) || 'Callio';
   const prompt = `You are an expert conversational analyst. Below is a transcript from a live demo call between a user and "${brandName} AI".
 Analyze the conversation and return a JSON object with the following fields:
 1. "summary": exactly 4 concise bullet points in Hindlish or natural English summarizing key moments of the conversation. Use "*" as the bullet point marker. Separated by newlines.
@@ -2257,9 +2257,13 @@ app.post('/api/trial-call', express.json(), async (req, res) => {
 
   // Active configs
   const activeVoice = defaultCallConfig.voice || 'Aoede';
+  // Resolve brand name from request host for dynamic persona
+  const _trialHost = req.headers.host || req.headers.origin || '';
+  const _trialBranding = resolveBranding(_trialHost);
+  const _trialBrandName = (_trialBranding && (_trialBranding.brandName || _trialBranding.brand_name)) || 'Callio';
   const activeInstruction = prompt && prompt.trim().length > 0 
     ? prompt 
-    : (defaultCallConfig.systemInstruction || 'Namaste! Main Callio AI Voice Assistant bol rahi hoon.');
+    : (defaultCallConfig.systemInstruction || `Namaste! Main ${_trialBrandName} AI Voice Assistant bol rahi hoon.`);
 
   try {
     const publicUrl = req.headers.host ? `http://${req.headers.host}` : `http://localhost:${PORT}`;
@@ -5832,6 +5836,8 @@ wss.on('connection', (ws, req) => {
     const host = req.headers.host || req.headers.origin || '';
     const hostBranding = resolveBranding(host);
     const domainDemoPrompt = hostBranding ? hostBranding.demoSystemPrompt : '';
+    // Dynamically resolve brand name for this domain
+    const brandName = (hostBranding && (hostBranding.brandName || hostBranding.brand_name)) || 'Callio';
 
     const queryVoice = urlObj.searchParams.get('voice') || 'Aoede';
     const rawUserPrompt = urlObj.searchParams.get('prompt') || '';
@@ -5876,8 +5882,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
 \n\n`;
 
       const genderPrefix = queryGender === 'male'
-        ? `[PERSONA]: You are a male AI voice assistant named Callio. You MUST always speak in first person as a male. In Hindi/Hinglish, always use masculine verb forms (e.g., "bol raha hoon", "kar raha hoon", "sun raha hoon", "ja raha hoon"). Never use feminine forms. You are confident, warm, and professional.\n\n`
-        : `[PERSONA]: You are a female AI voice assistant named Callio. You MUST always speak in first person as a female. In Hindi/Hinglish, always use feminine verb forms (e.g., "bol rahi hoon", "kar rahi hoon", "sun rahi hoon", "ja rahi hoon"). Never use masculine forms. You are warm, friendly, and professional.\n\n`;
+        ? `[PERSONA]: You are a male AI voice assistant named ${brandName}. You MUST always speak in first person as a male. In Hindi/Hinglish, always use masculine verb forms (e.g., "bol raha hoon", "kar raha hoon", "sun raha hoon", "ja raha hoon"). Never use feminine forms. You are confident, warm, and professional.\n\n`
+        : `[PERSONA]: You are a female AI voice assistant named ${brandName}. You MUST always speak in first person as a female. In Hindi/Hinglish, always use feminine verb forms (e.g., "bol rahi hoon", "kar rahi hoon", "sun rahi hoon", "ja rahi hoon"). Never use masculine forms. You are warm, friendly, and professional.\n\n`;
       const finalInstruction = genderPrefix + emotionRules + queryInstruction;
 
       const setupMessage = {
@@ -7458,3 +7464,4 @@ server.listen(PORT, () => {
     syncVobizApplications();
   }, 3000);
 });
+
