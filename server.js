@@ -3043,20 +3043,25 @@ app.get('/calls', (req, res) => {
       }
       return false;
     });
-  } else if (reseller) {
-    // Whitelabel Reseller Admin: Only return calls belonging to clients under this reseller
-    const resellerClientIds = new Set();
-    for (const [cId, c] of clientsDb.entries()) {
-      if (c.reseller_id === reseller.id) resellerClientIds.add(cId);
+  } else if (clientId === 'admin') {
+    if (reseller) {
+      // Whitelabel Reseller Admin: Only return calls belonging to clients under this reseller
+      const resellerClientIds = new Set();
+      for (const [cId, c] of clientsDb.entries()) {
+        if (c.reseller_id === reseller.id) resellerClientIds.add(cId);
+      }
+      list = list.filter(c => c.clientId && resellerClientIds.has(c.clientId));
+    } else if (host.toLowerCase().includes('callio.in')) {
+      // Callio Main Super Admin: Exclude reseller-owned client calls
+      const resellerClientIds = new Set();
+      for (const [cId, c] of clientsDb.entries()) {
+        if (c.reseller_id) resellerClientIds.add(cId);
+      }
+      list = list.filter(c => !c.clientId || !resellerClientIds.has(c.clientId));
     }
-    list = list.filter(c => c.clientId && resellerClientIds.has(c.clientId));
-  } else if (host.toLowerCase().includes('callio.in')) {
-    // Callio Main Super Admin: Exclude reseller-owned client calls
-    const resellerClientIds = new Set();
-    for (const [cId, c] of clientsDb.entries()) {
-      if (c.reseller_id) resellerClientIds.add(cId);
-    }
-    list = list.filter(c => !c.clientId || !resellerClientIds.has(c.clientId));
+  } else {
+    // SECURITY FIX: If no clientId or invalid clientId provided, return empty array to prevent data leak!
+    list = [];
   }
 
   res.json({ success: true, calls: list });

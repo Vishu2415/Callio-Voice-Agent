@@ -2695,13 +2695,28 @@ if (elBtnSavePrompt) {
 
 
 // --- Call Logging, Summarization, and Rec tab handlers ---
+function getUserCallsCacheKey() {
+  if (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) {
+    return 'callio_calls_cache_' + loggedInUser.id;
+  }
+  return null;
+}
+
 let selectedCallSid = null;
 let callsCache = [];
 try {
-  const localCachedCalls = localStorage.getItem('callio_calls_cache');
-  if (localCachedCalls) {
-    callsCache = JSON.parse(localCachedCalls);
-    window.callsCache = callsCache;
+  localStorage.removeItem('callio_calls_cache'); // Purge legacy un-scoped cache key
+  const session = localStorage.getItem('user_session');
+  if (session) {
+    const u = JSON.parse(session);
+    if (u && u.id) {
+      const localCachedCalls = localStorage.getItem('callio_calls_cache_' + u.id);
+      if (localCachedCalls) {
+        callsCache = JSON.parse(localCachedCalls);
+        window.callsCache = callsCache;
+        window.lastDashboardCalls = callsCache;
+      }
+    }
   }
 } catch (e) {}
 
@@ -2742,12 +2757,14 @@ async function refreshCallsList() {
     const fetchedCalls = Array.isArray(data) ? data : (data && Array.isArray(data.calls) ? data.calls : []);
     callsCache = fetchedCalls;
     window.callsCache = callsCache; // expose globally for metric modals
-    if (fetchedCalls.length > 0) {
-      try {
-        localStorage.setItem('callio_calls_cache', JSON.stringify(callsCache.slice(0, 100)));
-      } catch (e) {}
-    } else {
-      localStorage.removeItem('callio_calls_cache');
+    window.lastDashboardCalls = callsCache;
+    const cacheKey = getUserCallsCacheKey();
+    if (cacheKey) {
+      if (fetchedCalls.length > 0) {
+        try { localStorage.setItem(cacheKey, JSON.stringify(callsCache.slice(0, 100))); } catch (e) {}
+      } else {
+        localStorage.removeItem(cacheKey);
+      }
     }
     
     if (typeof updateDashboardWithClientCalls === 'function') {
@@ -5282,9 +5299,6 @@ function updateVobizMetrics() {
   if (elFailedCalls) elFailedCalls.innerText = failedCalls;
   if (elInterestedCalls) elInterestedCalls.innerText = interestedCount;
 
-  // Populate new 3 boxes for admin as well
-  populateDashboardBoxes(callsCache);
-
   // Real data charts logic
   if (usageChart && costChart && inboundChart) {
     const categories = [];
@@ -5939,10 +5953,13 @@ function hideAuthModal() {
 
 // Global logout function
 window.logout = function() {
-  localStorage.removeItem('user_session');
+  const cacheKey = getUserCallsCacheKey();
+  if (cacheKey) localStorage.removeItem(cacheKey);
   localStorage.removeItem('callio_calls_cache');
+  localStorage.removeItem('user_session');
   window.callsCache = [];
   callsCache = [];
+  window.lastDashboardCalls = [];
   loggedInUser = null;
   location.reload();
 };
@@ -6435,10 +6452,15 @@ document.getElementById('btn-signup-submit')?.addEventListener('click', async ()
       });
       const loginData = await loginRes.json();
       if (loginData.success) {
+        localStorage.removeItem('callio_calls_cache');
+        window.callsCache = [];
+        callsCache = [];
+        window.lastDashboardCalls = [];
         localStorage.setItem('user_session', JSON.stringify(loginData.user));
         localStorage.setItem('activeTab', 'tab-recordings');
         loggedInUser = loginData.user;
         applyUserRole(loggedInUser);
+        if (typeof updateDashboardWithClientCalls === 'function') updateDashboardWithClientCalls([]);
       }
     } else {
       alert(data.error || 'Signup failed.');
@@ -6474,10 +6496,15 @@ document.getElementById('btn-login-submit')?.addEventListener('click', async () 
     });
     const data = await res.json();
     if (data.success) {
+      localStorage.removeItem('callio_calls_cache');
+      window.callsCache = [];
+      callsCache = [];
+      window.lastDashboardCalls = [];
       localStorage.setItem('user_session', JSON.stringify(data.user));
       localStorage.setItem('activeTab', 'tab-recordings');
       loggedInUser = data.user;
       applyUserRole(loggedInUser);
+      if (typeof updateDashboardWithClientCalls === 'function') updateDashboardWithClientCalls([]);
     } else {
       alert(data.error || 'Login failed.');
     }
@@ -6598,11 +6625,25 @@ async function refreshCallsListForDashboard() {
 }
 
 function updateDashboardWithClientCalls(calls) {
-  const totalCalls = calls.length;
-  const activeCalls = calls.filter(c => c.status === 'active' || c.status === 'calling' || c.status === 'in-progress' || c.status === 'ringing' || c.status === 'queued' || c.status === 'initiated').length;
-  const completedCalls = calls.filter(c => c.status === 'completed').length;
-  const failedCalls = calls.filter(c => c.status === 'failed' || c.status === 'no-answer' || c.status === 'busy' || c.status === 'voicemail').length;
-  const interestedCalls = calls.filter(c => c.summary?.toLowerCase().includes('interested') && !c.summary?.toLowerCase().includes('not interested')).length;
+  const safeCalls = Array.isArray(calls) ? calls : [];
+  callsCache = safeCalls;
+  window.callsCache = safeCalls;
+  window.lastDashboardCalls = safeCalls;
+
+  const cacheKey = getUserCallsCacheKey();
+  if (cacheKey) {
+    if (safeCalls.length > 0) {
+      try { localStorage.setItem(cacheKey, JSON.stringify(safeCalls.slice(0, 100))); } catch(e){}
+    } else {
+      localStorage.removeItem(cacheKey);
+    }
+  }
+
+  const totalCalls = safeCalls.length;
+  const activeCalls = safeCalls.filter(c => c.status === 'active' || c.status === 'calling' || c.status === 'in-progress' || c.status === 'ringing' || c.status === 'queued' || c.status === 'initiated').length;
+  const completedCalls = safeCalls.filter(c => c.status === 'completed').length;
+  const failedCalls = safeCalls.filter(c => c.status === 'failed' || c.status === 'no-answer' || c.status === 'busy' || c.status === 'voicemail').length;
+  const interestedCalls = safeCalls.filter(c => c.summary?.toLowerCase().includes('interested') && !c.summary?.toLowerCase().includes('not interested')).length;
   const pickupRate = totalCalls > 0 ? Math.round((completedCalls / totalCalls) * 100) : 0;
 
   const elCallsMade = document.getElementById('vb-calls-made');
@@ -6613,14 +6654,19 @@ function updateDashboardWithClientCalls(calls) {
   const elInterestedCalls = document.getElementById('vb-interested-calls');
 
   if (elCallsMade) elCallsMade.innerText = totalCalls;
-  if (elActiveCalls) elActiveCalls.innerText = activeCalls;  // FIX: was hardcoded 0
+  if (elActiveCalls) elActiveCalls.innerText = activeCalls;
   if (elPickupRate) elPickupRate.innerText = pickupRate + '%';
   if (elCompletedCalls) elCompletedCalls.innerText = completedCalls;
   if (elFailedCalls) elFailedCalls.innerText = failedCalls;
   if (elInterestedCalls) elInterestedCalls.innerText = interestedCalls;
 
   // Populate dashboard boxes with the full calls list
-  populateDashboardBoxes(calls);
+  populateDashboardBoxes(safeCalls);
+
+  // Update ApexCharts (Call Volume Timeline, AI Sentiments, Recent Call Activity)
+  if (typeof updateVobizMetrics === 'function') {
+    updateVobizMetrics();
+  }
 }
 
 function populateDashboardBoxes(calls) {
@@ -6629,7 +6675,14 @@ function populateDashboardBoxes(calls) {
   window.lastDashboardCalls = calls;
   window.callsCache = calls;
   callsCache = calls;
-  try { localStorage.setItem('callio_calls_cache', JSON.stringify(calls.slice(0, 100))); } catch(e){}
+  const cacheKey = getUserCallsCacheKey();
+  if (cacheKey) {
+    if (calls.length > 0) {
+      try { localStorage.setItem(cacheKey, JSON.stringify(calls.slice(0, 100))); } catch(e){}
+    } else {
+      localStorage.removeItem(cacheKey);
+    }
+  }
 
   // Re-render modal automatically if currently open
   const modal = document.getElementById('dashboard-metric-detail-modal');
