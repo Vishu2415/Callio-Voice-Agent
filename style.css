@@ -5572,6 +5572,222 @@ html[data-theme="light"] .skeleton-box {
   box-sizing: border-box;
 }
 
+/* ==========================================================================
+   MODERN SAAS 3.0 TAB DESIGN ENHANCEMENTS (Contacts, Broadcast, Callings)
+   ========================================================================== */
+
+.premium-tab-header-title {
+  font-family: var(--font-title, sans-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+html[data-theme="light"] .premium-tab-header-title {
+  background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glass & Elevated Cards */
+.form-card, .vb-card {
+  background: var(--bg-surface);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(255, 255, 255, 0.03) inset !important;
+  backdrop-filter: blur(16px);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+html[data-theme="light"] .form-card,
+html[data-theme="light"] .vb-card {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.form-card:hover, .vb-card:hover {
+  border-color: rgba(6, 182, 212, 0.3) !important;
+  box-shadow: 0 10px 30px -5px rgba(6, 182, 212, 0.15) !important;
+}
+
+/* Premium Form Inputs & Selects */
+.form-group input[type="text"],
+.form-group input[type="datetime-local"],
+.form-group select,
+.glass-search-input {
+  width: 100%;
+  padding: 11px 16px !important;
+  font-size: 0.88rem !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.025) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-main) !important;
+  outline: none !important;
+  transition: all 0.2s ease !important;
+  box-sizing: border-box !important;
+}
+
+html[data-theme="light"] .form-group input[type="text"],
+html[data-theme="light"] .form-group input[type="datetime-local"],
+html[data-theme="light"] .form-group select,
+html[data-theme="light"] .glass-search-input {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.glass-search-input:focus {
+  border-color: var(--color-cyan) !important;
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.25) !important;
+  background: rgba(6, 182, 212, 0.03) !important;
+}
+
+/* Modern Dropzone Styling */
+.modern-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem !important;
+  border: 2px dashed rgba(255, 107, 74, 0.35) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(180deg, rgba(255, 107, 74, 0.04) 0%, rgba(255, 107, 74, 0.01) 100%) !important;
+  cursor: pointer;
+  transition: all 0.25s ease !important;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.modern-dropzone:hover {
+  border-color: #FF6B4A !important;
+  background: linear-gradient(180deg, rgba(255, 107, 74, 0.09) 0%, rgba(255, 107, 74, 0.02) 100%) !important;
+  box-shadow: 0 0 20px rgba(255, 107, 74, 0.15);
+  transform: translateY(-1px);
+}
+
+.modern-dropzone-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 107, 74, 0.2), rgba(225, 29, 72, 0.2));
+  border: 1px solid rgba(255, 107, 74, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  box-shadow: 0 4px 12px rgba(255, 107, 74, 0.2);
+}
+
+/* Modern Glass Table Styling */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 12px;
+}
+
+.premium-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.86rem;
+}
+
+.premium-table thead th {
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+html[data-theme="light"] .premium-table thead th {
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+.premium-table tbody tr {
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.premium-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+html[data-theme="light"] .premium-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.premium-table tbody td {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+html[data-theme="light"] .premium-table tbody td {
+  border-bottom-color: rgba(0, 0, 0, 0.05);
+}
+
+.premium-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Empty State Styling */
+.premium-empty-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem 2rem;
+  text-align: center;
+}
+
+.empty-icon-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.12), rgba(59, 130, 246, 0.12));
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 24px -4px rgba(6, 182, 212, 0.25);
+}
+
+.empty-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0 0 6px 0;
+}
+
+.empty-subtitle {
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  margin: 0 0 20px 0;
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+/* Interactive Pill Badges */
+.btn-tag-filter {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-tag-filter:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.2) !important;
+}
+
 
 
 

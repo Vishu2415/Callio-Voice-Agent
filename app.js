@@ -3504,10 +3504,15 @@ window.renderAllContactsTable = function() {
   if (list.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="5" style="text-align: center; padding: 4rem 2rem; color: var(--text-muted);">
-          <div style="font-size: 2.2rem; margin-bottom: 8px;">👥</div>
-          <h4 style="color: var(--text-main); margin-bottom: 4px;">No Contacts Found</h4>
-          <p style="font-size: 0.82rem;">Import a CSV file or add a single contact from the left panel.</p>
+        <td colspan="5" style="text-align: center; padding: 3.5rem 1.5rem; color: var(--text-muted);">
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 0;">
+            <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, rgba(6, 182, 212, 0.12), rgba(59, 130, 246, 0.12)); border: 1px solid rgba(6, 182, 212, 0.25); display: flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 4px 20px rgba(6, 182, 212, 0.15);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" style="width: 26px; height: 26px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <h4 style="color: var(--text-main); font-size: 1.05rem; font-weight: 700; margin: 0 0 4px 0;">No Contacts Found</h4>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0 0 16px 0; max-width: 340px; line-height: 1.5;">Import a CSV / Excel file or add a single contact from the left panel to populate your audience list.</p>
+            <button onclick="window.openAddSingleContactModal()" class="btn btn-secondary" style="padding: 7px 16px; font-size: 0.8rem; border-radius: 10px; font-weight: 600; border: 1px solid var(--color-cyan); color: var(--color-cyan); background: rgba(6,182,212,0.08); cursor: pointer;">➕ Add First Contact</button>
+          </div>
         </td>
       </tr>
     `;
@@ -4531,9 +4536,14 @@ window.renderRecentBroadcastsTable = function(broadcasts) {
   if (!broadcasts || broadcasts.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align: center; padding: 3rem 1.5rem; color: var(--text-muted);">
-          <div style="font-size: 1.8rem; margin-bottom: 6px;">📡</div>
-          <p style="margin: 0; font-size: 0.82rem;">No recent broadcast campaigns found.</p>
+        <td colspan="6" style="text-align: center; padding: 3.5rem 1.5rem; color: var(--text-muted);">
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem 0;">
+            <div style="width: 54px; height: 54px; border-radius: 16px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(6, 182, 212, 0.12)); border: 1px solid rgba(139, 92, 246, 0.25); display: flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-violet)" stroke-width="2" style="width: 24px; height: 24px;"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9c3.9 3.9 3.9 10.3 0 14.2"/></svg>
+            </div>
+            <h4 style="color: var(--text-main); font-size: 1rem; font-weight: 700; margin: 0 0 4px 0;">No Broadcast Campaigns Yet</h4>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0; max-width: 320px; line-height: 1.5;">Select an AI agent & target audience on the left to launch your first automated voice broadcast campaign.</p>
+          </div>
         </td>
       </tr>
     `;
