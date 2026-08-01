@@ -8584,6 +8584,7 @@ window.switchAdminSubtab = function(tabName) {
       }
       if (key === 'plans') {
         window.fetchAdminPlans();
+        window.initSuperAdminPricingConsole();
       }
       if (key === 'trial-leads') {
         window.fetchTrialLeads();
@@ -8680,14 +8681,26 @@ window.initSuperAdminPricingConsole = async function() {
   if (!select) return;
 
   try {
-    const adminPass = localStorage.getItem('adminPassword') || 'admin123';
-    const resellers = window._cachedResellers || [];
+    let resellers = window._cachedResellers;
+    if (!resellers || resellers.length === 0) {
+      const adminPass = localStorage.getItem('adminPassword') || 'admin123';
+      const res = await fetch(`/api/admin/resellers?admin_password=${encodeURIComponent(adminPass)}`);
+      const data = await res.json();
+      if (data.success && data.resellers) {
+        resellers = data.resellers;
+        window._cachedResellers = resellers;
+      }
+    }
+
+    resellers = resellers || [];
     let opts = '<option value="default">Default Platform Rates</option>';
     resellers.forEach(r => {
       opts += `<option value="${r.id}">${escapeHtml(r.name)} (${r.domain || r.subdomain || r.email})</option>`;
     });
     select.innerHTML = opts;
-  } catch(e) {}
+  } catch(e) {
+    console.error('Failed to populate pricing reseller dropdown:', e);
+  }
 };
 
 window.onSuperAdminSelectResellerPricing = function(resellerId) {
