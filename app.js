@@ -10137,6 +10137,10 @@ window.saveBrandingSettings = async function(event) {
   let id = document.getElementById('branding-tenant-id').value.trim();
   if (!id) id = 'default';
   const appName = document.getElementById('branding-app-name').value.trim();
+  if (!appName) {
+    alert('Please enter an App Name / Company Name.');
+    return;
+  }
   const customDomain = document.getElementById('branding-custom-domain').value.trim();
   const subdomain = document.getElementById('branding-subdomain').value.trim();
   const logoUrl = document.getElementById('branding-logo-url').value.trim();
