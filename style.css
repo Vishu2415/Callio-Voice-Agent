@@ -5325,42 +5325,68 @@ html[data-theme="light"] .admin-modern-title {
 /* --- Premium Admin Console Sub-tabs --- */
 .admin-console-tabs {
   display: flex !important;
-  gap: 1.5rem !important;
-  background: transparent !important;
+  flex-wrap: nowrap !important;
+  gap: 2px !important;
+  background: var(--bg-surface) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-  padding: 0 0 8px 0 !important;
+  padding: 0 0 0 0 !important;
   margin-bottom: 2rem !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(255,255,255,0.12) transparent !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.admin-console-tabs::-webkit-scrollbar {
+  height: 3px !important;
+}
+
+.admin-console-tabs::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.admin-console-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15) !important;
+  border-radius: 99px !important;
 }
 
 .admin-console-tab-btn {
   background: transparent !important;
   border: none !important;
+  border-bottom: 2px solid transparent !important;
   font-family: var(--font-sans) !important;
-  font-size: 0.9rem !important;
+  font-size: 0.8rem !important;
   font-weight: 600 !important;
-  padding: 8px 16px !important;
+  padding: 10px 14px !important;
   cursor: pointer !important;
   color: var(--text-muted) !important;
-  border-bottom: 2px solid transparent !important;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: all 0.2s ease !important;
   position: relative !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  letter-spacing: 0.01em !important;
 }
 
 .admin-console-tab-btn:hover {
   color: var(--text-main) !important;
+  background: rgba(255,255,255,0.04) !important;
 }
 
 .admin-console-tab-btn.active {
-  color: var(--color-cyan) !important;
-  border-bottom: 2px solid var(--color-cyan) !important;
+  color: var(--color-primary) !important;
+  border-bottom: 2px solid var(--color-primary) !important;
+  background: rgba(255, 107, 74, 0.06) !important;
 }
 
 /* Light Theme overrides for admin console sub-tabs */
 html[data-theme="light"] .admin-console-tabs {
-  border-bottom-color: #cbd5e1 !important;
+  border-bottom-color: #e2e8f0 !important;
+  background: #fff !important;
+  scrollbar-color: rgba(0,0,0,0.15) transparent !important;
 }
 
 html[data-theme="light"] .admin-console-tab-btn {
@@ -5369,9 +5395,12 @@ html[data-theme="light"] .admin-console-tab-btn {
 
 html[data-theme="light"] .admin-console-tab-btn:hover {
   color: #0f172a !important;
+  background: rgba(0,0,0,0.04) !important;
 }
 
 html[data-theme="light"] .admin-console-tab-btn.active {
+  color: var(--color-primary) !important;
+  background: rgba(255, 107, 74, 0.07) !important;
 }
 
 /* --- Premium Glass Modal Content --- */
