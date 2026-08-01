@@ -2739,16 +2739,20 @@ async function refreshCallsList() {
     const clientId = loggedInUser ? loggedInUser.id : '';
     const res = await fetch(`/calls?clientId=${clientId}`);
     const data = await res.json();
-    if (data.success && Array.isArray(data.calls)) {
-      callsCache = data.calls;
-      window.callsCache = callsCache; // expose globally for metric modals
+    const fetchedCalls = Array.isArray(data) ? data : (data && Array.isArray(data.calls) ? data.calls : []);
+    callsCache = fetchedCalls;
+    window.callsCache = callsCache; // expose globally for metric modals
+    if (fetchedCalls.length > 0) {
       try {
         localStorage.setItem('callio_calls_cache', JSON.stringify(callsCache.slice(0, 100)));
       } catch (e) {}
-      
-      if (typeof updateDashboardWithClientCalls === 'function') {
-        updateDashboardWithClientCalls(callsCache);
-      }
+    } else {
+      localStorage.removeItem('callio_calls_cache');
+    }
+    
+    if (typeof updateDashboardWithClientCalls === 'function') {
+      updateDashboardWithClientCalls(callsCache);
+    }
       
       const activeTab = localStorage.getItem('activeTab') || 'tab-dashboard';
       if (activeTab === 'tab-dashboard') {
@@ -2768,7 +2772,6 @@ async function refreshCallsList() {
           renderHistoryDetail(historySelectedSid);
         }
       }
-    }
   } catch (err) {
     console.error('[Calls List Fetch Error] Failed:', err);
   }
@@ -5937,6 +5940,9 @@ function hideAuthModal() {
 // Global logout function
 window.logout = function() {
   localStorage.removeItem('user_session');
+  localStorage.removeItem('callio_calls_cache');
+  window.callsCache = [];
+  callsCache = [];
   loggedInUser = null;
   location.reload();
 };
@@ -8912,6 +8918,11 @@ window.fetchTrialLeads = async function() {
                              .replace(/\n/g, '<br>');
         }
 
+        const currentBrand = window.getWhitelabelBrandName ? window.getWhitelabelBrandName() : 'Callio';
+        if (currentBrand && currentBrand !== 'Callio') {
+          cleanSum = cleanSum.replace(/Callio/gi, currentBrand);
+        }
+
         // Render call summary cleanly with tooltips
         const summaryHtml = cleanSum
           ? `<div style="max-height: 100px; overflow-y: auto; font-size: 0.78rem; line-height: 1.4; color: var(--on-surface);" title="${cleanSum.replace(/<br>/g, '\n')}">${cleanSum}</div>`
@@ -9396,6 +9407,9 @@ window.renderAdminPlansTable = async function() {
     if (data.success && data.plans) {
       window.activePlans = data.plans;
       
+      const btnCreatePlan = document.getElementById('btn-create-new-plan-admin');
+      if (btnCreatePlan) btnCreatePlan.style.display = isReseller ? 'none' : 'inline-flex';
+
       const tbody = document.getElementById('admin-plans-table-body');
       if (tbody) {
         tbody.innerHTML = '';
@@ -9894,6 +9908,12 @@ window.applyBranding = function(branding) {
     img.alt = branding.appName;
   });
 
+  // 4b. Update Login Right Hero Graphic
+  const heroImg = document.getElementById('auth-hero-graphic-img');
+  if (heroImg) {
+    heroImg.src = branding.authHeroUrl || branding.auth_hero_url || 'auth_right_bg.png';
+  }
+
   // 5. Update app names
   document.querySelectorAll('.brand-name').forEach(el => {
     el.textContent = branding.appName;
@@ -10008,6 +10028,7 @@ window.saveBrandingSettings = async function(event) {
   const subdomain = document.getElementById('branding-subdomain').value.trim();
   const logoUrl = document.getElementById('branding-logo-url').value.trim();
   const faviconUrl = document.getElementById('branding-favicon-url').value.trim();
+  const authHeroUrl = document.getElementById('branding-auth-hero-url')?.value.trim() || '';
   const primaryColor = document.getElementById('branding-primary-color').value.trim();
   const secondaryColor = document.getElementById('branding-secondary-color').value.trim();
   const supportEmail = document.getElementById('branding-support-email').value.trim();
@@ -10023,7 +10044,7 @@ window.saveBrandingSettings = async function(event) {
         'X-Tenant-Id': window.BrandingContext ? window.BrandingContext.id : ''
       },
       body: JSON.stringify({
-        id, customDomain, subdomain, appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText, demoSystemPrompt
+        id, customDomain, subdomain, appName, logoUrl, faviconUrl, authHeroUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText, demoSystemPrompt
       })
     });
     const data = await res.json();

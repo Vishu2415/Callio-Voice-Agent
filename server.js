@@ -459,7 +459,7 @@ function loadClients() {
   let dirty = false;
   for (const [key, client] of clientsDb.entries()) {
     if (client.balance === undefined) {
-      client.balance = 500.00; // default ₹500.00 trial balance
+      client.balance = 0.00; // default 0.00 balance
       dirty = true;
     }
     if (!client.pricing) {
@@ -1746,7 +1746,7 @@ app.get('/api/public/branding', (req, res) => {
 });
 
 app.post('/api/admin/branding', (req, res) => {
-  const { id, customDomain, subdomain, appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText, demoSystemPrompt } = req.body;
+  const { id, customDomain, subdomain, appName, logoUrl, faviconUrl, authHeroUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText, demoSystemPrompt } = req.body;
   const host = req.headers.host || req.headers.origin || req.headers.referer || '';
   let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
   if (cleanHost.startsWith('www.')) cleanHost = cleanHost.substring(4);
@@ -1759,6 +1759,7 @@ app.post('/api/admin/branding', (req, res) => {
       appName: appName || currentReseller.branding?.appName || 'Growvo',
       logoUrl: logoUrl !== undefined ? logoUrl : currentReseller.branding?.logoUrl,
       faviconUrl: faviconUrl !== undefined ? faviconUrl : currentReseller.branding?.faviconUrl,
+      authHeroUrl: authHeroUrl !== undefined ? authHeroUrl : (currentReseller.branding?.authHeroUrl || 'auth_right_bg.png'),
       primaryColor: primaryColor || currentReseller.branding?.primaryColor || '#FF6B4A',
       secondaryColor: secondaryColor || currentReseller.branding?.secondaryColor || '#ae3115',
       supportEmail: supportEmail !== undefined ? supportEmail : currentReseller.branding?.supportEmail,
@@ -1787,6 +1788,7 @@ app.post('/api/admin/branding', (req, res) => {
     appName: appName || 'Callio',
     logoUrl: logoUrl || 'logo_new.png',
     faviconUrl: faviconUrl || 'favicon.ico',
+    authHeroUrl: authHeroUrl || 'auth_right_bg.png',
     primaryColor: primaryColor || '#FF6B4A',
     secondaryColor: secondaryColor || '#ae3115',
     supportEmail: supportEmail || '',
@@ -1934,7 +1936,10 @@ app.post('/api/trial-summary', express.json(), async (req, res) => {
     return res.json({ summary: 'Conversation completed.', leadQuality: 'Cold Lead', actionToTake: 'No action needed.' });
   }
   const transcript = messages.map(m => `${m.role}: ${m.text}`).join('\n');
-  const prompt = `You are an expert conversational analyst. Below is a transcript from a live demo call between a user and "Callio AI".
+  const reqHost = getRealHostFromRequest(req);
+  const reqReseller = getResellerFromHost(reqHost);
+  const brandName = reqReseller ? (reqReseller.brand_name || 'Callio') : 'Callio';
+  const prompt = `You are an expert conversational analyst. Below is a transcript from a live demo call between a user and "${brandName} AI".
 Analyze the conversation and return a JSON object with the following fields:
 1. "summary": exactly 4 concise bullet points in Hindlish or natural English summarizing key moments of the conversation. Use "*" as the bullet point marker. Separated by newlines.
 2. "leadQuality": one of "Hot Lead" (if highly interested/ready to buy), "Warm Lead" (if interested but has questions/needs follow-up), or "Cold Lead" (if not interested, voicemail, or wrong number).
@@ -3970,6 +3975,8 @@ app.post('/api/auth/signup', async (req, res) => {
         language: "Hinglish"
       },
       status: 'pending_number',
+      balance: 0.00,
+      used_minutes: 0.00,
       created_at: new Date().toISOString()
     };
 
@@ -4090,7 +4097,7 @@ app.post('/api/auth/login', (req, res) => {
           status: client.status,
           phone_number: client.phone_number,
           agent_config: client.agent_config,
-          balance: client.balance !== undefined ? client.balance : 500.00,
+          balance: client.balance !== undefined ? client.balance : 0.00,
           plan: client.plan || 'basic',
           used_minutes: client.used_minutes !== undefined ? client.used_minutes : 0.00,
           pricing: client.pricing || { rate_per_minute: 2.00, rate_recording_per_minute: 1.00, rate_per_session: 0.00 },
@@ -4217,7 +4224,7 @@ app.post('/api/auth/update-profile', (req, res) => {
       status: client.status,
       phone_number: client.phone_number,
       agent_config: client.agent_config,
-      balance: client.balance !== undefined ? client.balance : 500.00,
+      balance: client.balance !== undefined ? client.balance : 0.00,
       plan: client.plan || 'basic',
       used_minutes: client.used_minutes !== undefined ? client.used_minutes : 0.00,
       pricing: client.pricing || { rate_per_minute: 2.00, rate_recording_per_minute: 1.00, rate_per_session: 0.00 },
@@ -4553,7 +4560,7 @@ app.get('/api/client/dashboard-data', (req, res) => {
       phone_number: client.phone_number,
       status: client.status,
       agent_config: client.agent_config,
-      balance: client.balance !== undefined ? client.balance : 500.00,
+      balance: client.balance !== undefined ? client.balance : 0.00,
       plan: client.plan || 'basic',
       used_minutes: client.used_minutes !== undefined ? client.used_minutes : 0.00,
       pricing: client.pricing || { rate_per_minute: 2.00, rate_recording_per_minute: 1.00, rate_per_session: 0.00 },
@@ -5828,7 +5835,10 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     async function generateTrialSummary(log) {
       if (!log || log.length === 0) return null;
       const transcript = log.map(l => `${l.role}: ${l.text}`).join('\n');
-      const prompt = `You are a helpful assistant. Below is a transcript of a short live voice demo conversation between a user and an AI voice assistant called "Callio AI". Write a 2-3 sentence friendly summary of what was discussed. Be concise and natural.\n\nTranscript:\n${transcript}\n\nSummary:`;
+      const bHost = ws.host || '';
+      const bReseller = getResellerFromHost(bHost);
+      const bName = bReseller ? (bReseller.brand_name || 'Callio') : 'Callio';
+      const prompt = `You are a helpful assistant. Below is a transcript of a short live voice demo conversation between a user and an AI voice assistant called "${bName} AI". Write a 2-3 sentence friendly summary of what was discussed. Be concise and natural.\n\nTranscript:\n${transcript}\n\nSummary:`;
       try {
         const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
           method: 'POST',
