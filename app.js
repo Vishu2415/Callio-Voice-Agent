@@ -8510,6 +8510,13 @@ window.loadBrandingToForm = function() {
   document.getElementById('branding-custom-domain').value = branding.customDomain || '';
   document.getElementById('branding-subdomain').value = branding.subdomain || '';
   document.getElementById('branding-logo-url').value = branding.logoUrl || '';
+
+  const logoH = branding.logoHeight || branding.logo_height || 36;
+  const logoHNum = document.getElementById('branding-logo-height');
+  const logoHSlider = document.getElementById('branding-logo-height-slider');
+  if (logoHNum) logoHNum.value = logoH;
+  if (logoHSlider) logoHSlider.value = logoH;
+
   document.getElementById('branding-favicon-url').value = branding.faviconUrl || '';
   
   const primaryHex = branding.primaryColor || '#FF6B4A';
@@ -9994,10 +10001,25 @@ window.applyBranding = function(branding) {
   `;
 
   // 4. Update logos
-  document.querySelectorAll('.brand-logo').forEach(img => {
-    img.src = branding.logoUrl;
-    img.alt = branding.appName;
+  const logoH = (branding.logoHeight || branding.logo_height || 36) + 'px';
+  document.querySelectorAll('.brand-logo, .app-logo-img').forEach(img => {
+    if (branding.logoUrl) img.src = branding.logoUrl;
+    if (branding.appName) img.alt = branding.appName;
+    img.style.maxHeight = logoH;
+    img.style.height = logoH;
+    img.style.width = 'auto';
+    img.style.objectFit = 'contain';
   });
+
+window.updateLiveLogoHeight = function(val) {
+  const h = (val || 36) + 'px';
+  document.querySelectorAll('.brand-logo, .app-logo-img').forEach(img => {
+    img.style.maxHeight = h;
+    img.style.height = h;
+    img.style.width = 'auto';
+    img.style.objectFit = 'contain';
+  });
+};
 
   // 4b. Update Login Right Hero Graphic
   const heroImg = document.getElementById('auth-hero-graphic-img');
@@ -10115,9 +10137,14 @@ window.saveBrandingSettings = async function(event) {
   let id = document.getElementById('branding-tenant-id').value.trim();
   if (!id) id = 'default';
   const appName = document.getElementById('branding-app-name').value.trim();
+  if (!appName) {
+    alert('Please enter an App Name / Company Name.');
+    return;
+  }
   const customDomain = document.getElementById('branding-custom-domain').value.trim();
   const subdomain = document.getElementById('branding-subdomain').value.trim();
   const logoUrl = document.getElementById('branding-logo-url').value.trim();
+  const logoHeight = parseInt(document.getElementById('branding-logo-height')?.value || '36', 10);
   const faviconUrl = document.getElementById('branding-favicon-url').value.trim();
   const authHeroUrl = document.getElementById('branding-auth-hero-url')?.value.trim() || '';
   const primaryColor = document.getElementById('branding-primary-color').value.trim();
@@ -10135,7 +10162,7 @@ window.saveBrandingSettings = async function(event) {
         'X-Tenant-Id': window.BrandingContext ? window.BrandingContext.id : ''
       },
       body: JSON.stringify({
-        id, customDomain, subdomain, appName, logoUrl, faviconUrl, authHeroUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText, demoSystemPrompt
+        id, customDomain, subdomain, appName, logoUrl, logoHeight, faviconUrl, authHeroUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText, demoSystemPrompt
       })
     });
     const data = await res.json();

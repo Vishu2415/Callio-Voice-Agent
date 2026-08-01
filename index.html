@@ -1970,10 +1970,14 @@
         const branding = window.BrandingContext;
         if (branding) {
             document.title = branding.appName + ' - AI Calling Agents That Actually Close Deals';
-            // Apply logo URLs
+            // Apply logo URLs & height
+            const logoH = (branding.logoHeight || branding.logo_height || 36) + 'px';
             document.querySelectorAll('.brand-logo').forEach(img => {
                 if (branding.logoUrl) img.src = branding.logoUrl;
                 img.alt = branding.appName;
+                img.style.maxHeight = logoH;
+                img.style.height = logoH;
+                img.style.width = 'auto';
             });
             // Apply app name text
             document.querySelectorAll('.brand-name').forEach(el => {
