@@ -1792,6 +1792,62 @@
           <!-- SECTION 4: Manage Pricing Plans & Whitelabel Reseller Commission Controls -->
           <div id="admin-panel-section-plans" style="display: none;">
             
+            <!-- Super Admin Wholesale Rates & Reseller Pricing Manager Banner -->
+            <div id="superadmin-pricing-console-card" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(6, 182, 212, 0.08)); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 20px; padding: 22px 26px; margin-bottom: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                  <div style="width: 48px; height: 48px; border-radius: 14px; background: rgba(139, 92, 246, 0.2); color: #a78bfa; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">👑</div>
+                  <div>
+                    <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--text-main);">Super Admin Wholesale Pricing Manager</h3>
+                    <p style="margin: 3px 0 0 0; font-size: 0.78rem; color: var(--text-muted);">Set custom wholesale calling rates & base plan prices for individual Whitelabel Partners or platform defaults.</p>
+                  </div>
+                </div>
+                
+                <!-- Reseller Selector Dropdown -->
+                <div style="display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 14px; padding: 8px 14px;">
+                  <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Whitelabel Partner:</span>
+                  <select id="superadmin-pricing-reseller-select" onchange="window.onSuperAdminSelectResellerPricing(this.value)" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 700; border-radius: 8px; padding: 6px 12px; font-size: 0.85rem; outline: none; cursor: pointer; min-width: 180px;">
+                    <option value="default">Default Platform Rates</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Wholesale Rates Form for Selected Reseller -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+                <!-- Wholesale Call Rate -->
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px;">
+                  <label style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; color: #a78bfa; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">📞 Wholesale Call Rate (₹/min)</label>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                    <input type="number" id="sa-wholesale-call-rate" step="0.1" min="0.1" value="2.0" style="width: 100%; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #06b6d4; font-weight: 800; font-family: var(--font-mono); font-size: 0.95rem;" placeholder="2.0">
+                  </div>
+                  <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Rate charged per call minute to this partner</div>
+                </div>
+
+                <!-- Wholesale Plan Base Costs -->
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px;">
+                  <label style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; color: #a78bfa; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">💳 Wholesale Base Plan Costs (₹/mo)</label>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;">
+                    <div style="flex: 1; min-width: 75px;">
+                      <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 600;">Basic (₹)</span>
+                      <input type="number" id="sa-plan-basic-rate" step="50" min="0" value="500" style="width: 100%; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem;">
+                    </div>
+                    <div style="flex: 1; min-width: 75px;">
+                      <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 600;">Pro (₹)</span>
+                      <input type="number" id="sa-plan-pro-rate" step="100" min="0" value="1000" style="width: 100%; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem;">
+                    </div>
+                    <div style="flex: 1; min-width: 75px;">
+                      <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 600;">Custom (₹)</span>
+                      <input type="number" id="sa-plan-custom-rate" step="100" min="0" value="3000" style="width: 100%; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem;">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+                <button onclick="window.saveSuperAdminCustomWholesaleRates()" class="admin-action-btn" style="background: linear-gradient(135deg, #8b5cf6, #06b6d4) !important; color: white !important; padding: 10px 22px !important; font-weight: 800; border: none !important; border-radius: 10px !important; cursor: pointer;">💾 Save Wholesale Rates for Selected Partner</button>
+              </div>
+            </div>
+
             <!-- Reseller Wallet & Commission Controls Banner (Visible to Whitelabel Resellers & Admins) -->
             <div id="reseller-wallet-commission-card" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(225, 29, 72, 0.05)); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 20px; padding: 22px 26px; margin-bottom: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
               <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;">
@@ -2933,7 +2989,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=20260801_v62"></script>
+  <script type="module" src="app.js?v=20260801_v63"></script>
   <!-- Today's Calls & Summaries Modal -->
   <div id="today-calls-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="width: 90%; max-width: 700px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 25px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh;">

@@ -5267,6 +5267,7 @@ app.get('/api/admin/resellers', express.json(), (req, res) => {
     subdomain: r.subdomain || '',
     created_at: r.created_at,
     quota: r.quota,
+    wholesale_plan_rates: r.wholesale_plan_rates || {},
     permissions: r.permissions,
     package_name: r.package_name || 'Standard',
     wallet_balance: r.wallet_balance !== undefined ? r.wallet_balance : 0,
@@ -5393,6 +5394,9 @@ app.put('/api/admin/resellers/:id/quota', express.json(), (req, res) => {
 
   if (req.body.total_minutes !== undefined) reseller.quota.total_minutes = Number(req.body.total_minutes);
   if (req.body.wholesale_rate_per_minute !== undefined) reseller.quota.wholesale_rate_per_minute = Number(req.body.wholesale_rate_per_minute);
+  if (req.body.wholesale_plan_rates && typeof req.body.wholesale_plan_rates === 'object') {
+    reseller.wholesale_plan_rates = { ...reseller.wholesale_plan_rates, ...req.body.wholesale_plan_rates };
+  }
   if (req.body.wallet_balance !== undefined) reseller.wallet_balance = Number(req.body.wallet_balance);
   if (req.body.add_wallet_balance !== undefined) {
     reseller.wallet_balance = (reseller.wallet_balance || 0) + Number(req.body.add_wallet_balance);
@@ -5400,7 +5404,7 @@ app.put('/api/admin/resellers/:id/quota', express.json(), (req, res) => {
 
   resellersDb.set(reseller.id, reseller);
   saveResellers();
-  res.json({ success: true, quota: reseller.quota, wallet_balance: reseller.wallet_balance });
+  res.json({ success: true, quota: reseller.quota, wallet_balance: reseller.wallet_balance, wholesale_plan_rates: reseller.wholesale_plan_rates });
 });
 
 // PUT suspend or activate reseller
@@ -5558,24 +5562,32 @@ app.put('/api/reseller/landing-page', express.json(), resellerAuthMiddleware, (r
 // GET reseller pricing config & base plans
 app.get('/api/reseller/pricing-config', resellerAuthMiddleware, (req, res) => {
   const reseller = req.reseller;
-  const basePlans = Array.from(plansDb.values()).map(p => ({
-    id: p.id,
-    name: p.name,
-    base_price_per_month: p.base_price_per_month !== undefined ? p.base_price_per_month : p.price_per_month,
-    base_rate_per_minute: p.base_rate_per_minute !== undefined ? p.base_rate_per_minute : (p.rate_per_minute || 5),
-    max_minutes: p.max_minutes,
-    max_agents: p.max_agents,
-    crm_integration: p.crm_integration,
-    api_sharing: p.api_sharing
-  }));
+  const customRates = reseller.wholesale_plan_rates || {};
+  const wholesaleRatePerMin = reseller.quota?.wholesale_rate_per_minute || 2.0;
+
+  const basePlans = Array.from(plansDb.values()).map(p => {
+    const planKey = (p.id || '').toLowerCase();
+    const customBasePrice = customRates[planKey] !== undefined ? Number(customRates[planKey]) : undefined;
+    return {
+      id: p.id,
+      name: p.name,
+      base_price_per_month: customBasePrice !== undefined ? customBasePrice : (p.base_price_per_month !== undefined ? p.base_price_per_month : p.price_per_month),
+      base_rate_per_minute: wholesaleRatePerMin,
+      max_minutes: p.max_minutes,
+      max_agents: p.max_agents,
+      crm_integration: p.crm_integration,
+      api_sharing: p.api_sharing
+    };
+  });
 
   reseller.markups = reseller.markups || { per_minute_markup: 0, plan_markups: {} };
-  reseller.wallet_balance = reseller.wallet_balance !== undefined ? reseller.wallet_balance : 10000;
+  reseller.wallet_balance = reseller.wallet_balance !== undefined ? reseller.wallet_balance : 0;
 
   res.json({
     success: true,
     wallet_balance: reseller.wallet_balance,
-    wholesale_rate_per_minute: reseller.quota?.wholesale_rate_per_minute || 2.0,
+    wholesale_rate_per_minute: wholesaleRatePerMin,
+    wholesale_plan_rates: customRates,
     base_plans: basePlans,
     markups: reseller.markups
   });

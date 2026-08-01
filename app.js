@@ -6257,10 +6257,19 @@ function applyUserRole(user) {
   const isWL = typeof window.isWhitelabelDomain === 'function' ? window.isWhitelabelDomain() : false;
   const isSuperAdmin = (user && user.role === 'admin' && !isWL);
 
-  // 1. Whitelabel Billing & Reseller Commission Console (Super Admin only)
+  // 1. Whitelabel Billing & Reseller Commission Console (Visible for Resellers)
   const resellerCommissionCard = document.getElementById('reseller-wallet-commission-card');
   if (resellerCommissionCard) {
-    resellerCommissionCard.style.display = isSuperAdmin ? 'block' : 'none';
+    resellerCommissionCard.style.display = (!isSuperAdmin || (user && user.role === 'reseller')) ? 'block' : 'none';
+  }
+
+  // 1b. Super Admin Wholesale Rates Console (Super Admin only)
+  const saPricingConsoleCard = document.getElementById('superadmin-pricing-console-card');
+  if (saPricingConsoleCard) {
+    saPricingConsoleCard.style.display = isSuperAdmin ? 'block' : 'none';
+    if (isSuperAdmin) {
+      window.initSuperAdminPricingConsole();
+    }
   }
 
   // 2. Create Base Plan button (Super Admin only)
@@ -8657,9 +8666,91 @@ window.fetchAdminResellers = async function() {
       </tr>
     `;
     }).join('');
+
+    // Also populate Super Admin Pricing Console reseller dropdown if active
+    window.initSuperAdminPricingConsole();
   } catch (err) {
     console.error('Fetch resellers error:', err);
     tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 20px;">Connection error loading resellers.</td></tr>';
+  }
+};
+
+window.initSuperAdminPricingConsole = async function() {
+  const select = document.getElementById('superadmin-pricing-reseller-select');
+  if (!select) return;
+
+  try {
+    const adminPass = localStorage.getItem('adminPassword') || 'admin123';
+    const resellers = window._cachedResellers || [];
+    let opts = '<option value="default">Default Platform Rates</option>';
+    resellers.forEach(r => {
+      opts += `<option value="${r.id}">${escapeHtml(r.name)} (${r.domain || r.subdomain || r.email})</option>`;
+    });
+    select.innerHTML = opts;
+  } catch(e) {}
+};
+
+window.onSuperAdminSelectResellerPricing = function(resellerId) {
+  const callRateInput = document.getElementById('sa-wholesale-call-rate');
+  const basicInput = document.getElementById('sa-plan-basic-rate');
+  const proInput = document.getElementById('sa-plan-pro-rate');
+  const customInput = document.getElementById('sa-plan-custom-rate');
+
+  if (resellerId === 'default') {
+    if (callRateInput) callRateInput.value = '2.0';
+    if (basicInput) basicInput.value = '500';
+    if (proInput) proInput.value = '1000';
+    if (customInput) customInput.value = '3000';
+    return;
+  }
+
+  const reseller = (window._cachedResellers || []).find(r => r.id === resellerId);
+  if (reseller) {
+    const callRate = reseller.quota?.wholesale_rate_per_minute !== undefined ? reseller.quota.wholesale_rate_per_minute : 2.0;
+    const planRates = reseller.wholesale_plan_rates || {};
+    if (callRateInput) callRateInput.value = callRate;
+    if (basicInput) basicInput.value = planRates.basic !== undefined ? planRates.basic : 500;
+    if (proInput) proInput.value = planRates.pro !== undefined ? planRates.pro : 1000;
+    if (customInput) customInput.value = planRates.custom !== undefined ? planRates.custom : 3000;
+  }
+};
+
+window.saveSuperAdminCustomWholesaleRates = async function() {
+  const resellerId = document.getElementById('superadmin-pricing-reseller-select')?.value || 'default';
+  const callRate = parseFloat(document.getElementById('sa-wholesale-call-rate')?.value) || 2.0;
+  const basicRate = parseFloat(document.getElementById('sa-plan-basic-rate')?.value) || 500;
+  const proRate = parseFloat(document.getElementById('sa-plan-pro-rate')?.value) || 1000;
+  const customRate = parseFloat(document.getElementById('sa-plan-custom-rate')?.value) || 3000;
+  const adminPass = localStorage.getItem('adminPassword') || 'admin123';
+
+  if (resellerId === 'default') {
+    alert('Default platform rates updated.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin/resellers/${resellerId}/quota`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        admin_password: adminPass,
+        wholesale_rate_per_minute: callRate,
+        wholesale_plan_rates: {
+          basic: basicRate,
+          pro: proRate,
+          custom: customRate
+        }
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('Custom wholesale rates saved successfully for this reseller partner!');
+      window.fetchAdminResellers();
+    } else {
+      alert('Failed to save rates: ' + (data.error || 'Unknown error'));
+    }
+  } catch(e) {
+    alert('Error saving rates: ' + e.message);
   }
 };
 
@@ -8703,6 +8794,24 @@ window.openResellerPackageModal = function(id, name, currentTotal, currentRate, 
           <div style="grid-column: span 2;">
             <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 5px;">Wallet Credit Balance (₹)</label>
             <input id="rp-wallet-balance" type="number" step="100" min="0" placeholder="e.g. 5000" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: #10b981; font-weight: 700; border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; outline: none; width: 100%;">
+          </div>
+        </div>
+
+        <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin-bottom: 18px; background: rgba(0,0,0,0.15);">
+          <div style="font-size: 0.85rem; font-weight: 700; margin-bottom: 8px; color: #a78bfa;">💳 Wholesale Base Plan Costs (₹/mo)</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Basic (₹/mo)</label>
+              <input id="rp-plan-basic" type="number" step="50" min="0" placeholder="500" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; outline: none; width: 100%;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Pro (₹/mo)</label>
+              <input id="rp-plan-pro" type="number" step="100" min="0" placeholder="1000" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; outline: none; width: 100%;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Custom (₹/mo)</label>
+              <input id="rp-plan-custom" type="number" step="100" min="0" placeholder="3000" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; outline: none; width: 100%;">
+            </div>
           </div>
         </div>
 
@@ -8754,8 +8863,13 @@ window.openResellerPackageModal = function(id, name, currentTotal, currentRate, 
   document.getElementById('rp-rate').value = currentRate || 2.0;
   document.getElementById('rp-wallet-balance').value = currentWallet || 0;
 
-  // Load current permissions from fetched reseller data
+  // Load current permissions & plan rates from fetched reseller data
   const resellerRow = window._cachedResellers?.find(r => r.id === id);
+  const customPlanRates = resellerRow?.wholesale_plan_rates || {};
+  document.getElementById('rp-plan-basic').value = customPlanRates.basic !== undefined ? customPlanRates.basic : 500;
+  document.getElementById('rp-plan-pro').value = customPlanRates.pro !== undefined ? customPlanRates.pro : 1000;
+  document.getElementById('rp-plan-custom').value = customPlanRates.custom !== undefined ? customPlanRates.custom : 3000;
+
   if (resellerRow?.permissions) {
     const p = resellerRow.permissions;
     document.getElementById('rp-perm-crm').checked = !!p.can_use_crm;
@@ -8778,6 +8892,9 @@ window.saveResellerPackage = async function() {
   const totalMinutes = parseFloat(document.getElementById('rp-total-minutes').value) || 1000;
   const rate = parseFloat(document.getElementById('rp-rate').value) || 2.0;
   const walletBal = parseFloat(document.getElementById('rp-wallet-balance').value) || 0;
+  const planBasic = parseFloat(document.getElementById('rp-plan-basic').value) || 500;
+  const planPro = parseFloat(document.getElementById('rp-plan-pro').value) || 1000;
+  const planCustom = parseFloat(document.getElementById('rp-plan-custom').value) || 3000;
   const adminPass = localStorage.getItem('adminPassword') || 'admin123';
 
   const permissions = {
@@ -8794,10 +8911,16 @@ window.saveResellerPackage = async function() {
   };
 
   try {
-    // Update quota + rate + wallet_balance
+    // Update quota + rate + wallet_balance + wholesale_plan_rates
     const rQuota = await fetch(`/api/admin/resellers/${id}/quota`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ admin_password: adminPass, total_minutes: totalMinutes, wholesale_rate_per_minute: rate, wallet_balance: walletBal })
+      body: JSON.stringify({
+        admin_password: adminPass,
+        total_minutes: totalMinutes,
+        wholesale_rate_per_minute: rate,
+        wallet_balance: walletBal,
+        wholesale_plan_rates: { basic: planBasic, pro: planPro, custom: planCustom }
+      })
     });
     // Update permissions + package_name
     const rPerms = await fetch(`/api/admin/resellers/${id}/permissions`, {
