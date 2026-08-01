@@ -9838,14 +9838,19 @@ window.resetSpacingEditor = function() {
     'navbar-right': 8
   };
 
-  document.getElementById('input-logo-left').value = defaults['logo-left'];
-  document.getElementById('input-logo-gap').value = defaults['logo-gap'];
-  document.getElementById('input-tab-gap').value = defaults['tab-gap'];
-  document.getElementById('input-actions-gap').value = defaults['actions-gap'];
-  document.getElementById('input-navbar-right').value = defaults['navbar-right'];
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-  document.getElementById('check-actions-auto').checked = true;
-  document.getElementById('input-actions-gap').disabled = true;
+  setVal('input-logo-left', defaults['logo-left']);
+  setVal('input-logo-gap', defaults['logo-gap']);
+  setVal('input-tab-gap', defaults['tab-gap']);
+  setVal('input-actions-gap', defaults['actions-gap']);
+  setVal('input-navbar-right', defaults['navbar-right']);
+
+  const chk = document.getElementById('check-actions-auto');
+  if (chk) chk.checked = true;
+  const actGap = document.getElementById('input-actions-gap');
+  if (actGap) actGap.disabled = true;
 
   document.documentElement.style.setProperty('--nav-padding-left', defaults['logo-left'] + 'px');
   document.documentElement.style.setProperty('--nav-logo-gap', defaults['logo-gap'] + 'px');
@@ -9853,11 +9858,11 @@ window.resetSpacingEditor = function() {
   document.documentElement.style.setProperty('--nav-actions-gap', 'auto');
   document.documentElement.style.setProperty('--nav-padding-right', defaults['navbar-right'] + 'px');
 
-  document.getElementById('val-logo-left').textContent = defaults['logo-left'] + 'px';
-  document.getElementById('val-logo-gap').textContent = defaults['logo-gap'] + 'px';
-  document.getElementById('val-tab-gap').textContent = defaults['tab-gap'] + 'px';
-  document.getElementById('val-actions-gap').textContent = 'Auto';
-  document.getElementById('val-navbar-right').textContent = defaults['navbar-right'] + 'px';
+  setText('val-logo-left', defaults['logo-left'] + 'px');
+  setText('val-logo-gap', defaults['logo-gap'] + 'px');
+  setText('val-tab-gap', defaults['tab-gap'] + 'px');
+  setText('val-actions-gap', 'Auto');
+  setText('val-navbar-right', defaults['navbar-right'] + 'px');
   
   saveSpacingToLocalStorage();
 };
@@ -9867,11 +9872,11 @@ function saveSpacingToLocalStorage() {
   if (!logoLeftEl) return;
   const settings = {
     logoLeft: logoLeftEl.value,
-    logoGap: document.getElementById('input-logo-gap').value,
-    tabGap: document.getElementById('input-tab-gap').value,
-    actionsGap: document.getElementById('input-actions-gap').value,
-    actionsAuto: document.getElementById('check-actions-auto').checked,
-    navbarRight: document.getElementById('input-navbar-right').value
+    logoGap: document.getElementById('input-logo-gap')?.value || 20,
+    tabGap: document.getElementById('input-tab-gap')?.value || 15,
+    actionsGap: document.getElementById('input-actions-gap')?.value || 100,
+    actionsAuto: document.getElementById('check-actions-auto')?.checked ?? true,
+    navbarRight: document.getElementById('input-navbar-right')?.value || 8
   };
   localStorage.setItem('navbar_spacing_settings', JSON.stringify(settings));
 }
@@ -9881,17 +9886,19 @@ function loadSpacingFromLocalStorage() {
   if (saved) {
     try {
       const settings = JSON.parse(saved);
-      const logoLeftEl = document.getElementById('input-logo-left');
-      if (!logoLeftEl) return;
+      const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-      logoLeftEl.value = settings.logoLeft;
-      document.getElementById('input-logo-gap').value = settings.logoGap;
-      document.getElementById('input-tab-gap').value = settings.tabGap;
-      document.getElementById('input-actions-gap').value = settings.actionsGap;
-      document.getElementById('check-actions-auto').checked = settings.actionsAuto;
-      document.getElementById('input-navbar-right').value = settings.navbarRight;
+      setVal('input-logo-left', settings.logoLeft);
+      setVal('input-logo-gap', settings.logoGap);
+      setVal('input-tab-gap', settings.tabGap);
+      setVal('input-actions-gap', settings.actionsGap);
+      setVal('input-navbar-right', settings.navbarRight);
 
-      document.getElementById('input-actions-gap').disabled = settings.actionsAuto;
+      const chk = document.getElementById('check-actions-auto');
+      if (chk) chk.checked = settings.actionsAuto;
+      const actGap = document.getElementById('input-actions-gap');
+      if (actGap) actGap.disabled = settings.actionsAuto;
 
       document.documentElement.style.setProperty('--nav-padding-left', settings.logoLeft + 'px');
       document.documentElement.style.setProperty('--nav-logo-gap', settings.logoGap + 'px');
@@ -9899,11 +9906,11 @@ function loadSpacingFromLocalStorage() {
       document.documentElement.style.setProperty('--nav-actions-gap', settings.actionsAuto ? 'auto' : settings.actionsGap + 'px');
       document.documentElement.style.setProperty('--nav-padding-right', settings.navbarRight + 'px');
 
-      document.getElementById('val-logo-left').textContent = settings.logoLeft + 'px';
-      document.getElementById('val-logo-gap').textContent = settings.logoGap + 'px';
-      document.getElementById('val-tab-gap').textContent = settings.tabGap + 'px';
-      document.getElementById('val-actions-gap').textContent = settings.actionsAuto ? 'Auto' : settings.actionsGap + 'px';
-      document.getElementById('val-navbar-right').textContent = settings.navbarRight + 'px';
+      setText('val-logo-left', settings.logoLeft + 'px');
+      setText('val-logo-gap', settings.logoGap + 'px');
+      setText('val-tab-gap', settings.tabGap + 'px');
+      setText('val-actions-gap', settings.actionsAuto ? 'Auto' : settings.actionsGap + 'px');
+      setText('val-navbar-right', settings.navbarRight + 'px');
     } catch (e) {
       console.error('Error loading spacing settings:', e);
     }

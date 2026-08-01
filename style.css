@@ -4289,7 +4289,7 @@ body.light-theme .input-action-btn:hover,
   .vb-chart-panel {
     grid-column: span 3 !important;
   }
-  .vb-bar-panel, #dashboard-spacing-card {
+  .vb-bar-panel {
     grid-column: 1 / -1 !important;
   }
 }

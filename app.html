@@ -782,22 +782,6 @@
               <div class="vb-card-title">Recent Call Activity <span style="float:right; font-size: 0.75rem; color:#888;">Live Updates</span></div>
               <div id="vb-chart-inbound" class="vb-chart" style="min-height:120px;"></div>
             </div>
-
-            <!-- Dashboard Navbar Spacing Option -->
-            <div id="dashboard-spacing-card" class="vb-card" style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 15px; background: rgba(6, 182, 212, 0.03); border: 1px dashed rgba(6, 182, 212, 0.25); padding: 1.25rem; border-radius: 16px; box-sizing: border-box;">
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <div style="background: rgba(6, 182, 212, 0.1); width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(6, 182, 212, 0.2);">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--color-cyan);"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                </div>
-                <div>
-                  <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-main);">Navbar Spacing Configuration</h4>
-                  <p style="margin: 3px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Adjust spacing and margins of the main application header elements</p>
-                </div>
-              </div>
-              <button id="btn-settings-open-spacing" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; color: var(--color-cyan); border-color: rgba(6, 182, 212, 0.4); background: rgba(6, 182, 212, 0.08); height: 40px; padding: 0 20px; cursor: pointer;">
-                📐 Open Spacing Editor Controls
-              </button>
-            </div>        
           </div>
         </section>
       </div>
@@ -1639,12 +1623,6 @@
             <div style="display: flex; gap: 2rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-muted);">
               <div>ENVIRONMENT: <strong style="color: #10b981;">PRODUCTION LIVE</strong></div>
               <div>UPTIME: <strong id="admin-uptime-display" style="color: var(--text-main);">—</strong></div>
-            </div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
-              SPACING TOOL: 
-              <button id="btn-toggle-spacing-visibility" onclick="window.toggleSpacingControlsVisibility()" class="btn" style="padding: 4px 12px; font-size: 0.72rem; border-radius: 20px; font-weight: bold; background: var(--grad-coral); border: none; color: white; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 5px rgba(255, 107, 74, 0.25);">
-                VISIBLE
-              </button>
             </div>
             <div style="font-size: 0.8rem; color: var(--text-muted);">
               SERVER TIME: <strong id="admin-server-time" style="color: var(--color-cyan); font-family: monospace;">--:--:--</strong>
@@ -2926,7 +2904,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=20260801_v53"></script>
+  <script type="module" src="app.js?v=20260801_v54"></script>
   <!-- Today's Calls & Summaries Modal -->
   <div id="today-calls-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="width: 90%; max-width: 700px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 25px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh;">
@@ -3141,79 +3119,6 @@
       </form>
     </div>
   </div>
-
-  <!-- Floating Navbar Spacing Editor -->
-  <div id="spacing-editor-panel" class="vb-card" style="display: none; position: fixed; bottom: 80px; right: 20px; width: 320px; z-index: 9999; padding: 1.25rem; background: var(--bg-surface); backdrop-filter: blur(20px); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); box-sizing: border-box;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
-      <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; color: var(--color-cyan);"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        Navbar Spacing Editor
-      </span>
-      <button onclick="toggleSpacingEditor()" style="background: none; border: none; color: #ff5252; cursor: pointer; font-size: 1.3rem; padding: 0; line-height: 1;">&times;</button>
-    </div>
-    
-    <div style="display: flex; flex-direction: column; gap: 14px;">
-      <!-- Logo Left Padding -->
-      <div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 5px;">
-          <span>Logo Left Padding</span>
-          <strong id="val-logo-left" style="color: var(--text-main);">8px</strong>
-        </div>
-        <input type="range" id="input-logo-left" min="0" max="80" value="8" style="width: 100%; height: 5px; border-radius: 3px; accent-color: var(--color-cyan); background: rgba(128,128,128,0.2); outline: none; border: none;">
-      </div>
-      
-      <!-- Logo to Dashboard Gap -->
-      <div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 5px;">
-          <span>Logo to Dashboard Gap</span>
-          <strong id="val-logo-gap" style="color: var(--text-main);">32px</strong>
-        </div>
-        <input type="range" id="input-logo-gap" min="10" max="300" value="32" style="width: 100%; height: 5px; border-radius: 3px; accent-color: var(--color-cyan); background: rgba(128,128,128,0.2); outline: none; border: none;">
-      </div>
-      
-      <!-- Gap Between Tabs -->
-      <div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 5px;">
-          <span>Gap Between Tabs</span>
-          <strong id="val-tab-gap" style="color: var(--text-main);">20px</strong>
-        </div>
-        <input type="range" id="input-tab-gap" min="5" max="40" value="20" style="width: 100%; height: 5px; border-radius: 3px; accent-color: var(--color-cyan); background: rgba(128,128,128,0.2); outline: none; border: none;">
-      </div>
-      
-      <!-- Tabs to Right Buttons Gap -->
-      <div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 5px;">
-          <span>Tabs to Buttons Gap</span>
-          <strong id="val-actions-gap" style="color: var(--text-main);">Auto</strong>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          <input type="range" id="input-actions-gap" min="10" max="500" value="100" disabled style="width: 100%; height: 5px; border-radius: 3px; accent-color: var(--color-cyan); background: rgba(128,128,128,0.2); outline: none; border: none;">
-          <label style="font-size: 0.7rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
-            <input type="checkbox" id="check-actions-auto" checked style="accent-color: var(--color-cyan); width: 13px; height: 13px;"> Auto (Push to Far Right Edge)
-          </label>
-        </div>
-      </div>
-      
-      <!-- Actions Right Padding -->
-      <div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 5px;">
-          <span>Navbar Right Padding</span>
-          <strong id="val-navbar-right" style="color: var(--text-main);">8px</strong>
-        </div>
-        <input type="range" id="input-navbar-right" min="0" max="80" value="8" style="width: 100%; height: 5px; border-radius: 3px; accent-color: var(--color-cyan); background: rgba(128,128,128,0.2); outline: none; border: none;">
-      </div>
-      
-      <div style="display: flex; gap: 10px; margin-top: 5px;">
-        <button onclick="resetSpacingEditor()" class="btn btn-secondary" style="flex: 1; padding: 8px; font-size: 0.75rem; border-radius: 8px; font-weight: 600;">Reset Defaults</button>
-        <button onclick="toggleSpacingEditor()" class="btn btn-primary" style="flex: 1; padding: 8px; font-size: 0.75rem; border-radius: 8px; font-weight: 600; background: var(--color-cyan); border-color: var(--color-cyan); color: #000;">Close Editor</button>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Floating Toggle Button for Spacing Editor -->
-  <button id="btn-toggle-spacing-editor" style="position: fixed; bottom: 20px; right: 20px; width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-cyan)); border: none; color: #fff; cursor: pointer; box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4); display: flex; align-items: center; justify-content: center; z-index: 9998; transition: transform 0.2s ease;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'" title="Open Navbar Spacing Editor">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-  </button>
 
   <!-- Plan Limit Upgrade Modal -->
   <div id="plan-upgrade-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); z-index: 1100; align-items: center; justify-content: center;">
