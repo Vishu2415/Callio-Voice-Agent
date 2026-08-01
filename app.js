@@ -9985,7 +9985,8 @@ window.applyBranding = function(branding) {
   }
   favicon.href = branding.faviconUrl;
 
-  // 3. Dynamic CSS variables
+  // 3. Dynamic CSS variables & Logo Height rule
+  const logoH = (branding.logoHeight || branding.logo_height || 36) + 'px';
   let styleTag = document.getElementById('dynamic-branding-colors');
   if (!styleTag) {
     styleTag = document.createElement('style');
@@ -9994,19 +9995,30 @@ window.applyBranding = function(branding) {
   }
   styleTag.innerHTML = `
     :root {
-      --color-primary: ${branding.primaryColor} !important;
-      --color-secondary: ${branding.secondaryColor} !important;
-      --grad-coral: linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor}) !important;
+      --color-primary: ${branding.primaryColor || '#FF6B4A'} !important;
+      --color-secondary: ${branding.secondaryColor || '#ae3115'} !important;
+      --grad-coral: linear-gradient(135deg, ${branding.primaryColor || '#FF6B4A'}, ${branding.secondaryColor || '#ae3115'}) !important;
+    }
+    .brand-logo, .app-logo-img {
+      max-height: ${logoH} !important;
+      height: ${logoH} !important;
+      width: auto !important;
+      object-fit: contain !important;
     }
   `;
 
+  // Sync to local cache so page refresh uses fresh branding instantly
+  try {
+    window.BrandingContext = branding;
+    localStorage.setItem('cached_domain_branding_' + window.location.host, JSON.stringify(branding));
+  } catch (e) {}
+
   // 4. Update logos
-  const logoH = (branding.logoHeight || branding.logo_height || 36) + 'px';
   document.querySelectorAll('.brand-logo, .app-logo-img').forEach(img => {
     if (branding.logoUrl) img.src = branding.logoUrl;
     if (branding.appName) img.alt = branding.appName;
-    img.style.maxHeight = logoH;
-    img.style.height = logoH;
+    img.style.setProperty('height', logoH, 'important');
+    img.style.setProperty('max-height', logoH, 'important');
     img.style.width = 'auto';
     img.style.objectFit = 'contain';
   });
@@ -10014,11 +10026,15 @@ window.applyBranding = function(branding) {
 window.updateLiveLogoHeight = function(val) {
   const h = (val || 36) + 'px';
   document.querySelectorAll('.brand-logo, .app-logo-img').forEach(img => {
-    img.style.maxHeight = h;
-    img.style.height = h;
+    img.style.setProperty('height', h, 'important');
+    img.style.setProperty('max-height', h, 'important');
     img.style.width = 'auto';
     img.style.objectFit = 'contain';
   });
+  let styleTag = document.getElementById('dynamic-branding-colors');
+  if (styleTag) {
+    styleTag.innerHTML = styleTag.innerHTML.replace(/(height:\s*)\d+px/g, `$1${h}`);
+  }
 };
 
   // 4b. Update Login Right Hero Graphic

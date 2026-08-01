@@ -3,36 +3,82 @@
 <head>
     <script>
         (function() {
+            // 0. Synchronous Theme Restoration
+            try {
+                const savedTheme = localStorage.getItem('callio-theme') || localStorage.getItem('theme');
+                if (savedTheme) {
+                    document.documentElement.setAttribute('data-theme', savedTheme);
+                }
+            } catch(e) {}
+
             const hostname = window.location.host;
+            let branding = null;
+
+            // 1. Instant cache restoration from localStorage
+            try {
+                const cached = localStorage.getItem('cached_domain_branding_' + hostname);
+                if (cached) {
+                    branding = JSON.parse(cached);
+                    window.BrandingContext = branding;
+                }
+            } catch (e) {}
+
+            // 2. Synchronous fresh fetch if no cache
             const xhr = new XMLHttpRequest();
             xhr.open('GET', '/api/public/branding?domain=' + encodeURIComponent(hostname), false);
             try {
                 xhr.send();
                 if (xhr.status === 200) {
-                    const branding = JSON.parse(xhr.responseText);
+                    branding = JSON.parse(xhr.responseText);
                     window.BrandingContext = branding;
-                    
-                    const styleTag = document.createElement('style');
-                    styleTag.id = 'dynamic-branding-colors';
-                    styleTag.innerHTML = `
-                        :root {
-                            --color-primary: ${branding.primaryColor} !important;
-                            --color-secondary: ${branding.secondaryColor} !important;
-                            --grad-coral: linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor}) !important;
-                        }
-                    `;
-                    document.head.appendChild(styleTag);
-                    document.title = branding.appName + ' - AI Calling Agents';
-                    // Update live demo phone mockup text to brand name
-                    document.addEventListener('DOMContentLoaded', function() {
+                    try { localStorage.setItem('cached_domain_branding_' + hostname, JSON.stringify(branding)); } catch (e) {}
+                }
+            } catch (e) {}
+
+            if (branding) {
+                const logoH = (branding.logoHeight || branding.logo_height || 36) + 'px';
+                const styleTag = document.createElement('style');
+                styleTag.id = 'dynamic-branding-colors';
+                styleTag.innerHTML = `
+                    :root {
+                        --color-primary: ${branding.primaryColor || '#FF6B4A'} !important;
+                        --color-secondary: ${branding.secondaryColor || '#ae3115'} !important;
+                        --grad-coral: linear-gradient(135deg, ${branding.primaryColor || '#FF6B4A'}, ${branding.secondaryColor || '#ae3115'}) !important;
+                    }
+                    .brand-logo, .app-logo-img {
+                        max-height: ${logoH} !important;
+                        height: ${logoH} !important;
+                        width: auto !important;
+                        object-fit: contain !important;
+                    }
+                `;
+                document.head.appendChild(styleTag);
+                if (branding.appName) document.title = branding.appName + ' - AI Calling Agents';
+
+                // Pre-paint DOM observer to replace brand logo & texts before first render frame
+                const observer = new MutationObserver(function() {
+                    if (branding.logoUrl) {
+                        document.querySelectorAll('.brand-logo').forEach(img => {
+                            if (img.getAttribute('src') !== branding.logoUrl) {
+                                img.src = branding.logoUrl;
+                                img.alt = branding.appName || '';
+                            }
+                        });
+                    }
+                    if (branding.appName) {
                         const demoName = document.getElementById('lp-demo-brand-name');
                         const demoTag = document.getElementById('lp-demo-brand-tagline');
-                        if (demoName) demoName.textContent = branding.appName + ' Live Demo';
-                        if (demoTag) demoTag.textContent = 'Choose voice & speak live with ' + branding.appName + ' AI';
-                    });
-                }
-            } catch (e) {
-                console.error('Branding resolution failed:', e);
+                        if (demoName && !demoName.getAttribute('data-branded')) {
+                            demoName.textContent = branding.appName + ' Live Demo';
+                            demoName.setAttribute('data-branded', 'true');
+                        }
+                        if (demoTag && !demoTag.getAttribute('data-branded')) {
+                            demoTag.textContent = 'Choose voice & speak live with ' + branding.appName + ' AI';
+                            demoTag.setAttribute('data-branded', 'true');
+                        }
+                    }
+                });
+                observer.observe(document.documentElement, { childList: true, subtree: true });
             }
         })();
     </script>
