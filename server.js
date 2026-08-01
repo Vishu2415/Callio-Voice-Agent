@@ -6008,11 +6008,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           latestLead.summary = summary;
           latestLead.leadQuality = conversationLog.length > 2 ? 'Warm Lead' : 'Cold Lead';
           latestLead.actionToTake = 'Follow up for live demo onboarding.';
-          if (!latestLead.recordingUrl) {
-            latestLead.recordingUrl = '/recordings/demo_trial_call.mp3';
-          }
           saveTrialLeads();
-          console.log('[Browser Trial WS] Updated latest trial lead summary & recording for:', latestLead.phone);
+          console.log('[Browser Trial WS] Updated latest trial lead summary & quality for:', latestLead.phone);
         }
       }
       ws.close();
