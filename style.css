@@ -5322,71 +5322,61 @@ html[data-theme="light"] .admin-modern-title {
   -webkit-text-fill-color: transparent !important;
 }
 
-/* --- Premium Admin Console Sub-tabs --- */
+/* --- Premium Admin Console Sub-tabs (Pill Segment Style) --- */
 .admin-console-tabs {
   display: flex !important;
   flex-wrap: nowrap !important;
-  gap: 2px !important;
-  background: var(--bg-surface) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-  padding: 0 0 0 0 !important;
+  gap: 4px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-radius: 14px !important;
+  padding: 5px !important;
   margin-bottom: 2rem !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
-  scrollbar-width: thin !important;
-  scrollbar-color: rgba(255,255,255,0.12) transparent !important;
+  scrollbar-width: none !important;
   -webkit-overflow-scrolling: touch !important;
 }
 
 .admin-console-tabs::-webkit-scrollbar {
-  height: 3px !important;
-}
-
-.admin-console-tabs::-webkit-scrollbar-track {
-  background: transparent !important;
-}
-
-.admin-console-tabs::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.15) !important;
-  border-radius: 99px !important;
+  display: none !important;
 }
 
 .admin-console-tab-btn {
   background: transparent !important;
   border: none !important;
-  border-bottom: 2px solid transparent !important;
+  border-radius: 10px !important;
   font-family: var(--font-sans) !important;
-  font-size: 0.8rem !important;
+  font-size: 0.82rem !important;
   font-weight: 600 !important;
-  padding: 10px 14px !important;
+  padding: 9px 18px !important;
   cursor: pointer !important;
   color: var(--text-muted) !important;
-  transition: all 0.2s ease !important;
-  position: relative !important;
+  transition: all 0.18s ease !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 7px !important;
   white-space: nowrap !important;
   flex-shrink: 0 !important;
   letter-spacing: 0.01em !important;
+  position: relative !important;
 }
 
 .admin-console-tab-btn:hover {
   color: var(--text-main) !important;
-  background: rgba(255,255,255,0.04) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
 }
 
 .admin-console-tab-btn.active {
-  color: var(--color-primary) !important;
-  border-bottom: 2px solid var(--color-primary) !important;
-  background: rgba(255, 107, 74, 0.06) !important;
+  background: var(--color-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 12px rgba(255, 107, 74, 0.35) !important;
 }
 
-/* Light Theme overrides for admin console sub-tabs */
+/* Light Theme */
 html[data-theme="light"] .admin-console-tabs {
-  border-bottom-color: #e2e8f0 !important;
-  background: #fff !important;
-  scrollbar-color: rgba(0,0,0,0.15) transparent !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
 }
 
 html[data-theme="light"] .admin-console-tab-btn {
@@ -5394,13 +5384,14 @@ html[data-theme="light"] .admin-console-tab-btn {
 }
 
 html[data-theme="light"] .admin-console-tab-btn:hover {
-  color: #0f172a !important;
-  background: rgba(0,0,0,0.04) !important;
+  color: #1e293b !important;
+  background: rgba(0, 0, 0, 0.06) !important;
 }
 
 html[data-theme="light"] .admin-console-tab-btn.active {
-  color: var(--color-primary) !important;
-  background: rgba(255, 107, 74, 0.07) !important;
+  background: var(--color-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 12px rgba(255, 107, 74, 0.3) !important;
 }
 
 /* --- Premium Glass Modal Content --- */
