@@ -5981,11 +5981,21 @@ function renderClientPricingCards(currentPlanId) {
 
     const actionBtn = document.createElement('button');
     actionBtn.id = `btn-subscribe-${p.id}`;
+
+    // Enterprise / Custom plan → show Contact Sales instead of Subscribe
+    const isCustomPlan = p.id === 'custom' || p.id === 'enterprise' || (p.name || '').toLowerCase().includes('enterprise') || (p.name || '').toLowerCase().includes('custom');
+
     if (isCurrent) {
       actionBtn.textContent = 'Active Plan';
       actionBtn.disabled = true;
       actionBtn.className = 'btn btn-secondary';
       actionBtn.style.cssText = 'width: 100%; font-weight: 600; padding: 10px; border-radius: 8px; justify-content: center; height: 38px; opacity: 0.7; cursor: not-allowed;';
+    } else if (isCustomPlan) {
+      actionBtn.textContent = '🏢 Contact Sales';
+      actionBtn.disabled = false;
+      actionBtn.className = 'btn';
+      actionBtn.style.cssText = 'width: 100%; background: linear-gradient(135deg, #1e293b, #334155); color: #fff; font-weight: 700; border: 1px solid rgba(255,255,255,0.12); padding: 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 38px;';
+      actionBtn.onclick = () => { if (typeof window.openEnterpriseModal === 'function') window.openEnterpriseModal(); };
     } else {
       const isUpgrade = p.price_per_month > 0;
       actionBtn.textContent = isUpgrade ? `Subscribe ${p.name.replace(' Plan', '')}` : 'Subscribe';
@@ -6236,6 +6246,12 @@ function applyUserRole(user) {
   const trialLeadsTab = document.getElementById('admin-subtab-trial-leads');
   if (trialLeadsTab) {
     trialLeadsTab.style.display = 'inline-block';
+  }
+
+  // 3b. Admin Subtab: Enterprise Inquiries (Visible for all Admins & Whitelabel Reseller Admins)
+  const enterpriseInqTab = document.getElementById('admin-subtab-enterprise-inquiries');
+  if (enterpriseInqTab) {
+    enterpriseInqTab.style.display = 'inline-block';
   }
 
   // 4. Admin Subtab: Whitelabel Resellers (Super Admin only)
@@ -8461,6 +8477,7 @@ window.switchAdminSubtab = function(tabName) {
     'logs': 'admin-panel-section-logs',
     'plans': 'admin-panel-section-plans',
     'trial-leads': 'admin-panel-section-trial-leads',
+    'enterprise-inquiries': 'admin-panel-section-enterprise-inquiries',
     'branding': 'admin-panel-section-branding',
     'resellers': 'admin-panel-section-resellers'
   };
@@ -8470,6 +8487,7 @@ window.switchAdminSubtab = function(tabName) {
     'logs': 'admin-subtab-logs',
     'plans': 'admin-subtab-plans',
     'trial-leads': 'admin-subtab-trial-leads',
+    'enterprise-inquiries': 'admin-subtab-enterprise-inquiries',
     'branding': 'admin-subtab-branding',
     'resellers': 'admin-subtab-resellers'
   };
@@ -8490,6 +8508,9 @@ window.switchAdminSubtab = function(tabName) {
       }
       if (key === 'trial-leads') {
         window.fetchTrialLeads();
+      }
+      if (key === 'enterprise-inquiries') {
+        window.fetchEnterpriseInquiries();
       }
       if (key === 'branding') {
         window.loadBrandingToForm();
@@ -10860,4 +10881,161 @@ window.submitKycNumberRequest = async function(event) {
   } catch (err) {
     alert('Error submitting request: ' + err.message);
   }
+};
+
+// ─── Enterprise Inquiry Modal Functions ──────────────────────────────────────
+
+window.openEnterpriseModal = function() {
+  const modal = document.getElementById('enterprise-inquiry-modal');
+  if (modal) {
+    const form = document.getElementById('enterprise-inquiry-form');
+    if (form) form.reset();
+    const msg = document.getElementById('ent-form-msg');
+    if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
+    const btn = document.getElementById('ent-submit-btn');
+    if (btn) { btn.disabled = false; btn.innerHTML = '🚀 Submit Enterprise Inquiry'; }
+    modal.style.display = 'flex';
+  }
+};
+
+window.closeEnterpriseModal = function() {
+  const modal = document.getElementById('enterprise-inquiry-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+document.addEventListener('click', function(e) {
+  const modal = document.getElementById('enterprise-inquiry-modal');
+  if (modal && e.target === modal) window.closeEnterpriseModal();
+});
+
+window.submitEnterpriseInquiry = async function(event) {
+  event.preventDefault();
+  const name = document.getElementById('ent-name')?.value.trim();
+  const phone = document.getElementById('ent-phone')?.value.trim();
+  const company = document.getElementById('ent-company')?.value.trim();
+  const requirement = document.getElementById('ent-requirement')?.value.trim();
+  const msg = document.getElementById('ent-form-msg');
+  const btn = document.getElementById('ent-submit-btn');
+
+  if (!name || !phone || !company || !requirement) {
+    if (msg) {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(239,68,68,0.12)';
+      msg.style.color = '#ef4444';
+      msg.style.border = '1px solid rgba(239,68,68,0.25)';
+      msg.textContent = '⚠️ Please fill in all required fields.';
+    }
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Submitting...'; }
+
+  try {
+    const res = await fetch('/api/public/enterprise-inquiry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, company, requirement })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (msg) {
+        msg.style.display = 'block';
+        msg.style.background = 'rgba(16,185,129,0.12)';
+        msg.style.color = '#10b981';
+        msg.style.border = '1px solid rgba(16,185,129,0.25)';
+        msg.textContent = '✅ ' + (data.message || 'Inquiry submitted! Our team will contact you within 24 hours.');
+      }
+      if (btn) btn.innerHTML = '✅ Submitted!';
+      setTimeout(() => window.closeEnterpriseModal(), 3000);
+    } else {
+      if (msg) { msg.style.display = 'block'; msg.style.background = 'rgba(239,68,68,0.12)'; msg.style.color = '#ef4444'; msg.style.border = '1px solid rgba(239,68,68,0.25)'; msg.textContent = '❌ ' + (data.error || 'Submission failed. Please try again.'); }
+      if (btn) { btn.disabled = false; btn.innerHTML = '🚀 Submit Enterprise Inquiry'; }
+    }
+  } catch (err) {
+    if (msg) { msg.style.display = 'block'; msg.style.background = 'rgba(239,68,68,0.12)'; msg.style.color = '#ef4444'; msg.style.border = '1px solid rgba(239,68,68,0.25)'; msg.textContent = '❌ Network error. Please try again.'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '🚀 Submit Enterprise Inquiry'; }
+  }
+};
+
+// ─── Admin: Fetch & Render Enterprise Inquiries ────────────────────────────
+
+window.fetchEnterpriseInquiries = async function() {
+  const tbody = document.getElementById('admin-enterprise-inquiries-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Loading inquiries...</td></tr>';
+
+  try {
+    const res = await fetch('/api/admin/enterprise-inquiries');
+    const data = await res.json();
+    if (!data.success) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:20px;">${data.error || 'Failed to load inquiries.'}</td></tr>`;
+      return;
+    }
+    const inquiries = data.inquiries || [];
+    if (inquiries.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px;font-style:italic;">No enterprise inquiries yet. Inquiries submitted via the Enterprise plan form will appear here.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    inquiries.forEach(inq => {
+      const dt = new Date(inq.timestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const statusColors = {
+        new: { bg: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: 'rgba(59,130,246,0.25)', label: '🆕 New' },
+        contacted: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: 'rgba(245,158,11,0.25)', label: '📞 Contacted' },
+        resolved: { bg: 'rgba(16,185,129,0.12)', color: '#10b981', border: 'rgba(16,185,129,0.25)', label: '✅ Resolved' }
+      };
+      const sc = statusColors[inq.status] || statusColors.new;
+      const isReseller = inq.reseller_id !== null;
+      const domainBadge = isReseller
+        ? `<span style="background:rgba(139,92,246,0.12);color:#8b5cf6;border:1px solid rgba(139,92,246,0.25);font-size:0.7rem;padding:2px 7px;border-radius:20px;font-weight:700;">${inq.reseller_name || inq.domain}</span>`
+        : `<span style="background:rgba(255,107,74,0.12);color:var(--color-primary);border:1px solid rgba(255,107,74,0.25);font-size:0.7rem;padding:2px 7px;border-radius:20px;font-weight:700;">Callio Main</span>`;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;">${dt}</td>
+        <td style="font-weight:700;font-size:0.88rem;">${inq.name}</td>
+        <td><a href="tel:${inq.phone}" style="color:var(--color-primary);font-weight:600;font-size:0.85rem;text-decoration:none;">${inq.phone}</a></td>
+        <td style="font-weight:600;font-size:0.85rem;">${inq.company}</td>
+        <td><div style="max-width:200px;max-height:60px;overflow-y:auto;font-size:0.78rem;line-height:1.45;" title="${inq.requirement.replace(/"/g,'&quot;')}">${inq.requirement}</div></td>
+        <td>${domainBadge}</td>
+        <td><span class="badge" style="background:${sc.bg};color:${sc.color};border:1px solid ${sc.border};font-size:0.7rem;padding:3px 8px;border-radius:20px;font-weight:700;white-space:nowrap;">${sc.label}</span></td>
+        <td>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;">
+            ${inq.status !== 'contacted' ? `<button onclick="window.updateEnterpriseInquiryStatus('${inq.id}','contacted')" class="admin-action-btn" style="font-size:0.7rem;padding:4px 8px;">📞 Contacted</button>` : ''}
+            ${inq.status !== 'resolved' ? `<button onclick="window.updateEnterpriseInquiryStatus('${inq.id}','resolved')" class="admin-action-btn admin-action-btn-recharge" style="font-size:0.7rem;padding:4px 8px;">✅ Resolve</button>` : ''}
+            <button onclick="window.deleteEnterpriseInquiry('${inq.id}')" class="admin-action-btn" style="font-size:0.7rem;padding:4px 8px;background:rgba(239,68,68,0.1);color:#ef4444;border-color:rgba(239,68,68,0.25);">🗑️ Delete</button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:20px;">Error: ${err.message}</td></tr>`;
+  }
+};
+
+window.updateEnterpriseInquiryStatus = async function(id, status) {
+  try {
+    const res = await fetch('/api/admin/enterprise-inquiry/update-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status })
+    });
+    const data = await res.json();
+    if (data.success) window.fetchEnterpriseInquiries();
+  } catch (err) { console.error('Status update failed:', err); }
+};
+
+window.deleteEnterpriseInquiry = async function(id) {
+  if (!confirm('Delete this enterprise inquiry? This cannot be undone.')) return;
+  try {
+    const res = await fetch('/api/admin/enterprise-inquiry/update-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action: 'delete' })
+    });
+    const data = await res.json();
+    if (data.success) window.fetchEnterpriseInquiries();
+  } catch (err) { console.error('Delete failed:', err); }
 };

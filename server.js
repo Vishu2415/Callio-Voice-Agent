@@ -120,6 +120,30 @@ function saveBroadcasts() {
 const BRANDING_DB_FILE = './branding_db.json';
 const brandingDb = new Map();
 
+const ENTERPRISE_INQUIRIES_FILE = './enterprise_inquiries_db.json';
+let enterpriseInquiries = [];
+
+function loadEnterpriseInquiries() {
+  try {
+    if (fs.existsSync(ENTERPRISE_INQUIRIES_FILE)) {
+      const raw = fs.readFileSync(ENTERPRISE_INQUIRIES_FILE, 'utf8');
+      enterpriseInquiries = JSON.parse(raw);
+    } else {
+      enterpriseInquiries = [];
+    }
+  } catch (err) {
+    console.error('[Startup] Failed to load enterprise inquiries:', err.message);
+  }
+}
+
+function saveEnterpriseInquiries() {
+  try {
+    fs.writeFileSync(ENTERPRISE_INQUIRIES_FILE, JSON.stringify(enterpriseInquiries, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[Database] Failed to save enterprise inquiries:', err.message);
+  }
+}
+
 function loadBranding() {
   loadDatabase(BRANDING_DB_FILE, brandingDb);
   if (brandingDb.size === 0) {
@@ -238,6 +262,7 @@ function resolveBranding(host) {
       appName: appName,
       logoUrl: b.logoUrl || 'logo_new.png',
       faviconUrl: b.faviconUrl || 'favicon.ico',
+      authHeroUrl: b.authHeroUrl || b.auth_hero_url || 'auth_right_bg.png',
       primaryColor: b.primaryColor || '#FF6B4A',
       secondaryColor: b.secondaryColor || '#ae3115',
       supportEmail: b.supportEmail || reseller.email || '',
@@ -262,13 +287,15 @@ function resolveBranding(host) {
   }
 
   // 3. Fallback to default Callio branding
-  return brandingDb.get('default') || {
-    appName: 'Callio',
-    logoUrl: 'logo_new.png',
-    faviconUrl: 'favicon.ico',
-    primaryColor: '#FF6B4A',
-    secondaryColor: '#ae3115',
-    copyrightText: '© 2026 Callio. All rights reserved.'
+  const def = brandingDb.get('default') || {};
+  return {
+    appName: def.appName || 'Callio',
+    logoUrl: def.logoUrl || 'logo_new.png',
+    faviconUrl: def.faviconUrl || 'favicon.ico',
+    authHeroUrl: def.authHeroUrl || def.auth_hero_url || 'auth_right_bg.png',
+    primaryColor: def.primaryColor || '#FF6B4A',
+    secondaryColor: def.secondaryColor || '#ae3115',
+    copyrightText: def.copyrightText || '© 2026 Callio. All rights reserved.'
   };
 }
 
@@ -568,6 +595,7 @@ loadCallbacks();
 loadPlans();
 loadTrialLimits();
 loadTrialLeads();
+loadEnterpriseInquiries();
 loadBranding();
 
 function cleanAndComparePhone(p1, p2) {
@@ -1808,6 +1836,73 @@ app.post('/api/admin/branding', (req, res) => {
 });
 
 
+
+// ─── Enterprise Inquiry Endpoints ─────────────────────────────────────────────
+
+// POST /api/public/enterprise-inquiry — public form submission
+app.post('/api/public/enterprise-inquiry', express.json(), (req, res) => {
+  const { name, phone, company, requirement } = req.body;
+  if (!name || !phone || !company || !requirement) {
+    return res.status(400).json({ success: false, error: 'All fields are required.' });
+  }
+
+  const host = getRealHostFromRequest(req);
+  const reseller = getResellerFromHost(host);
+
+  const inquiry = {
+    id: 'ent_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    timestamp: new Date().toISOString(),
+    name: name.trim(),
+    phone: phone.trim(),
+    company: company.trim(),
+    requirement: requirement.trim(),
+    status: 'new',
+    reseller_id: reseller ? reseller.id : null,
+    reseller_name: reseller ? (reseller.brand_name || reseller.name || 'Whitelabel Partner') : 'Callio Main',
+    domain: reseller ? (reseller.domain || host) : host
+  };
+
+  enterpriseInquiries.push(inquiry);
+  saveEnterpriseInquiries();
+  console.log(`[Enterprise Inquiry] New inquiry from ${name} (${company}) via ${inquiry.domain}`);
+  res.json({ success: true, message: 'Your enterprise inquiry has been submitted! Our team will contact you shortly.' });
+});
+
+// GET /api/admin/enterprise-inquiries — fetch inquiries for admin/reseller
+app.get('/api/admin/enterprise-inquiries', (req, res) => {
+  const sessionToken = req.headers['x-session-token'] || req.query.token;
+  const host = getRealHostFromRequest(req);
+  const reseller = getResellerFromHost(host);
+
+  // For reseller admin portals — only return their inquiries
+  if (reseller) {
+    const filtered = enterpriseInquiries.filter(i => i.reseller_id === reseller.id);
+    return res.json({ success: true, inquiries: filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) });
+  }
+
+  // For super admin — return all inquiries
+  res.json({ success: true, inquiries: [...enterpriseInquiries].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) });
+});
+
+// POST /api/admin/enterprise-inquiry/update-status — update or delete an inquiry
+app.post('/api/admin/enterprise-inquiry/update-status', express.json(), (req, res) => {
+  const { id, status, action } = req.body;
+  if (!id) return res.status(400).json({ success: false, error: 'Inquiry ID required.' });
+
+  if (action === 'delete') {
+    enterpriseInquiries = enterpriseInquiries.filter(i => i.id !== id);
+    saveEnterpriseInquiries();
+    return res.json({ success: true, message: 'Inquiry deleted.' });
+  }
+
+  const inquiry = enterpriseInquiries.find(i => i.id === id);
+  if (!inquiry) return res.status(404).json({ success: false, error: 'Inquiry not found.' });
+
+  if (status) inquiry.status = status;
+  inquiry.updated_at = new Date().toISOString();
+  saveEnterpriseInquiries();
+  res.json({ success: true, inquiry });
+});
 
 app.post('/api/upload-branding-asset', (req, res) => {
   const { fileName, fileData } = req.body;
@@ -5405,12 +5500,13 @@ app.get('/api/reseller/me', resellerAuthMiddleware, (req, res) => {
 // PUT reseller branding update
 app.put('/api/reseller/branding', express.json(), resellerAuthMiddleware, (req, res) => {
   const reseller = req.reseller;
-  const { appName, logoUrl, faviconUrl, primaryColor, secondaryColor, supportEmail, copyrightText } = req.body;
+  const { appName, logoUrl, faviconUrl, authHeroUrl, primaryColor, secondaryColor, supportEmail, copyrightText } = req.body;
 
   reseller.branding = {
     appName: appName || reseller.branding.appName,
     logoUrl: logoUrl !== undefined ? logoUrl : reseller.branding.logoUrl,
     faviconUrl: faviconUrl !== undefined ? faviconUrl : reseller.branding.faviconUrl,
+    authHeroUrl: authHeroUrl !== undefined ? authHeroUrl : (reseller.branding.authHeroUrl || 'auth_right_bg.png'),
     primaryColor: primaryColor || reseller.branding.primaryColor,
     secondaryColor: secondaryColor || reseller.branding.secondaryColor,
     supportEmail: supportEmail || reseller.branding.supportEmail,

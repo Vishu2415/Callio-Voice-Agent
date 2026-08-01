@@ -1020,7 +1020,7 @@
                     <div class="text-display-lg font-bold">Enterprise</div>
                 </div>
                 <p class="font-body-md text-body-md mb-12 flex-1" style="color: inherit; opacity: 0.8;">Dedicated infrastructure, white-labeling, and advanced compliance for global organizations.</p>
-                <a href="mailto:sales@callio.ai" class="w-full py-4 text-center rounded-full font-label-md text-label-md hover:opacity-90 transition-all shadow-md" style="background: var(--color-btn-enterprise-bg); color: var(--color-btn-enterprise-text);">Contact Sales</a>
+                <button onclick="openEnterpriseInquiryModal()" class="w-full py-4 text-center rounded-full font-label-md text-label-md hover:opacity-90 transition-all shadow-md cursor-pointer" style="background: var(--color-btn-enterprise-bg); color: var(--color-btn-enterprise-text); border: none;">Contact Sales</button>
             </div>
         </div>
     </div>
@@ -1994,6 +1994,85 @@
             }
         }
     })();
+</script>
+
+<!-- ─── Enterprise Inquiry Modal (Landing Page) ────────────────── -->
+<div id="lp-enterprise-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);backdrop-filter:blur(10px);z-index:9999;align-items:center;justify-content:center;">
+  <div style="width:92%;max-width:520px;background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:22px;padding:32px;box-shadow:0 30px 60px rgba(0,0,0,0.5);position:relative;max-height:90vh;overflow-y:auto;">
+    <button onclick="document.getElementById('lp-enterprise-modal').style.display='none'" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.08);border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:0.9rem;color:#aaa;display:flex;align-items:center;justify-content:center;">✕</button>
+    <div style="width:44px;height:44px;background:linear-gradient(135deg,#FF6B4A,#ae3115);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin-bottom:14px;">🏢</div>
+    <h3 style="margin:0 0 6px;font-size:1.25rem;font-weight:800;color:#fff;">Custom Enterprise Plan</h3>
+    <p style="margin:0 0 22px;font-size:0.82rem;color:rgba(255,255,255,0.55);line-height:1.55;">Tell us your requirements. Our team will get back to you within 24 hours with a custom quote.</p>
+    <form id="lp-ent-form" onsubmit="submitLandingEnterpriseInquiry(event)" style="display:flex;flex-direction:column;gap:13px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;">
+        <div>
+          <label style="font-size:0.73rem;font-weight:700;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Full Name *</label>
+          <input id="lp-ent-name" type="text" required placeholder="Rahul Sharma" style="width:100%;padding:9px 11px;border-radius:9px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;font-size:0.87rem;outline:none;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:0.73rem;font-weight:700;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Phone *</label>
+          <input id="lp-ent-phone" type="tel" required placeholder="+91 98765 43210" style="width:100%;padding:9px 11px;border-radius:9px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;font-size:0.87rem;outline:none;box-sizing:border-box;">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.73rem;font-weight:700;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Company Name *</label>
+        <input id="lp-ent-company" type="text" required placeholder="Acme Corp Pvt. Ltd." style="width:100%;padding:9px 11px;border-radius:9px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;font-size:0.87rem;outline:none;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.73rem;font-weight:700;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Detailed Requirement *</label>
+        <textarea id="lp-ent-req" required rows="4" placeholder="e.g. 50,000 mins/month, 10 AI agents, CRM integration, inbound + outbound, custom voice training..." style="width:100%;padding:9px 11px;border-radius:9px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;font-size:0.83rem;outline:none;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+      </div>
+      <div id="lp-ent-msg" style="display:none;padding:9px 13px;border-radius:9px;font-size:0.81rem;font-weight:600;"></div>
+      <button type="submit" id="lp-ent-btn" style="width:100%;padding:12px;background:linear-gradient(135deg,#FF6B4A,#ae3115);color:#fff;border:none;border-radius:10px;font-size:0.9rem;font-weight:800;cursor:pointer;letter-spacing:0.3px;">🚀 Submit Enterprise Inquiry</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openEnterpriseInquiryModal() {
+    const m = document.getElementById('lp-enterprise-modal');
+    if (m) {
+      document.getElementById('lp-ent-form').reset();
+      const msg = document.getElementById('lp-ent-msg');
+      if (msg) msg.style.display = 'none';
+      const btn = document.getElementById('lp-ent-btn');
+      if (btn) { btn.disabled = false; btn.innerHTML = '🚀 Submit Enterprise Inquiry'; }
+      m.style.display = 'flex';
+    }
+  }
+  document.addEventListener('click', function(e) {
+    const m = document.getElementById('lp-enterprise-modal');
+    if (m && e.target === m) m.style.display = 'none';
+  });
+  async function submitLandingEnterpriseInquiry(event) {
+    event.preventDefault();
+    const name = document.getElementById('lp-ent-name').value.trim();
+    const phone = document.getElementById('lp-ent-phone').value.trim();
+    const company = document.getElementById('lp-ent-company').value.trim();
+    const requirement = document.getElementById('lp-ent-req').value.trim();
+    const msg = document.getElementById('lp-ent-msg');
+    const btn = document.getElementById('lp-ent-btn');
+    if (!name || !phone || !company || !requirement) {
+      msg.style.display = 'block'; msg.style.background = 'rgba(239,68,68,0.18)'; msg.style.color = '#ef4444'; msg.style.border = '1px solid rgba(239,68,68,0.3)'; msg.textContent = '⚠️ Please fill in all required fields.';
+      return;
+    }
+    btn.disabled = true; btn.innerHTML = '⏳ Submitting...';
+    try {
+      const res = await fetch('/api/public/enterprise-inquiry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone, company, requirement }) });
+      const data = await res.json();
+      if (data.success) {
+        msg.style.display = 'block'; msg.style.background = 'rgba(16,185,129,0.15)'; msg.style.color = '#10b981'; msg.style.border = '1px solid rgba(16,185,129,0.3)'; msg.textContent = '✅ Inquiry submitted! Our team will contact you within 24 hours.';
+        btn.innerHTML = '✅ Submitted!';
+        setTimeout(() => { document.getElementById('lp-enterprise-modal').style.display = 'none'; }, 3200);
+      } else {
+        msg.style.display = 'block'; msg.style.background = 'rgba(239,68,68,0.18)'; msg.style.color = '#ef4444'; msg.style.border = '1px solid rgba(239,68,68,0.3)'; msg.textContent = '❌ ' + (data.error || 'Submission failed.');
+        btn.disabled = false; btn.innerHTML = '🚀 Submit Enterprise Inquiry';
+      }
+    } catch(e) {
+      msg.style.display = 'block'; msg.style.background = 'rgba(239,68,68,0.18)'; msg.style.color = '#ef4444'; msg.style.border = '1px solid rgba(239,68,68,0.3)'; msg.textContent = '❌ Network error. Please try again.';
+      btn.disabled = false; btn.innerHTML = '🚀 Submit Enterprise Inquiry';
+    }
+  }
 </script>
 
 </body>
