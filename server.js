@@ -261,6 +261,7 @@ function resolveBranding(host) {
       subdomain: reseller.subdomain || '',
       appName: appName,
       logoUrl: b.logoUrl || 'logo_new.png',
+      logoHeight: b.logoHeight ? Number(b.logoHeight) : 36,
       faviconUrl: b.faviconUrl || 'favicon.ico',
       authHeroUrl: b.authHeroUrl || b.auth_hero_url || 'auth_right_bg.png',
       primaryColor: b.primaryColor || '#FF6B4A',
@@ -289,13 +290,20 @@ function resolveBranding(host) {
   // 3. Fallback to default Callio branding
   const def = brandingDb.get('default') || {};
   return {
+    id: 'default',
+    customDomain: def.customDomain || '',
+    subdomain: def.subdomain || '',
     appName: def.appName || 'Callio',
     logoUrl: def.logoUrl || 'logo_new.png',
+    logoHeight: def.logoHeight ? Number(def.logoHeight) : 36,
     faviconUrl: def.faviconUrl || 'favicon.ico',
     authHeroUrl: def.authHeroUrl || def.auth_hero_url || 'auth_right_bg.png',
     primaryColor: def.primaryColor || '#FF6B4A',
     secondaryColor: def.secondaryColor || '#ae3115',
-    copyrightText: def.copyrightText || '© 2026 Callio. All rights reserved.'
+    supportEmail: def.supportEmail || '',
+    supportPhone: def.supportPhone || '',
+    copyrightText: def.copyrightText || '© 2026 Callio. All rights reserved.',
+    demoSystemPrompt: def.demoSystemPrompt || ''
   };
 }
 
