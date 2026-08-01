@@ -1776,10 +1776,6 @@ app.get('/api/public/branding', (req, res) => {
 app.post('/api/admin/branding', (req, res) => {
   const { id, customDomain, subdomain, appName, logoUrl, logoHeight, faviconUrl, authHeroUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText, demoSystemPrompt } = req.body;
 
-  if (!appName || typeof appName !== 'string' || appName.trim().length === 0) {
-    return res.status(400).json({ success: false, error: 'App Name / Company Name cannot be empty.' });
-  }
-
   const host = req.headers.host || req.headers.origin || req.headers.referer || '';
   let cleanHost = host.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].toLowerCase();
   if (cleanHost.startsWith('www.')) cleanHost = cleanHost.substring(4);
@@ -1789,7 +1785,7 @@ app.post('/api/admin/branding', (req, res) => {
   if (currentReseller) {
     // If request is made from a reseller portal (e.g. growvo.in), ONLY update this reseller's branding
     currentReseller.branding = {
-      appName: appName.trim(),
+      appName: appName !== undefined ? appName.trim() : (currentReseller.branding?.appName || ''),
       logoUrl: logoUrl !== undefined ? logoUrl : currentReseller.branding?.logoUrl,
       logoHeight: logoHeight ? Number(logoHeight) : (currentReseller.branding?.logoHeight || 36),
       faviconUrl: faviconUrl !== undefined ? faviconUrl : currentReseller.branding?.faviconUrl,
@@ -1819,7 +1815,7 @@ app.post('/api/admin/branding', (req, res) => {
     id: targetDomain,
     customDomain: customDomain || '',
     subdomain: subdomain || '',
-    appName: appName.trim(),
+    appName: appName !== undefined ? appName.trim() : '',
     logoUrl: logoUrl || 'logo_new.png',
     logoHeight: logoHeight ? Number(logoHeight) : 36,
     faviconUrl: faviconUrl || 'favicon.ico',

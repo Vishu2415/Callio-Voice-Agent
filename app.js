@@ -9974,7 +9974,7 @@ window.applyBranding = function(branding) {
   if (!branding) return;
 
   // 1. Dynamic Title
-  document.title = branding.appName + ' - Live AI Voice Agent';
+  document.title = (branding.appName ? branding.appName + ' - ' : '') + 'Live AI Voice Agent';
 
   // 2. Favicon
   let favicon = document.querySelector("link[rel~='icon']");
@@ -10137,10 +10137,6 @@ window.saveBrandingSettings = async function(event) {
   let id = document.getElementById('branding-tenant-id').value.trim();
   if (!id) id = 'default';
   const appName = document.getElementById('branding-app-name').value.trim();
-  if (!appName) {
-    alert('Please enter an App Name / Company Name.');
-    return;
-  }
   const customDomain = document.getElementById('branding-custom-domain').value.trim();
   const subdomain = document.getElementById('branding-subdomain').value.trim();
   const logoUrl = document.getElementById('branding-logo-url').value.trim();
