@@ -344,12 +344,13 @@ body {
 /* Base: size, transitions. multiply blend removes white bg on any non-white surface */
 .brand-logo,
 .app-logo-img.brand-logo {
-  height: 40px;
+  height: 36px;
+  max-height: 36px;
   width: auto;
   display: block;
   object-fit: contain;
-  transition: filter 0.3s ease, opacity 0.3s ease;
-  mix-blend-mode: multiply;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+  mix-blend-mode: normal;
   filter: none;
 }
 
@@ -388,7 +389,7 @@ html[data-theme="light"] .app-logo-img.brand-logo {
   max-width: calc(100vw - 320px);
   min-width: 0;
   flex-shrink: 1;
-  margin: 0 auto 0 2.5rem;
+  margin: 0 auto 0 5.5rem;
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;

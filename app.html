@@ -28,6 +28,7 @@
       } catch (e) {}
 
       if (branding) {
+        const logoH = (branding.logoHeight || branding.logo_height || 36) + 'px';
         const styleTag = document.createElement('style');
         styleTag.id = 'dynamic-branding-colors';
         styleTag.innerHTML = `
@@ -35,6 +36,12 @@
             --color-primary: ${branding.primaryColor || '#ea580c'} !important;
             --color-secondary: ${branding.secondaryColor || '#ae3115'} !important;
             --grad-coral: linear-gradient(135deg, ${branding.primaryColor || '#ea580c'}, ${branding.secondaryColor || '#ae3115'}) !important;
+          }
+          .brand-logo, .app-logo-img {
+            max-height: ${logoH} !important;
+            height: ${logoH} !important;
+            width: auto !important;
+            object-fit: contain !important;
           }
         `;
         document.head.appendChild(styleTag);
@@ -49,7 +56,11 @@
           }
           if (branding.logoUrl) {
             document.querySelectorAll('.brand-logo').forEach(img => {
-              if (img.src !== branding.logoUrl) { img.src = branding.logoUrl; img.alt = branding.appName || ''; }
+              const currentSrc = img.getAttribute('src');
+              if (currentSrc !== branding.logoUrl) { 
+                img.src = branding.logoUrl; 
+                img.alt = branding.appName || ''; 
+              }
             });
           }
           const heroUrl = branding.authHeroUrl || branding.auth_hero_url;
@@ -365,7 +376,7 @@
     
     .app-logo-img {
       filter: none !important;
-      transition: all 0.3s ease;
+      transition: opacity 0.2s ease;
     }
     html[data-theme="light"] .app-logo-img {
       filter: none !important;
@@ -380,7 +391,7 @@
       <!-- Glass Navbar -->
       <header class="glass-navbar">
         <div class="logo-area" style="display: flex; align-items: center; gap: 10px;">
-          <img src="logo_new.png" alt="Callio" class="app-logo-img brand-logo">
+          <img src="logo_new.png" alt="Callio" class="app-logo-img brand-logo" style="height: 36px; max-height: 36px; width: auto; object-fit: contain;">
         </div>
         
         <nav class="top-nav-links">
@@ -2914,7 +2925,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=20260801_v59"></script>
+  <script type="module" src="app.js?v=20260801_v60"></script>
   <!-- Today's Calls & Summaries Modal -->
   <div id="today-calls-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="width: 90%; max-width: 700px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 25px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh;">
