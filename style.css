@@ -388,7 +388,7 @@ html[data-theme="light"] .app-logo-img.brand-logo {
   max-width: calc(100vw - 320px);
   min-width: 0;
   flex-shrink: 1;
-  margin: 0 auto;
+  margin: 0 auto 0 2.5rem;
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
