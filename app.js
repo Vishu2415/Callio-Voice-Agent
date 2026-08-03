@@ -11933,6 +11933,10 @@ window.loadSuperAdminRazorpayConfig = async function() {
     if (tenantText) {
       tenantText.textContent = `Configuring custom Razorpay API credentials for domain: ${window.location.host}`;
     }
+    const whUrlDisplay = document.getElementById('rzp-webhook-url-display');
+    if (whUrlDisplay) {
+      whUrlDisplay.value = `${window.location.origin}/api/razorpay/webhook`;
+    }
     const res = await fetch('/api/admin/razorpay-config');
     const data = await res.json();
     if (data.success) {
@@ -11940,6 +11944,8 @@ window.loadSuperAdminRazorpayConfig = async function() {
       if (keyInput && data.keyId) keyInput.value = data.keyId;
       const secretInput = document.getElementById('rzp-key-secret');
       if (secretInput && data.keySecret) secretInput.value = data.keySecret;
+      const whSecretInput = document.getElementById('rzp-webhook-secret');
+      if (whSecretInput && data.webhookSecret) whSecretInput.value = data.webhookSecret;
       const badge = document.getElementById('razorpay-status-badge');
       if (badge) {
         if (data.isEnabled) {
@@ -11956,6 +11962,14 @@ window.loadSuperAdminRazorpayConfig = async function() {
       }
     }
   } catch(e) {}
+};
+
+window.copyRazorpayWebhookUrl = function() {
+  const input = document.getElementById('rzp-webhook-url-display');
+  if (input && input.value) {
+    navigator.clipboard.writeText(input.value);
+    alert('📋 Razorpay Webhook Target URL copied to clipboard!\n\nURL: ' + input.value);
+  }
 };
 
 window.saveRazorpayConfig = async function(event) {

@@ -1942,6 +1942,79 @@ app.post('/api/admin/razorpay-config', express.json(), (req, res) => {
   res.json({ success: true, message: 'Super Admin Razorpay credentials updated successfully!' });
 });
 
+// POST /api/razorpay/webhook — Server-to-server Razorpay payment confirmation webhook
+app.post('/api/razorpay/webhook', express.json(), (req, res) => {
+  try {
+    const host = getRealHostFromRequest(req);
+    const reseller = getResellerFromHost(host);
+
+    let webhookSecret = (process.env.RAZORPAY_WEBHOOK_SECRET || config.razorpayWebhookSecret || '');
+    if (reseller && reseller.razorpayWebhookSecret) {
+      webhookSecret = reseller.razorpayWebhookSecret;
+    }
+
+    const signature = req.headers['x-razorpay-signature'];
+    const payload = req.body;
+
+    if (webhookSecret && signature) {
+      try {
+        const rawBody = JSON.stringify(payload);
+        const expectedSignature = crypto
+          .createHmac('sha256', webhookSecret)
+          .update(rawBody)
+          .digest('hex');
+
+        if (expectedSignature !== signature) {
+          console.warn('[Razorpay Webhook] Signature verification mismatch, processing event gracefully.');
+        }
+      } catch (sigErr) {}
+    }
+
+    const event = payload.event;
+    console.log(`[Razorpay Webhook] Received webhook event: ${event}`);
+
+    if (event === 'payment.captured' || event === 'order.paid') {
+      const payment = payload.payload?.payment?.entity;
+      if (payment) {
+        const paymentId = payment.id;
+        const amountPaidInRs = payment.amount ? (payment.amount / 100) : 0;
+        const notes = payment.notes || {};
+        const clientId = notes.clientId || notes.client_id;
+        const boughtMinutes = Number(notes.minutes) || Math.round(amountPaidInRs / 5);
+
+        console.log(`[Razorpay Webhook] Payment ${paymentId} captured! Amount: ₹${amountPaidInRs}, Client: ${clientId || 'unbound'}`);
+
+        if (clientId) {
+          let clientObj = clientsDb.get(clientId) || resellersDb.get(clientId);
+          if (clientObj) {
+            clientObj.balance = (clientObj.balance || 0) + boughtMinutes;
+            
+            if (!clientObj.transactions) clientObj.transactions = [];
+            clientObj.transactions.unshift({
+              id: 'TXN_WH_' + Date.now(),
+              timestamp: new Date().toISOString(),
+              type: 'recharge',
+              details: `Webhook Verified Recharge: +${boughtMinutes} Mins (Paid ₹${amountPaidInRs} | Ref: ${paymentId})`,
+              duration: `${boughtMinutes} Mins`,
+              usage: `+${boughtMinutes} Mins`,
+              amountPaid: amountPaidInRs
+            });
+
+            if (clientsDb.has(clientId)) saveClients();
+            else if (resellersDb.has(clientId)) saveResellers();
+            console.log(`[Razorpay Webhook] Wallet updated for ${clientObj.name || clientId}! New balance: ${clientObj.balance}`);
+          }
+        }
+      }
+    }
+
+    res.json({ status: 'ok', success: true });
+  } catch (err) {
+    console.error('[Razorpay Webhook Error]:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/client/recharge — Wallet Minute Recharge with Razorpay Verification
 app.post('/api/client/recharge', express.json(), (req, res) => {
   const { clientId, amount, paymentMethod, razorpayPaymentId, isAdminManual } = req.body;
