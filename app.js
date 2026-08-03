@@ -11047,6 +11047,116 @@ window.openTodayCallsModal = function(e) {
   }
 };
 
+window.initiateUserRecharge = async function() {
+  const amountInput = document.getElementById('user-recharge-amount');
+  const methodSelect = document.getElementById('user-payment-method');
+  if (!amountInput) return;
+
+  const amount = Number(amountInput.value);
+  if (isNaN(amount) || amount <= 0) {
+    alert("Please enter valid recharge minutes (e.g. 500).");
+    return;
+  }
+
+  const adminSelect = document.getElementById('admin-billing-client-select');
+  const isAdmin = (window.loggedInUser && window.loggedInUser.role === 'admin');
+  const targetClientId = (isAdmin && adminSelect && adminSelect.value) 
+    ? adminSelect.value 
+    : (window.loggedInUser ? window.loggedInUser.id : '');
+
+  // Calculate total price based on plan rate
+  const plan = window.loggedInUser ? (window.loggedInUser.plan || 'basic') : 'basic';
+  const planInfo = (window.activePlans || []).find(p => p.id.toLowerCase() === plan.toLowerCase());
+  const rate = planInfo ? planInfo.rate_per_minute : (plan.toLowerCase() === 'pro' ? 4.24 : (plan.toLowerCase() === 'custom' ? 2.00 : 5.00));
+  const totalRupees = Math.round(amount * rate);
+  const method = methodSelect ? methodSelect.value : 'UPI';
+
+  // Check if Razorpay Gateway is enabled
+  try {
+    const rRes = await fetch('/api/admin/razorpay-config');
+    const rData = await rRes.json();
+
+    if (rData.success && rData.isEnabled && window.Razorpay && rData.keyId) {
+      // Trigger Razorpay payment modal
+      const options = {
+        key: rData.keyId,
+        amount: totalRupees * 100, // amount in paisa
+        currency: 'INR',
+        name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
+        description: `Wallet Recharge: ${amount} Minutes (@ ₹${rate.toFixed(2)}/min)`,
+        image: window.BrandingContext?.logoUrl || '/logo_new.png',
+        handler: async function (response) {
+          try {
+            const rechargeRes = await fetch('/api/client/recharge', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clientId: targetClientId,
+                amount: amount,
+                paymentMethod: method,
+                razorpayPaymentId: response.razorpay_payment_id
+              })
+            });
+            const rechargeData = await rechargeRes.json();
+            if (rechargeData.success) {
+              alert(`✅ Payment & Recharge Successful!\nPayment ID: ${response.razorpay_payment_id}\nAdded ${amount} Minutes to your wallet balance.\nNew Balance: ${rechargeData.balance.toFixed(1)} Mins.`);
+              amountInput.value = '';
+              if (window.loggedInUser && (window.loggedInUser.role !== 'admin' || targetClientId === window.loggedInUser.id)) {
+                window.loggedInUser.balance = rechargeData.balance;
+                localStorage.setItem('user_session', JSON.stringify(window.loggedInUser));
+              }
+              if (typeof fetchBillingData === 'function') fetchBillingData();
+              if (typeof window.fetchClientDashboardData === 'function') window.fetchClientDashboardData();
+            } else {
+              alert(`Recharge verification failed: ${rechargeData.error}`);
+            }
+          } catch(err) {
+            alert(`Communication error verifying payment: ${err.message}`);
+          }
+        },
+        prefill: {
+          name: window.loggedInUser?.name || '',
+          email: window.loggedInUser?.email || ''
+        },
+        theme: {
+          color: window.BrandingContext?.primaryColor || '#ea580c'
+        }
+      };
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      return;
+    } else if (isAdmin) {
+      // Allow Super Admin manual top-up with explicit confirmation
+      if (confirm(`[ADMIN MANUAL TOP-UP]\nDo you want to manually add ${amount} minutes (Value ₹${totalRupees}) to client wallet without Razorpay payment?`)) {
+        const rechargeRes = await fetch('/api/client/recharge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: targetClientId,
+            amount: amount,
+            paymentMethod: 'Admin Manual',
+            isAdminManual: true
+          })
+        });
+        const rechargeData = await rechargeRes.json();
+        if (rechargeData.success) {
+          alert(`✅ Admin Manual Top-up Successful!\nAdded ${amount} Mins to account. New Balance: ${rechargeData.balance.toFixed(1)} Mins.`);
+          amountInput.value = '';
+          if (typeof fetchBillingData === 'function') fetchBillingData();
+        } else {
+          alert(`Admin Top-up failed: ${rechargeData.error}`);
+        }
+      }
+      return;
+    }
+  } catch(e) {
+    console.error('Razorpay check error:', e);
+  }
+
+  // Blocking notice for regular users if Razorpay is not configured
+  alert(`🔒 Online Payment Gateway Setup Required!\nRazorpay is not yet configured for this platform. Please set up Razorpay in Admin Panel > Razorpay Gateway or contact support.`);
+};
+
 window.closeTodayCallsModal = function() {
   const modal = document.getElementById('today-calls-modal');
   if (modal) modal.style.display = 'none';
@@ -11069,98 +11179,6 @@ window.selectRechargePkg = function(amount) {
   if (input) {
     input.value = amount;
   }
-};
-
-window.initiateUserRecharge = function() {
-  const amountInput = document.getElementById('user-recharge-amount');
-  const methodSelect = document.getElementById('user-payment-method');
-  if (!amountInput || !methodSelect) return;
-
-  const amount = Number(amountInput.value);
-  if (isNaN(amount) || amount <= 0) {
-    alert("Please enter a valid recharge amount.");
-    return;
-  }
-
-  const method = methodSelect.value;
-  const adminSelect = document.getElementById('admin-billing-client-select');
-  const targetClientId = (loggedInUser && loggedInUser.role === 'admin' && adminSelect && adminSelect.value) 
-    ? adminSelect.value 
-    : (loggedInUser ? loggedInUser.id : '');
-
-  // Show simulated checkout modal if elements exist
-  const modal = document.getElementById('payment-simulation-modal');
-  const loadingState = document.getElementById('payment-loading-state');
-  const successState = document.getElementById('payment-success-state');
-  const successMsg = document.getElementById('payment-success-msg');
-  const summaryEl = document.getElementById('payment-order-summary');
-
-  if (summaryEl) {
-    const plan = loggedInUser ? (loggedInUser.plan || 'basic') : 'basic';
-    const planInfo = (window.activePlans || []).find(p => p.id.toLowerCase() === plan.toLowerCase());
-    const rate = planInfo ? planInfo.rate_per_minute : (plan.toLowerCase() === 'pro' ? 4.24 : 5.00);
-    const cost = amount * rate;
-    summaryEl.innerHTML = `
-      <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;"><span>Plan:</span><strong style="text-transform: capitalize; color: var(--text-main);">${plan}</strong></div>
-      <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;"><span>Minutes to Buy:</span><strong style="color: var(--text-main);">${amount} Mins</strong></div>
-      <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;"><span>Rate/Min:</span><strong style="color: var(--text-main);">₹${rate.toFixed(2)}/min</strong></div>
-      <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--border-color); padding-top:6px; margin-top:6px; font-weight:bold; color:var(--color-cyan); font-size:0.9rem;"><span>Total Amount:</span><strong>₹${cost.toFixed(2)}</strong></div>
-    `;
-  }
-
-  if (modal && loadingState && successState) {
-    loadingState.style.display = 'flex';
-    successState.style.display = 'none';
-    modal.style.display = 'flex';
-  }
-
-  setTimeout(async () => {
-    try {
-      const res = await fetch('/api/client/recharge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: targetClientId,
-          amount: amount,
-          paymentMethod: method
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (loggedInUser && (loggedInUser.role !== 'admin' || targetClientId === loggedInUser.id)) {
-          loggedInUser.balance = data.balance;
-          localStorage.setItem('user_session', JSON.stringify(loggedInUser));
-        }
-
-        const balanceEl = document.getElementById('billing-wallet-balance');
-        const headerWalletBalance = document.getElementById('header-wallet-balance');
-        const remMins = data.balance !== undefined ? (data.balance >= 99999 ? '∞' : Math.max(0, data.balance).toFixed(1)) : '0.0';
-        if (balanceEl) balanceEl.textContent = `${remMins} Mins`;
-        if (loggedInUser && loggedInUser.role === 'admin' && window.onAdminBillingClientChange) {
-          window.onAdminBillingClientChange();
-        } else {
-          fetchBillingData();
-        }
-
-        if (modal && loadingState && successState) {
-          loadingState.style.display = 'none';
-          successState.style.display = 'flex';
-          if (successMsg) successMsg.innerHTML = `Successfully added <strong>${amount} Mins</strong> to your wallet balance using ${method}.`;
-        } else {
-          alert(`Successfully added ${amount} Mins! New Balance: ${data.balance} Mins`);
-        }
-        
-        amountInput.value = '';
-      } else {
-        if (modal) modal.style.display = 'none';
-        alert(`Recharge failed: ${data.error}`);
-      }
-    } catch (err) {
-      console.error(err);
-      if (modal) modal.style.display = 'none';
-      alert("Payment simulation failed.");
-    }
-  }, 1000);
 };
 
 window.closePaymentModal = function() {

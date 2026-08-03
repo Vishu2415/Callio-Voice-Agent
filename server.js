@@ -1942,6 +1942,77 @@ app.post('/api/admin/razorpay-config', express.json(), (req, res) => {
   res.json({ success: true, message: 'Super Admin Razorpay credentials updated successfully!' });
 });
 
+// POST /api/client/recharge — Wallet Minute Recharge with Razorpay Verification
+app.post('/api/client/recharge', express.json(), (req, res) => {
+  const { clientId, amount, paymentMethod, razorpayPaymentId, isAdminManual } = req.body;
+  const numAmount = Number(amount);
+
+  if (isNaN(numAmount) || numAmount <= 0) {
+    return res.status(400).json({ success: false, error: 'Invalid recharge minute amount.' });
+  }
+
+  const host = req.headers.host || '';
+  const reseller = getResellerFromHost(host);
+
+  // Identify target client/reseller
+  let targetId = clientId;
+  let clientObj = null;
+
+  if (targetId && clientsDb.has(targetId)) {
+    clientObj = clientsDb.get(targetId);
+  } else if (targetId && resellersDb.has(targetId)) {
+    clientObj = resellersDb.get(targetId);
+  } else if (reseller) {
+    clientObj = reseller;
+  } else {
+    // Default fallback client if none specified
+    const firstClient = Array.from(clientsDb.values())[0];
+    if (firstClient) {
+      clientObj = firstClient;
+      targetId = firstClient.id;
+    }
+  }
+
+  if (!clientObj) {
+    return res.status(404).json({ success: false, error: 'Target user account not found.' });
+  }
+
+  // Security Check: Require Razorpay payment ID for non-admin users
+  if (!isAdminManual && !razorpayPaymentId) {
+    return res.status(400).json({ success: false, error: 'Payment verification failed. No Razorpay payment ID provided.' });
+  }
+
+  // Credit balance
+  clientObj.balance = (clientObj.balance || 0) + numAmount;
+
+  // Add ledger transaction entry
+  if (!clientObj.transactions) clientObj.transactions = [];
+  const txnId = 'TXN_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4).toUpperCase();
+  const rate = clientObj.plan === 'pro' ? 4.24 : (clientObj.plan === 'custom' ? 2.00 : 5.00);
+  const paidCost = (numAmount * rate).toFixed(2);
+  
+  clientObj.transactions.unshift({
+    id: txnId,
+    timestamp: new Date().toISOString(),
+    type: 'recharge',
+    details: `Wallet Recharge of ${numAmount} Minutes via ${paymentMethod || 'Razorpay'}${razorpayPaymentId ? ` (Paid ₹${paidCost} | Ref: ${razorpayPaymentId})` : ' (Admin Manual Top-Up)'}`,
+    duration: `${numAmount} Mins`,
+    usage: `+${numAmount} Mins`,
+    amountPaid: Number(paidCost)
+  });
+
+  if (clientsDb.has(targetId)) {
+    clientsDb.set(targetId, clientObj);
+    saveClients();
+  } else if (resellersDb.has(targetId)) {
+    resellersDb.set(targetId, clientObj);
+    saveResellers();
+  }
+
+  console.log(`[Wallet Recharge] Successfully credited ${numAmount} Mins to ${clientObj.name || targetId}. New Balance: ${clientObj.balance}`);
+  res.json({ success: true, balance: clientObj.balance, transactionId: txnId });
+});
+
 // ─── Enterprise Inquiry Endpoints ─────────────────────────────────────────────
 
 // POST /api/public/enterprise-inquiry — public form submission
