@@ -5116,28 +5116,40 @@ app.post('/api/auth/verify-session', (req, res) => {
 
 // 2A. Update Profile Endpoint (for user/admin profile settings)
 app.post('/api/auth/update-profile', (req, res) => {
-  const { id, name, email, password } = req.body;
+  const { id, name, email, password, gstin } = req.body;
   if (!id || !name || !email) {
     return res.status(400).json({ success: false, error: 'ID, name, and email are required.' });
   }
 
-  if (id === 'admin') {
+  const cleanGstin = gstin !== undefined ? String(gstin).trim().toUpperCase() : '';
+  const host = getRealHostFromRequest(req);
+  const reseller = getResellerFromHost(host);
+
+  if (id === 'admin' || (reseller && id === reseller.id)) {
     try {
-      defaultCallConfig.adminName = name;
-      defaultCallConfig.adminEmail = email;
-      if (password) {
-        defaultCallConfig.adminPassword = password;
+      if (id === 'admin') {
+        config.adminName = name;
+        config.adminEmail = email;
+        if (password) config.adminPassword = password;
+        if (cleanGstin) config.gstin = cleanGstin;
+        saveConfig();
+        console.log(`[Config Sync] Admin profile updated in config.json`);
+      } else if (reseller) {
+        reseller.name = name;
+        reseller.email = email;
+        if (cleanGstin) reseller.gstin = cleanGstin;
+        resellersDb.set(reseller.id, reseller);
+        saveResellers();
       }
-      fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultCallConfig, null, 2), 'utf-8');
-      console.log(`[Config Sync] Admin profile updated in config.json`);
 
       return res.json({
         success: true,
         user: {
-          id: 'admin',
+          id: id,
           name: name,
           email: email,
-          role: 'admin'
+          role: 'admin',
+          gstin: cleanGstin || (reseller ? reseller.gstin : config.gstin) || ''
         }
       });
     } catch (err) {
@@ -5146,7 +5158,7 @@ app.post('/api/auth/update-profile', (req, res) => {
     }
   }
 
-  const client = clientsDb.get(id);
+  let client = clientsDb.get(id) || resellersDb.get(id);
   if (!client) {
     return res.status(404).json({ success: false, error: 'Client account not found.' });
   }
@@ -5160,12 +5172,20 @@ app.post('/api/auth/update-profile', (req, res) => {
 
   client.name = name;
   client.email = email;
+  if (cleanGstin !== undefined) {
+    client.gstin = cleanGstin;
+  }
   if (password) {
     client.password = hashPassword(password);
   }
 
-  clientsDb.set(id, client);
-  saveClients();
+  if (clientsDb.has(id)) {
+    clientsDb.set(id, client);
+    saveClients();
+  } else if (resellersDb.has(id)) {
+    resellersDb.set(id, client);
+    saveResellers();
+  }
 
   res.json({
     success: true,
@@ -5173,7 +5193,8 @@ app.post('/api/auth/update-profile', (req, res) => {
       id: client.id,
       name: client.name,
       email: client.email,
-      role: 'client',
+      gstin: client.gstin || '',
+      role: client.role || 'client',
       status: client.status,
       phone_number: client.phone_number,
       agent_config: client.agent_config,

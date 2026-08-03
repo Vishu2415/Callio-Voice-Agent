@@ -2371,10 +2371,12 @@ window.addEventListener('DOMContentLoaded', () => {
     const nameInput = document.getElementById('profile-name');
     const emailInput = document.getElementById('profile-email');
     const passInput = document.getElementById('profile-password');
+    const gstinInput = document.getElementById('profile-gstin');
     
     const name = nameInput ? nameInput.value.trim() : '';
     const email = emailInput ? emailInput.value.trim() : '';
     const password = passInput ? passInput.value.trim() : '';
+    const gstin = gstinInput ? gstinInput.value.trim().toUpperCase() : '';
 
     if (!name || !email) {
       alert('Name and Email are required.');
@@ -2390,13 +2392,23 @@ window.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/api/auth/update-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: loggedInUser.id, name, email, password })
+        body: JSON.stringify({ id: loggedInUser.id, name, email, password, gstin })
       });
       const data = res.ok ? await res.json() : null;
       if (data && data.success) {
         loggedInUser = { ...loggedInUser, ...data.user };
         localStorage.setItem('user_session', JSON.stringify(loggedInUser));
-        alert('Profile details updated successfully!');
+        
+        // Sync with Admin Invoices GSTIN and Quick Recharge GSTIN
+        if (loggedInUser.role === 'admin' || loggedInUser.role === 'reseller') {
+          window._domainGstin = gstin;
+          const adminGstinInput = document.getElementById('admin-gstin-input');
+          if (adminGstinInput) adminGstinInput.value = gstin;
+        }
+        const rechargeGstinInput = document.getElementById('user-gstin-input');
+        if (rechargeGstinInput) rechargeGstinInput.value = gstin;
+
+        alert('✅ Profile details & GSTIN updated successfully!');
         if (passInput) passInput.value = '';
         
         // Populate inputs again with updated session values
@@ -6221,9 +6233,16 @@ function populateProfileSettings(user) {
   const nameInput = document.getElementById('profile-name');
   const emailInput = document.getElementById('profile-email');
   const passInput = document.getElementById('profile-password');
+  const gstinInput = document.getElementById('profile-gstin');
+  const rechargeGstinInput = document.getElementById('user-gstin-input');
+
   if (nameInput) nameInput.value = user.name || '';
   if (emailInput) emailInput.value = user.email || '';
   if (passInput) passInput.value = '';
+
+  const resolvedGstin = user.gstin || (user.role === 'admin' || user.role === 'reseller' ? window._domainGstin : '') || '';
+  if (gstinInput) gstinInput.value = resolvedGstin;
+  if (rechargeGstinInput && !rechargeGstinInput.value) rechargeGstinInput.value = resolvedGstin;
 }
 
 function applyUserRole(user) {
