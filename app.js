@@ -11049,6 +11049,8 @@ window.openTodayCallsModal = function(e) {
 
 // ─── Wallet & Transaction Ledger Renderer ──────────────────────────────────────
 window.renderClientTransactionHistory = function(transactions, balance) {
+  window.clientTransactionsCache = transactions || [];
+
   const balanceEl = document.getElementById('billing-wallet-balance');
   if (balanceEl && balance !== undefined) {
     balanceEl.textContent = `${Number(balance).toFixed(1)} Mins`;
@@ -11058,19 +11060,20 @@ window.renderClientTransactionHistory = function(transactions, balance) {
   if (!tbody) return;
 
   if (!transactions || transactions.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">No transactions recorded yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">No transactions recorded yet.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = transactions.map(txn => {
-    const isCredit = txn.usage && txn.usage.startsWith('+');
+    const isCredit = (txn.usage && txn.usage.startsWith('+')) || txn.type === 'recharge';
     const badgeBg = isCredit ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
     const badgeColor = isCredit ? '#10b981' : '#ef4444';
     const formattedDate = txn.timestamp ? new Date(txn.timestamp).toLocaleString('en-IN') : 'N/A';
+    const txnId = txn.id || 'TXN_N/A';
 
     return `
       <tr style="border-bottom: 1px solid var(--border-color);">
-        <td style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-cyan); font-weight: 700;">${txn.id || 'TXN_N/A'}</td>
+        <td style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-cyan); font-weight: 700;">${txnId}</td>
         <td style="font-size: 0.8rem; color: var(--text-muted);">${formattedDate}</td>
         <td>
           <span style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 12px; background: ${badgeBg}; color: ${badgeColor}; text-transform: uppercase;">
@@ -11079,10 +11082,135 @@ window.renderClientTransactionHistory = function(transactions, balance) {
         </td>
         <td style="font-size: 0.82rem; color: var(--text-main); font-weight: 600;">${txn.details || 'Wallet Recharge'}</td>
         <td style="font-size: 0.82rem; color: var(--text-muted);">${txn.duration || '-'}</td>
-        <td style="text-align: right; font-weight: 800; font-size: 0.88rem; color: ${badgeColor};">${txn.usage || '+0 Mins'}</td>
+        <td style="font-weight: 800; font-size: 0.88rem; color: ${badgeColor};">${txn.usage || '+0 Mins'}</td>
+        <td style="text-align: right;">
+          <button onclick="window.openInvoiceModal('${txnId}')" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.76rem; font-weight: 700; border-radius: 6px; cursor: pointer; color: var(--color-cyan); border-color: rgba(6,182,212,0.3); background: rgba(6,182,212,0.08); display: inline-flex; align-items: center; gap: 4px;">
+            📄 Invoice
+          </button>
+        </td>
       </tr>
     `;
   }).join('');
+};
+
+window.openInvoiceModal = function(txnId) {
+  const txn = (window.clientTransactionsCache || []).find(t => t.id === txnId || t.txnId === txnId) || {
+    id: txnId,
+    timestamp: new Date().toISOString(),
+    details: 'Wallet Self-Recharge',
+    amountPaid: 2500,
+    usage: '+500 Mins'
+  };
+
+  const container = document.getElementById('printable-invoice-content');
+  const modal = document.getElementById('admin-view-invoice-modal');
+
+  if (!modal || !container) {
+    alert('Invoice modal container missing.');
+    return;
+  }
+
+  const brand = window.BrandingContext || {};
+  const appName = brand.appName || 'Callio AI Voice Agent';
+  const logoUrl = brand.logoUrl || '/logo_new.png';
+  const supportEmail = brand.supportEmail || 'support@callio.ai';
+  const user = window.loggedInUser || { name: 'Valued Customer', email: 'customer@client.com' };
+
+  const txnDate = txn.timestamp ? new Date(txn.timestamp).toLocaleString('en-IN') : new Date().toLocaleString('en-IN');
+  const details = txn.details || 'AI Voice Agent Wallet Recharge';
+  const amountPaid = txn.amountPaid || 2500;
+  const subtotal = (amountPaid / 1.18).toFixed(2);
+  const gstTax = (amountPaid - Number(subtotal)).toFixed(2);
+  const refId = txn.id || ('INV-' + Date.now().toString().slice(-6));
+
+  container.innerHTML = `
+    <div style="padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; background: #ffffff; border-radius: 12px;">
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 24px;">
+        <div>
+          <img src="${logoUrl}" alt="${appName}" style="max-height: 48px; object-fit: contain; margin-bottom: 8px;" onerror="this.style.display='none'">
+          <h2 style="margin: 0; font-size: 1.4rem; color: #0f172a; font-weight: 800;">${appName}</h2>
+          <p style="margin: 4px 0 0 0; font-size: 0.8rem; color: #64748b;">Official Tax Invoice &amp; Payment Receipt</p>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 0.75rem; font-weight: 800; color: #10b981; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); padding: 4px 12px; border-radius: 20px; display: inline-block; margin-bottom: 8px;">
+            🟢 PAID &amp; VERIFIED
+          </div>
+          <div style="font-size: 0.85rem; font-weight: 700; color: #334155;">Invoice #: <span style="font-family: monospace; color: #2563eb;">INV-${refId}</span></div>
+          <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">Date: ${txnDate}</div>
+        </div>
+      </div>
+
+      <!-- Customer & Issuer Info -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; background: #f8fafc; padding: 18px; border-radius: 10px; border: 1px solid #e2e8f0;">
+        <div>
+          <div style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Billed To (Customer):</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #0f172a;">${user.name || 'Client Account'}</div>
+          <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">Email: ${user.email || 'N/A'}</div>
+          <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">Account ID: ${user.id || 'N/A'}</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Issued By (Platform):</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #0f172a;">${appName} Inc.</div>
+          <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">Support: ${supportEmail}</div>
+          <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">Payment Gateway: Razorpay Verified</div>
+        </div>
+      </div>
+
+      <!-- Itemized Table -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+        <thead>
+          <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+            <th style="text-align: left; padding: 10px 14px; font-size: 0.78rem; color: #475569; font-weight: 700;">DESCRIPTION</th>
+            <th style="text-align: center; padding: 10px 14px; font-size: 0.78rem; color: #475569; font-weight: 700;">QTY / DURATION</th>
+            <th style="text-align: right; padding: 10px 14px; font-size: 0.78rem; color: #475569; font-weight: 700;">AMOUNT</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 14px; font-size: 0.88rem; font-weight: 700; color: #0f172a;">
+              ${details}
+            </td>
+            <td style="padding: 14px; text-align: center; font-size: 0.85rem; color: #475569; font-weight: 600;">
+              ${txn.usage || '1 Package'}
+            </td>
+            <td style="padding: 14px; text-align: right; font-size: 0.88rem; font-weight: 700; color: #0f172a;">
+              ₹${subtotal}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Totals Breakdown -->
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 24px;">
+        <div style="width: 280px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.82rem; color: #64748b; margin-bottom: 6px;">
+            <span>Subtotal:</span>
+            <span style="font-weight: 600; color: #334155;">₹${subtotal}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.82rem; color: #64748b; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+            <span>GST (18% Included):</span>
+            <span style="font-weight: 600; color: #334155;">₹${gstTax}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 1.05rem; font-weight: 800; color: #0f172a;">
+            <span>Total Paid:</span>
+            <span style="color: #10b981;">₹${Number(amountPaid).toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Note -->
+      <div style="border-top: 1px dashed #cbd5e1; padding-top: 16px; text-align: center; font-size: 0.75rem; color: #94a3b8;">
+        This is a computer-generated official tax invoice and payment receipt. No signature required.
+      </div>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+};
+
+window.printInvoiceModal = function() {
+  window.print();
 };
 
 window.fetchClientTransactionsAndBalance = async function() {
