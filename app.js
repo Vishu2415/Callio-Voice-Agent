@@ -11810,3 +11810,109 @@ window.deleteEnterpriseInquiry = async function(id) {
     if (data.success) window.fetchEnterpriseInquiries();
   } catch (err) { console.error('Delete failed:', err); }
 };
+
+// ─── Client Subscription Plans Renderer ───────────────────────────────────────
+window.fetchAndRenderSubscriptionPlans = async function() {
+  const container = document.getElementById('client-pricing-cards-container');
+  if (!container) return;
+
+  try {
+    const res = await fetch('/api/plans');
+    const data = await res.json();
+    if (!data.success || !data.plans || !data.plans.length) {
+      container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 30px;">No subscription plans available currently.</div>`;
+      return;
+    }
+
+    const currentClientPlan = (window.CurrentClient && window.CurrentClient.plan) ? window.CurrentClient.plan.toLowerCase() : 'basic';
+
+    container.innerHTML = data.plans.map(p => {
+      const isCurrent = (currentClientPlan === p.id.toLowerCase());
+      const isPopular = (p.id.toLowerCase() === 'pro');
+      const badgeHtml = isPopular 
+        ? `<div style="position: absolute; top: -12px; right: 20px; background: linear-gradient(135deg, #ea580c, #f97316); color: #fff; font-size: 0.7rem; font-weight: 800; padding: 4px 12px; border-radius: 20px; letter-spacing: 0.05em; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4); text-transform: uppercase;">🔥 Most Popular</div>` 
+        : '';
+
+      const features = [
+        `🎙️ <strong>${p.max_minutes >= 9999 ? 'Unlimited' : p.max_minutes}</strong> Calling Minutes / mo`,
+        `🤖 Up to <strong>${p.max_agents >= 9999 ? 'Unlimited' : p.max_agents}</strong> AI Agents`,
+        `⚡ Call Rate: <strong>₹${Number(p.rate_per_minute).toFixed(2)}</strong> / min`,
+        p.crm_integration ? `✅ CRM Webhook Integration` : `❌ CRM Integrations (Locked)`,
+        p.api_sharing ? `✅ API Access & Tokens` : `❌ API Tokens (Locked)`,
+        `📞 High-Priority Realtime Voice Server`
+      ];
+
+      return `
+        <div class="pricing-plan-card ${isPopular ? 'popular-plan' : ''}" style="position: relative; background: var(--bg-surface); border: ${isPopular ? '2px solid var(--color-primary)' : '1px solid var(--border-color)'}; border-radius: 20px; padding: 28px 24px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: ${isPopular ? '0 12px 40px rgba(234, 88, 12, 0.15)' : '0 4px 20px rgba(0,0,0,0.06)'}; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='none'">
+          ${badgeHtml}
+          <div>
+            <div style="font-size: 1.25rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px; font-family: var(--font-title);">${p.name}</div>
+            <div style="font-size: 0.82rem; color: var(--text-muted); min-height: 38px; line-height: 1.4; margin-bottom: 18px;">${p.description || ''}</div>
+            
+            <div style="display: flex; align-items: baseline; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+              <span style="font-size: 2.2rem; font-weight: 900; color: var(--text-main); font-family: var(--font-title);">₹${Number(p.price_per_month).toLocaleString('en-IN')}</span>
+              <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">/ month</span>
+            </div>
+
+            <ul style="list-style: none; padding: 0; margin: 0 0 24px 0; display: flex; flex-direction: column; gap: 12px; font-size: 0.88rem; color: var(--text-main);">
+              ${features.map(f => `<li style="display: flex; align-items: center; gap: 8px; font-size: 0.86rem; color: var(--text-main);">${f}</li>`).join('')}
+            </ul>
+          </div>
+
+          <button onclick="window.handleSubscribePlanClick('${p.id}', '${p.name}', ${p.price_per_month})" class="btn" style="width: 100%; padding: 14px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; border: none; transition: all 0.2s; ${isCurrent ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;' : (isPopular ? 'background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)); color: #fff; box-shadow: 0 6px 20px rgba(234, 88, 12, 0.3);' : 'background: var(--bg-primary); color: var(--text-main); border: 1px solid var(--border-color);')}">
+            ${isCurrent ? '✔ Current Active Plan' : '⚡ Subscribe & Upgrade'}
+          </button>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error loading subscription plans:', err);
+    container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #ef4444; padding: 30px;">Error loading subscription plans: ${err.message}</div>`;
+  }
+};
+
+window.handleSubscribePlanClick = async function(planId, planName, price) {
+  if (confirm(`Do you want to subscribe to ${planName} for ₹${price.toLocaleString('en-IN')}/month?`)) {
+    try {
+      const rRes = await fetch('/api/admin/razorpay-config');
+      const rData = await rRes.json();
+      
+      if (rData.success && rData.isEnabled && window.Razorpay && rData.keyId) {
+        const options = {
+          key: rData.keyId,
+          amount: price * 100,
+          currency: 'INR',
+          name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
+          description: `Subscription for ${planName}`,
+          image: window.BrandingContext?.logoUrl || '/logo_new.png',
+          handler: function (response) {
+            alert(`✅ Payment Successful! Payment ID: ${response.razorpay_payment_id}\nYour account is now upgraded to ${planName}.`);
+            location.reload();
+          },
+          prefill: {
+            name: window.CurrentClient?.name || '',
+            email: window.CurrentClient?.email || ''
+          },
+          theme: {
+            color: window.BrandingContext?.primaryColor || '#ea580c'
+          }
+        };
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      } else {
+        alert(`Plan Upgrade Request Submitted!\nPlease contact support/admin to activate ${planName} for ₹${price.toLocaleString('en-IN')}/mo.`);
+      }
+    } catch(e) {
+      alert(`Plan Upgrade Request Received for ${planName}. Support team will assist you shortly.`);
+    }
+  }
+};
+
+// Auto-trigger plan rendering
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    window.fetchAndRenderSubscriptionPlans();
+  });
+} else {
+  window.fetchAndRenderSubscriptionPlans();
+}

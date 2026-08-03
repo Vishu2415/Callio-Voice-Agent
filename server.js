@@ -1850,7 +1850,97 @@ app.post('/api/admin/branding', (req, res) => {
   res.json({ success: true, branding: brandingData });
 });
 
+// ─── Subscription Plans API & Razorpay Endpoints ──────────────────────────────
+const plansDbPath = path.join(__dirname, 'plans_db.json');
 
+function loadSubscriptionPlans() {
+  if (fs.existsSync(plansDbPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(plansDbPath, 'utf8'));
+      if (typeof data === 'object' && data !== null) {
+        plansDb.clear();
+        for (const [k, v] of Object.entries(data)) {
+          plansDb.set(k, v);
+        }
+      }
+    } catch (e) {
+      console.error('Error reading plans_db.json:', e);
+    }
+  }
+}
+loadSubscriptionPlans();
+
+function saveSubscriptionPlans() {
+  try {
+    const obj = Object.fromEntries(plansDb);
+    fs.writeFileSync(plansDbPath, JSON.stringify(obj, null, 2));
+  } catch (e) {
+    console.error('Error saving plans_db.json:', e);
+  }
+}
+
+// GET /api/plans - Public endpoint to retrieve active subscription plans
+app.get('/api/plans', (req, res) => {
+  const host = req.headers.host || req.headers.origin || '';
+  const reseller = getResellerFromHost(host);
+  const plansArray = Array.from(plansDb.values());
+  res.json({
+    success: true,
+    plans: plansArray,
+    isWhitelabel: !!reseller,
+    resellerName: reseller ? (reseller.companyName || reseller.name) : null,
+    currency: 'INR',
+    symbol: '₹'
+  });
+});
+
+// GET /api/admin/razorpay-config
+app.get('/api/admin/razorpay-config', (req, res) => {
+  const host = req.headers.host || '';
+  const currentReseller = getResellerFromHost(host);
+  if (currentReseller) {
+    return res.json({
+      success: true,
+      keyId: currentReseller.razorpayKeyId || '',
+      keySecret: currentReseller.razorpayKeySecret ? '••••••••' : '',
+      webhookSecret: currentReseller.razorpayWebhookSecret ? '••••••••' : '',
+      isEnabled: !!currentReseller.razorpayKeyId
+    });
+  }
+  // Super Admin Default Config
+  res.json({
+    success: true,
+    keyId: process.env.RAZORPAY_KEY_ID || config.razorpayKeyId || '',
+    keySecret: (process.env.RAZORPAY_KEY_SECRET || config.razorpayKeySecret) ? '••••••••' : '',
+    webhookSecret: (process.env.RAZORPAY_WEBHOOK_SECRET || config.razorpayWebhookSecret) ? '••••••••' : '',
+    isEnabled: !!(process.env.RAZORPAY_KEY_ID || config.razorpayKeyId)
+  });
+});
+
+// POST /api/admin/razorpay-config
+app.post('/api/admin/razorpay-config', express.json(), (req, res) => {
+  const { keyId, keySecret, webhookSecret } = req.body;
+  const host = req.headers.host || '';
+  const currentReseller = getResellerFromHost(host);
+
+  if (currentReseller) {
+    if (keyId !== undefined) currentReseller.razorpayKeyId = keyId.trim();
+    if (keySecret && keySecret !== '••••••••') currentReseller.razorpayKeySecret = keySecret.trim();
+    if (webhookSecret && webhookSecret !== '••••••••') currentReseller.razorpayWebhookSecret = webhookSecret.trim();
+    resellersDb.set(currentReseller.id, currentReseller);
+    saveResellers();
+    return res.json({ success: true, message: 'Reseller Razorpay credentials updated successfully!' });
+  }
+
+  // Super Admin Config
+  if (keyId !== undefined) config.razorpayKeyId = keyId.trim();
+  if (keySecret && keySecret !== '••••••••') config.razorpayKeySecret = keySecret.trim();
+  if (webhookSecret && webhookSecret !== '••••••••') config.razorpayWebhookSecret = webhookSecret.trim();
+  try {
+    fs.writeFileSync(path.join(__dirname, 'config.json'), JSON.stringify(config, null, 2));
+  } catch(e){}
+  res.json({ success: true, message: 'Super Admin Razorpay credentials updated successfully!' });
+});
 
 // ─── Enterprise Inquiry Endpoints ─────────────────────────────────────────────
 
