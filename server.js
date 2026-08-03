@@ -1961,6 +1961,39 @@ app.post('/api/admin/razorpay-config', express.json(), (req, res) => {
   res.json({ success: true, message: 'Super Admin Razorpay credentials updated successfully!' });
 });
 
+// GET /api/user/me — Returns current authenticated user/admin profile
+app.get('/api/user/me', (req, res) => {
+  const host = getRealHostFromRequest(req);
+  const reseller = getResellerFromHost(host);
+
+  if (reseller) {
+    return res.json({
+      success: true,
+      user: {
+        id: reseller.id,
+        name: reseller.companyName || reseller.name || 'Whitelabel Admin',
+        email: reseller.email || 'admin@reseller.com',
+        role: 'admin',
+        balance: reseller.balance || 0,
+        plan: reseller.plan || 'pro'
+      }
+    });
+  }
+
+  // Super Admin Default Profile
+  res.json({
+    success: true,
+    user: {
+      id: 'admin',
+      name: 'Super Admin',
+      email: 'admin@callio.in',
+      role: 'admin',
+      balance: 1000,
+      plan: 'pro'
+    }
+  });
+});
+
 // GET /api/client/transactions — Retrieve client balance & transaction history
 app.get('/api/client/transactions', (req, res) => {
   const clientId = req.query.clientId || req.query.client_id || '';

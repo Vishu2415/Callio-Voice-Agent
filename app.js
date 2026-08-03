@@ -11213,9 +11213,41 @@ window.printInvoiceModal = function() {
   window.print();
 };
 
+window.getUserSessionProfile = async function() {
+  if (window.loggedInUser && (window.loggedInUser.id || window.loggedInUser.email)) {
+    return window.loggedInUser;
+  }
+  if (typeof loggedInUser !== 'undefined' && loggedInUser && (loggedInUser.id || loggedInUser.email)) {
+    window.loggedInUser = loggedInUser;
+    return loggedInUser;
+  }
+  try {
+    const stored = localStorage.getItem('user_session') || sessionStorage.getItem('user_session');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && (parsed.id || parsed.email)) {
+        window.loggedInUser = parsed;
+        return parsed;
+      }
+    }
+  } catch(e) {}
+
+  try {
+    const meRes = await fetch('/api/user/me');
+    const meData = await meRes.json();
+    if (meData && meData.user) {
+      window.loggedInUser = meData.user;
+      return meData.user;
+    }
+  } catch(e) {}
+
+  return null;
+};
+
 window.fetchClientTransactionsAndBalance = async function() {
   try {
-    const clientId = window.loggedInUser ? window.loggedInUser.id : '';
+    const user = await window.getUserSessionProfile();
+    const clientId = user ? (user.id || user.email || '') : '';
     const res = await fetch(`/api/client/transactions?clientId=${encodeURIComponent(clientId)}`);
     const data = await res.json();
     if (data.success) {
@@ -11237,15 +11269,16 @@ window.initiateUserRecharge = async function() {
     return;
   }
 
-  if (!window.loggedInUser || !window.loggedInUser.id) {
-    alert("⚠️ Session expired or not logged in. Please log in to your account to recharge wallet balance.");
+  const currentUser = await window.getUserSessionProfile();
+  if (!currentUser) {
+    alert("⚠️ Could not resolve user session. Please refresh the page and try again.");
     return;
   }
 
-  const targetClientId = window.loggedInUser.id;
+  const targetClientId = currentUser.id || currentUser.email || 'admin';
 
   // Calculate total price based on plan rate
-  const plan = window.loggedInUser ? (window.loggedInUser.plan || 'basic') : 'basic';
+  const plan = currentUser.plan || 'basic';
   const planInfo = (window.activePlans || []).find(p => p.id.toLowerCase() === plan.toLowerCase());
   const rate = planInfo ? planInfo.rate_per_minute : (plan.toLowerCase() === 'pro' ? 4.24 : (plan.toLowerCase() === 'custom' ? 2.00 : 5.00));
   const totalRupees = Math.round(amount * rate);
