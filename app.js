@@ -11237,7 +11237,12 @@ window.initiateUserRecharge = async function() {
     return;
   }
 
-  const targetClientId = window.loggedInUser ? window.loggedInUser.id : '';
+  if (!window.loggedInUser || !window.loggedInUser.id) {
+    alert("⚠️ Session expired or not logged in. Please log in to your account to recharge wallet balance.");
+    return;
+  }
+
+  const targetClientId = window.loggedInUser.id;
 
   // Calculate total price based on plan rate
   const plan = window.loggedInUser ? (window.loggedInUser.plan || 'basic') : 'basic';
@@ -11260,6 +11265,10 @@ window.initiateUserRecharge = async function() {
         name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
         description: `Wallet Recharge: ${amount} Minutes (@ ₹${rate.toFixed(2)}/min)`,
         image: window.BrandingContext?.logoUrl || '/logo_new.png',
+        notes: {
+          clientId: targetClientId,
+          minutes: amount
+        },
         handler: async function (response) {
           try {
             const rechargeRes = await fetch('/api/client/recharge', {

@@ -1964,7 +1964,7 @@ app.post('/api/admin/razorpay-config', express.json(), (req, res) => {
 // GET /api/client/transactions — Retrieve client balance & transaction history
 app.get('/api/client/transactions', (req, res) => {
   const clientId = req.query.clientId || req.query.client_id || '';
-  const host = req.headers.host || '';
+  const host = getRealHostFromRequest(req);
   const reseller = getResellerFromHost(host);
 
   let targetObj = null;
@@ -1974,11 +1974,19 @@ app.get('/api/client/transactions', (req, res) => {
     targetObj = resellersDb.get(clientId);
   } else if (reseller) {
     targetObj = reseller;
-  } else {
-    targetObj = Array.from(clientsDb.values())[0];
   }
 
   if (!targetObj) {
+    return res.json({ success: true, balance: 0, transactions: [] });
+  }
+
+  // Tenant / Domain Isolation Check
+  if (reseller) {
+    const clientResellerId = targetObj.resellerId || targetObj.reseller_id || (resellersDb.has(targetObj.id) ? targetObj.id : null);
+    if (clientResellerId !== reseller.id && targetObj.id !== reseller.id) {
+      return res.json({ success: true, balance: 0, transactions: [] });
+    }
+  } else if (targetObj.resellerId && targetObj.resellerId !== 'default' && targetObj.resellerId !== 'main') {
     return res.json({ success: true, balance: 0, transactions: [] });
   }
 
@@ -2071,25 +2079,36 @@ app.post('/api/client/recharge', express.json(), (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid recharge minute amount.' });
   }
 
-  const host = req.headers.host || '';
+  const host = getRealHostFromRequest(req);
   const reseller = getResellerFromHost(host);
 
   // Identify target client/reseller
-  let targetId = clientId;
+  let targetId = clientId ? String(clientId).trim() : '';
   let clientObj = null;
 
   if (targetId && clientsDb.has(targetId)) {
     clientObj = clientsDb.get(targetId);
   } else if (targetId && resellersDb.has(targetId)) {
     clientObj = resellersDb.get(targetId);
-  } else if (reseller) {
-    clientObj = reseller;
+  }
+
+  if (!clientObj) {
+    return res.status(400).json({ success: false, error: 'Target user account not found. Please log in again.' });
+  }
+
+  // Strictly enforce Domain / Tenant Isolation
+  if (reseller) {
+    // Request comes from a Whitelabel Reseller Domain (e.g. growvo.in)
+    const clientResellerId = clientObj.resellerId || clientObj.reseller_id || (resellersDb.has(clientObj.id) ? clientObj.id : null);
+    if (clientResellerId !== reseller.id && clientObj.id !== reseller.id) {
+      console.warn(`[Security Alert] Cross-tenant recharge blocked! Host: ${host}, Client: ${clientObj.id}, Reseller: ${reseller.id}`);
+      return res.status(403).json({ success: false, error: 'Cross-tenant payment forbidden. Account does not belong to this platform domain.' });
+    }
   } else {
-    // Default fallback client if none specified
-    const firstClient = Array.from(clientsDb.values())[0];
-    if (firstClient) {
-      clientObj = firstClient;
-      targetId = firstClient.id;
+    // Request comes from Main Platform (e.g. callio.in)
+    if (clientObj.resellerId && clientObj.resellerId !== 'default' && clientObj.resellerId !== 'main') {
+      console.warn(`[Security Alert] Whitelabel client recharge blocked on Main Platform! Host: ${host}, Client: ${clientObj.id}, Client Reseller: ${clientObj.resellerId}`);
+      return res.status(403).json({ success: false, error: 'Whitelabel user recharge must be completed on your reseller portal domain.' });
     }
   }
 
