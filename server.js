@@ -1939,7 +1939,13 @@ app.post('/api/upload-branding-asset', express.json({ limit: '50mb' }), (req, re
   res.json({ success: true, url: `/uploads/${safeName}` });
 });
 
-app.use('/uploads', express.static('./uploads'));
+app.use('/uploads', express.static('./uploads', {
+  maxAge: '30d',
+  immutable: true,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+  }
+}));
 
 app.get('/app', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
