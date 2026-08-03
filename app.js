@@ -11047,6 +11047,57 @@ window.openTodayCallsModal = function(e) {
   }
 };
 
+// ─── Wallet & Transaction Ledger Renderer ──────────────────────────────────────
+window.renderClientTransactionHistory = function(transactions, balance) {
+  const balanceEl = document.getElementById('billing-wallet-balance');
+  if (balanceEl && balance !== undefined) {
+    balanceEl.textContent = `${Number(balance).toFixed(1)} Mins`;
+  }
+
+  const tbody = document.getElementById('billing-history-table-body');
+  if (!tbody) return;
+
+  if (!transactions || transactions.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">No transactions recorded yet.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = transactions.map(txn => {
+    const isCredit = txn.usage && txn.usage.startsWith('+');
+    const badgeBg = isCredit ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+    const badgeColor = isCredit ? '#10b981' : '#ef4444';
+    const formattedDate = txn.timestamp ? new Date(txn.timestamp).toLocaleString('en-IN') : 'N/A';
+
+    return `
+      <tr style="border-bottom: 1px solid var(--border-color);">
+        <td style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-cyan); font-weight: 700;">${txn.id || 'TXN_N/A'}</td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">${formattedDate}</td>
+        <td>
+          <span style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 12px; background: ${badgeBg}; color: ${badgeColor}; text-transform: uppercase;">
+            ${txn.type || 'RECHARGE'}
+          </span>
+        </td>
+        <td style="font-size: 0.82rem; color: var(--text-main); font-weight: 600;">${txn.details || 'Wallet Recharge'}</td>
+        <td style="font-size: 0.82rem; color: var(--text-muted);">${txn.duration || '-'}</td>
+        <td style="text-align: right; font-weight: 800; font-size: 0.88rem; color: ${badgeColor};">${txn.usage || '+0 Mins'}</td>
+      </tr>
+    `;
+  }).join('');
+};
+
+window.fetchClientTransactionsAndBalance = async function() {
+  try {
+    const clientId = window.loggedInUser ? window.loggedInUser.id : '';
+    const res = await fetch(`/api/client/transactions?clientId=${encodeURIComponent(clientId)}`);
+    const data = await res.json();
+    if (data.success) {
+      window.renderClientTransactionHistory(data.transactions || [], data.balance);
+    }
+  } catch (err) {
+    console.error('Failed to fetch transaction history:', err);
+  }
+};
+
 window.initiateUserRecharge = async function() {
   const amountInput = document.getElementById('user-recharge-amount');
   const methodSelect = document.getElementById('user-payment-method');
@@ -11058,11 +11109,7 @@ window.initiateUserRecharge = async function() {
     return;
   }
 
-  const adminSelect = document.getElementById('admin-billing-client-select');
-  const isAdmin = (window.loggedInUser && window.loggedInUser.role === 'admin');
-  const targetClientId = (isAdmin && adminSelect && adminSelect.value) 
-    ? adminSelect.value 
-    : (window.loggedInUser ? window.loggedInUser.id : '');
+  const targetClientId = window.loggedInUser ? window.loggedInUser.id : '';
 
   // Calculate total price based on plan rate
   const plan = window.loggedInUser ? (window.loggedInUser.plan || 'basic') : 'basic';
@@ -11101,12 +11148,11 @@ window.initiateUserRecharge = async function() {
             if (rechargeData.success) {
               alert(`✅ Payment & Recharge Successful!\nPayment ID: ${response.razorpay_payment_id}\nAdded ${amount} Minutes to your wallet balance.\nNew Balance: ${rechargeData.balance.toFixed(1)} Mins.`);
               amountInput.value = '';
-              if (window.loggedInUser && (window.loggedInUser.role !== 'admin' || targetClientId === window.loggedInUser.id)) {
+              if (window.loggedInUser) {
                 window.loggedInUser.balance = rechargeData.balance;
                 localStorage.setItem('user_session', JSON.stringify(window.loggedInUser));
               }
-              if (typeof fetchBillingData === 'function') fetchBillingData();
-              if (typeof window.fetchClientDashboardData === 'function') window.fetchClientDashboardData();
+              window.fetchClientTransactionsAndBalance();
             } else {
               alert(`Recharge verification failed: ${rechargeData.error}`);
             }
@@ -12014,13 +12060,15 @@ window.testRazorpayConnection = function() {
   alert(`⚡ Razorpay SDK loaded successfully!\nKey ID (${keyId.substring(0, 12)}...) is active.`);
 };
 
-// Auto-trigger plan & Razorpay rendering
+// Auto-trigger plan, transaction ledger & Razorpay rendering
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
     window.fetchAndRenderSubscriptionPlans();
     window.loadSuperAdminRazorpayConfig();
+    window.fetchClientTransactionsAndBalance();
   });
 } else {
   window.fetchAndRenderSubscriptionPlans();
   window.loadSuperAdminRazorpayConfig();
+  window.fetchClientTransactionsAndBalance();
 }

@@ -1961,6 +1961,34 @@ app.post('/api/admin/razorpay-config', express.json(), (req, res) => {
   res.json({ success: true, message: 'Super Admin Razorpay credentials updated successfully!' });
 });
 
+// GET /api/client/transactions — Retrieve client balance & transaction history
+app.get('/api/client/transactions', (req, res) => {
+  const clientId = req.query.clientId || req.query.client_id || '';
+  const host = req.headers.host || '';
+  const reseller = getResellerFromHost(host);
+
+  let targetObj = null;
+  if (clientId && clientsDb.has(clientId)) {
+    targetObj = clientsDb.get(clientId);
+  } else if (clientId && resellersDb.has(clientId)) {
+    targetObj = resellersDb.get(clientId);
+  } else if (reseller) {
+    targetObj = reseller;
+  } else {
+    targetObj = Array.from(clientsDb.values())[0];
+  }
+
+  if (!targetObj) {
+    return res.json({ success: true, balance: 0, transactions: [] });
+  }
+
+  res.json({
+    success: true,
+    balance: targetObj.balance || 0,
+    transactions: targetObj.transactions || []
+  });
+});
+
 // POST /api/razorpay/webhook — Server-to-server Razorpay payment confirmation webhook
 app.post('/api/razorpay/webhook', express.json(), (req, res) => {
   try {
