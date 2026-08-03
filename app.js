@@ -8555,6 +8555,7 @@ window.switchAdminSubtab = function(tabName) {
     'requests': 'admin-panel-section-requests',
     'logs': 'admin-panel-section-logs',
     'plans': 'admin-panel-section-plans',
+    'invoices': 'admin-panel-section-invoices',
     'trial-leads': 'admin-panel-section-trial-leads',
     'enterprise-inquiries': 'admin-panel-section-enterprise-inquiries',
     'branding': 'admin-panel-section-branding',
@@ -8565,6 +8566,7 @@ window.switchAdminSubtab = function(tabName) {
     'requests': 'admin-subtab-requests',
     'logs': 'admin-subtab-logs',
     'plans': 'admin-subtab-plans',
+    'invoices': 'admin-subtab-invoices',
     'trial-leads': 'admin-subtab-trial-leads',
     'enterprise-inquiries': 'admin-subtab-enterprise-inquiries',
     'branding': 'admin-subtab-branding',
@@ -8585,6 +8587,9 @@ window.switchAdminSubtab = function(tabName) {
       if (key === 'plans') {
         window.fetchAdminPlans();
         window.initSuperAdminPricingConsole();
+      }
+      if (key === 'invoices') {
+        window.fetchAdminInvoices();
       }
       if (key === 'trial-leads') {
         window.fetchTrialLeads();
@@ -9115,6 +9120,398 @@ window.playLeadRecording = function(btn, url) {
     btn.nextElementSibling.innerText = 'Playing...';
     currentPlayingBtn = btn;
   }
+};
+
+// --- Invoices & Tax Billing System ---
+window._cachedInvoices = [];
+
+window.fetchAdminInvoices = async function() {
+  try {
+    const tbody = document.getElementById('admin-invoices-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">Loading invoices...</td></tr>';
+
+    const res = await fetch('/api/admin/invoices');
+    const data = await res.json();
+
+    if (!data.success) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 20px;">${data.error || 'Failed to load invoices.'}</td></tr>`;
+      return;
+    }
+
+    window._cachedInvoices = data.invoices || [];
+    window.renderAdminInvoicesTable(window._cachedInvoices);
+  } catch (err) {
+    console.error('Failed to fetch admin invoices:', err);
+  }
+};
+
+window.renderAdminInvoicesTable = function(invoices) {
+  const tbody = document.getElementById('admin-invoices-table-body');
+  if (!tbody) return;
+
+  // Calculate summary stats
+  let totalCount = invoices.length;
+  let paidAmount = 0;
+  let pendingAmount = 0;
+
+  invoices.forEach(inv => {
+    const amt = Number(inv.totalAmount || inv.subtotal || 0);
+    if (inv.status === 'paid') {
+      paidAmount += amt;
+    } else {
+      pendingAmount += amt;
+    }
+  });
+
+  const totalCountEl = document.getElementById('invoice-stat-total-count');
+  const paidAmountEl = document.getElementById('invoice-stat-paid-amount');
+  const pendingAmountEl = document.getElementById('invoice-stat-pending-amount');
+
+  if (totalCountEl) totalCountEl.textContent = totalCount;
+  if (paidAmountEl) paidAmountEl.textContent = `₹${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+  if (pendingAmountEl) pendingAmountEl.textContent = `₹${pendingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+  if (invoices.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">No invoices found. Click "Create New Invoice" to issue one.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = invoices.map(inv => {
+    const dt = inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : '—';
+    const subtotalStr = `₹${Number(inv.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    const taxStr = `₹${Number(inv.taxAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    const totalStr = `₹${Number(inv.totalAmount || inv.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+    const isPaid = inv.status === 'paid';
+    const statusBadge = isPaid
+      ? `<span class="badge badge-green" style="padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700;">✓ PAID</span>`
+      : (inv.status === 'pending' 
+          ? `<span class="badge" style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700;">⏳ PENDING</span>`
+          : `<span class="badge badge-red" style="padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700;">UNPAID</span>`);
+
+    return `
+      <tr>
+        <td style="font-family: monospace; font-weight: 700; color: var(--color-cyan); font-size: 0.85rem;">${escapeHtml(inv.id)}</td>
+        <td>
+          <strong style="color: var(--text-main); font-size: 0.85rem;">${escapeHtml(inv.clientName)}</strong>
+          ${inv.clientCompany && inv.clientCompany !== inv.clientName ? `<div style="font-size: 0.74rem; color: var(--text-muted);">${escapeHtml(inv.clientCompany)}</div>` : ''}
+        </td>
+        <td style="font-size: 0.82rem; color: var(--text-main);">${escapeHtml(inv.description || inv.planName || 'AI Service')}</td>
+        <td style="font-size: 0.85rem; font-weight: 600;">${subtotalStr}</td>
+        <td style="font-size: 0.85rem; color: var(--text-muted);">${taxStr}</td>
+        <td style="font-size: 0.9rem; font-weight: 800; color: #10b981;">${totalStr}</td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">${dt}</td>
+        <td>${statusBadge}</td>
+        <td style="text-align: right; white-space: nowrap;">
+          <button onclick="window.openViewInvoiceModal('${inv.id}')" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; margin-right: 4px; font-weight: 700; background: rgba(6,182,212,0.12); color: #06b6d4; border-color: rgba(6,182,212,0.3);">👁️ View & Print</button>
+          <button onclick="window.toggleInvoiceStatus('${inv.id}', '${inv.status}')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">${isPaid ? 'Mark Unpaid' : 'Mark Paid'}</button>
+          <button onclick="window.deleteInvoice('${inv.id}')" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3);">Delete</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+window.filterAdminInvoices = function() {
+  const query = (document.getElementById('admin-invoices-search')?.value || '').toLowerCase().trim();
+  const statusFilter = document.getElementById('admin-invoices-status-filter')?.value || 'all';
+
+  let filtered = [...(window._cachedInvoices || [])];
+
+  if (statusFilter !== 'all') {
+    if (statusFilter === 'paid') {
+      filtered = filtered.filter(i => i.status === 'paid');
+    } else {
+      filtered = filtered.filter(i => i.status !== 'paid');
+    }
+  }
+
+  if (query) {
+    filtered = filtered.filter(i => 
+      (i.id || '').toLowerCase().includes(query) ||
+      (i.clientName || '').toLowerCase().includes(query) ||
+      (i.clientEmail || '').toLowerCase().includes(query) ||
+      (i.clientCompany || '').toLowerCase().includes(query) ||
+      (i.description || '').toLowerCase().includes(query)
+    );
+  }
+
+  window.renderAdminInvoicesTable(filtered);
+};
+
+window.openCreateInvoiceModal = async function() {
+  const modal = document.getElementById('admin-create-invoice-modal');
+  if (!modal) return;
+
+  const select = document.getElementById('ci-client-select');
+  if (select) {
+    select.innerHTML = '<option value="">Loading clients...</option>';
+    try {
+      const clients = window.activeClients || [];
+      let opts = '<option value="">-- Choose Client --</option>';
+      clients.forEach(c => {
+        opts += `<option value="${c.id}">${escapeHtml(c.name)} (${c.email || c.phone_number || 'Client'})</option>`;
+      });
+      select.innerHTML = opts;
+    } catch (e) {
+      select.innerHTML = '<option value="">-- Choose Client --</option>';
+    }
+  }
+
+  // Reset form inputs
+  document.getElementById('ci-client-name').value = '';
+  document.getElementById('ci-client-company').value = '';
+  document.getElementById('ci-client-email').value = '';
+  document.getElementById('ci-client-phone').value = '';
+  document.getElementById('ci-description').value = 'Pro AI Calling Plan - Monthly Subscription (5,000 Mins)';
+  document.getElementById('ci-subtotal').value = '1000';
+  document.getElementById('ci-tax-rate').value = '18';
+  document.getElementById('ci-status').value = 'paid';
+  document.getElementById('ci-payment-method').value = 'UPI / Razorpay';
+  
+  window.calcInvoiceTotals();
+  modal.style.display = 'flex';
+};
+
+window.onSelectInvoiceClient = function(clientId) {
+  if (!clientId) return;
+  const client = (window.activeClients || []).find(c => c.id === clientId);
+  if (client) {
+    document.getElementById('ci-client-name').value = client.name || '';
+    document.getElementById('ci-client-email').value = client.email || '';
+    document.getElementById('ci-client-phone').value = client.phone_number || '';
+    document.getElementById('ci-client-company').value = client.company_name || client.name || '';
+  }
+};
+
+window.calcInvoiceTotals = function() {
+  const subtotal = parseFloat(document.getElementById('ci-subtotal')?.value) || 0;
+  const taxRate = parseFloat(document.getElementById('ci-tax-rate')?.value) || 0;
+  const taxAmt = subtotal * (taxRate / 100);
+  const total = subtotal + taxAmt;
+
+  const totalEl = document.getElementById('ci-total-display');
+  if (totalEl) {
+    totalEl.value = `₹${total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+};
+
+window.submitCreateInvoice = async function(event) {
+  event.preventDefault();
+
+  const clientName = document.getElementById('ci-client-name').value.trim();
+  const clientCompany = document.getElementById('ci-client-company').value.trim();
+  const clientEmail = document.getElementById('ci-client-email').value.trim();
+  const clientPhone = document.getElementById('ci-client-phone').value.trim();
+  const description = document.getElementById('ci-description').value.trim();
+  const subtotal = parseFloat(document.getElementById('ci-subtotal').value) || 0;
+  const taxRate = parseFloat(document.getElementById('ci-tax-rate').value) || 18;
+  const status = document.getElementById('ci-status').value;
+  const paymentMethod = document.getElementById('ci-payment-method').value.trim();
+  const clientId = document.getElementById('ci-client-select').value;
+
+  try {
+    const res = await fetch('/api/admin/invoices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId,
+        clientName,
+        clientCompany,
+        clientEmail,
+        clientPhone,
+        planName: description,
+        description,
+        subtotal,
+        taxRate,
+        status,
+        paymentMethod
+      })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('admin-create-invoice-modal').style.display = 'none';
+      window.fetchAdminInvoices();
+    } else {
+      alert('Error creating invoice: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    alert('Failed to create invoice: ' + e.message);
+  }
+};
+
+window.toggleInvoiceStatus = async function(invoiceId, currentStatus) {
+  const newStatus = currentStatus === 'paid' ? 'unpaid' : 'paid';
+  try {
+    const res = await fetch(`/api/admin/invoices/${invoiceId}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.fetchAdminInvoices();
+    }
+  } catch(e) {}
+};
+
+window.deleteInvoice = async function(invoiceId) {
+  if (!confirm(`Are you sure you want to delete invoice ${invoiceId}?`)) return;
+  try {
+    const res = await fetch(`/api/admin/invoices/${invoiceId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      window.fetchAdminInvoices();
+    }
+  } catch(e) {}
+};
+
+window.openViewInvoiceModal = function(invoiceId) {
+  const inv = (window._cachedInvoices || []).find(i => i.id === invoiceId);
+  if (!inv) return;
+
+  const brand = window.BrandingContext || { appName: 'Callio', logoUrl: '', supportEmail: 'support@callio.in' };
+  const brandName = brand.appName || 'Callio';
+  const logoHtml = brand.logoUrl 
+    ? `<img src="${brand.logoUrl}" style="height: 38px; max-height: 38px; object-fit: contain;">`
+    : `<div style="font-size: 1.4rem; font-weight: 900; color: #2563eb;">${brandName}</div>`;
+
+  const dt = inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Today';
+  const dueDt = inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : 'On Receipt';
+  
+  const subtotalNum = Number(inv.subtotal || 0);
+  const taxRate = Number(inv.taxRate !== undefined ? inv.taxRate : 18);
+  const taxAmount = Number(inv.taxAmount || (subtotalNum * (taxRate / 100)));
+  const cgst = (taxAmount / 2).toFixed(2);
+  const sgst = (taxAmount / 2).toFixed(2);
+  const totalNum = Number(inv.totalAmount || (subtotalNum + taxAmount));
+
+  const isPaid = inv.status === 'paid';
+  const statusBadge = isPaid
+    ? `<span style="background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase;">PAID</span>`
+    : `<span style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase;">UNPAID</span>`;
+
+  const html = `
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px;">
+      <div>
+        ${logoHtml}
+        <div style="font-size: 0.8rem; color: #64748b; margin-top: 6px;">AI Conversational Voice Platform</div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 1.6rem; font-weight: 900; color: #0f172a; letter-spacing: -0.5px;">TAX INVOICE</div>
+        <div style="font-family: monospace; font-size: 0.95rem; font-weight: 700; color: #2563eb; margin-top: 2px;"># ${escapeHtml(inv.id)}</div>
+        <div style="margin-top: 6px;">${statusBadge}</div>
+      </div>
+    </div>
+
+    <!-- Metadata Row -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; margin-bottom: 28px;">
+      <div>
+        <div style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">ISSUED BY (PROVIDER)</div>
+        <div style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${escapeHtml(brandName)}</div>
+        <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">Domain: ${escapeHtml(inv.tenantDomain || window.location.host)}</div>
+        <div style="font-size: 0.82rem; color: #475569;">Email: ${escapeHtml(brand.supportEmail || 'support@' + window.location.host)}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">BILLED TO (CUSTOMER)</div>
+        <div style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${escapeHtml(inv.clientName)}</div>
+        ${inv.clientCompany && inv.clientCompany !== inv.clientName ? `<div style="font-size: 0.82rem; color: #475569;">${escapeHtml(inv.clientCompany)}</div>` : ''}
+        <div style="font-size: 0.82rem; color: #475569;">${escapeHtml(inv.clientEmail || '—')} | ${escapeHtml(inv.clientPhone || '—')}</div>
+        <div style="font-size: 0.82rem; color: #475569;">${escapeHtml(inv.clientAddress || 'India')}</div>
+      </div>
+    </div>
+
+    <!-- Dates Row -->
+    <div style="display: flex; justify-content: space-between; margin-bottom: 24px; font-size: 0.85rem;">
+      <div><span style="color: #64748b;">Invoice Date:</span> <strong style="color: #0f172a;">${dt}</strong></div>
+      <div><span style="color: #64748b;">Payment Method:</span> <strong style="color: #0f172a;">${escapeHtml(inv.paymentMethod || 'Online Payment')}</strong></div>
+      <div><span style="color: #64748b;">Due Date:</span> <strong style="color: #0f172a;">${dueDt}</strong></div>
+    </div>
+
+    <!-- Items Table -->
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+      <thead>
+        <tr style="background: #f1f5f9; text-align: left;">
+          <th style="padding: 10px 14px; font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase; border-radius: 8px 0 0 8px;">Description / Item</th>
+          <th style="padding: 10px 14px; font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase; text-align: center;">Qty</th>
+          <th style="padding: 10px 14px; font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase; text-align: right;">Rate</th>
+          <th style="padding: 10px 14px; font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase; text-align: right; border-radius: 0 8px 8px 0;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 14px; font-size: 0.88rem; font-weight: 600; color: #0f172a;">
+            ${escapeHtml(inv.description || inv.planName || 'AI Voice Subscription')}
+          </td>
+          <td style="padding: 14px; font-size: 0.88rem; color: #475569; text-align: center;">1</td>
+          <td style="padding: 14px; font-size: 0.88rem; color: #475569; text-align: right;">₹${subtotalNum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td style="padding: 14px; font-size: 0.88rem; font-weight: 700; color: #0f172a; text-align: right;">₹${subtotalNum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Total Calculations Box -->
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 32px;">
+      <div style="width: 280px;">
+        <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.85rem; color: #475569;">
+          <span>Subtotal:</span>
+          <span>₹${subtotalNum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.85rem; color: #475569;">
+          <span>CGST (9%):</span>
+          <span>₹${cgst}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.85rem; color: #475569;">
+          <span>SGST (9%):</span>
+          <span>₹${sgst}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; margin-top: 6px; border-top: 2px solid #0f172a; font-size: 1.1rem; font-weight: 900; color: #0f172a;">
+          <span>Total Amount:</span>
+          <span style="color: #2563eb;">₹${totalNum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Note -->
+    <div style="border-top: 1px solid #e2e8f0; padding-top: 18px; text-align: center; font-size: 0.78rem; color: #94a3b8;">
+      Thank you for choosing ${escapeHtml(brandName)}! This is a computer-generated tax invoice and does not require a physical signature.
+    </div>
+  `;
+
+  document.getElementById('printable-invoice-content').innerHTML = html;
+  document.getElementById('admin-view-invoice-modal').style.display = 'flex';
+};
+
+window.printInvoiceModal = function() {
+  const content = document.getElementById('printable-invoice-content').innerHTML;
+  const printWin = window.open('', '_blank', 'width=850,height=900');
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Tax Invoice</title>
+        <style>
+          body { font-family: 'Inter', sans-serif; margin: 30px; color: #0f172a; }
+          @media print {
+            .no-print { display: none !important; }
+          }
+        </style>
+      </head>
+      <body>
+        ${content}
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  printWin.document.close();
 };
 
 window.fetchTrialLeads = async function() {

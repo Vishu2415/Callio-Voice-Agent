@@ -2253,6 +2253,199 @@ app.get('/api/admin/trial-leads', (req, res) => {
   res.json({ success: true, leads: sorted });
 });
 
+// ============================================================
+//  INVOICES & TAX BILLING SYSTEM (TENANT ISOLATED)
+// ============================================================
+const INVOICES_DB_FILE = './invoices_db.json';
+let invoicesDb = [];
+
+function loadInvoices() {
+  try {
+    if (fs.existsSync(INVOICES_DB_FILE)) {
+      const raw = fs.readFileSync(INVOICES_DB_FILE, 'utf8');
+      invoicesDb = JSON.parse(raw);
+    } else {
+      invoicesDb = [];
+    }
+  } catch (err) {
+    console.error('[Startup] Failed to load invoices:', err.message);
+    invoicesDb = [];
+  }
+}
+
+function saveInvoices() {
+  try {
+    fs.writeFileSync(INVOICES_DB_FILE, JSON.stringify(invoicesDb, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[Database] Failed to save invoices:', err.message);
+  }
+}
+loadInvoices();
+
+// Seed initial sample invoices if DB is empty
+if (invoicesDb.length === 0) {
+  invoicesDb = [
+    {
+      id: "INV-2026-1001",
+      tenantId: "reseller_growvo",
+      tenantDomain: "growvo.in",
+      clientId: "client_rohit",
+      clientName: "Rohit Sharma",
+      clientEmail: "sharma@gmail.com",
+      clientPhone: "+917971442441",
+      clientCompany: "Growvo Media Pvt Ltd",
+      clientAddress: "Mumbai, Maharashtra, India",
+      planName: "Pro AI Calling Plan",
+      description: "Pro AI Calling Plan - Monthly Subscription (5,000 Mins)",
+      subtotal: 1000.00,
+      taxRate: 18,
+      taxAmount: 180.00,
+      totalAmount: 1180.00,
+      currency: "INR",
+      status: "paid",
+      paymentMethod: "UPI / Razorpay",
+      createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
+      dueDate: new Date(Date.now() - 2 * 86400000).toISOString()
+    },
+    {
+      id: "INV-2026-1002",
+      tenantId: "default",
+      tenantDomain: "callio.in",
+      clientId: "client_vaibhav",
+      clientName: "Vaibhav Gupta",
+      clientEmail: "vgupta61199@gmail.com",
+      clientPhone: "+919876543210",
+      clientCompany: "TechVibe Solutions",
+      clientAddress: "Delhi NCR, India",
+      planName: "Basic AI Calling Plan",
+      description: "Basic AI Calling Plan - Monthly Subscription (1,000 Mins)",
+      subtotal: 500.00,
+      taxRate: 18,
+      taxAmount: 90.00,
+      totalAmount: 590.00,
+      currency: "INR",
+      status: "paid",
+      paymentMethod: "Wallet Credit",
+      createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+      dueDate: new Date(Date.now() + 4 * 86400000).toISOString()
+    }
+  ];
+  saveInvoices();
+}
+
+// GET /api/admin/invoices (Tenant-isolated for Whitelabel Resellers)
+app.get('/api/admin/invoices', (req, res) => {
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const reseller = getResellerFromHost(host);
+
+  let list = [...invoicesDb];
+
+  if (reseller) {
+    // Whitelabel Reseller Admin Panel — show ONLY invoices for this reseller's domain/tenant
+    const rId = String(reseller.id || '').toLowerCase();
+    const rDom = String(reseller.domain || reseller.subdomain || '').toLowerCase().replace(/^www\./, '');
+
+    list = list.filter(inv => {
+      const iTenant = String(inv.tenantId || '').toLowerCase();
+      const iDomain = String(inv.tenantDomain || inv.domain || '').toLowerCase().replace(/^www\./, '');
+      return iTenant === rId || (rDom && iDomain.includes(rDom));
+    });
+  } else {
+    // Main Callio Super Admin Panel — show all invoices or filter if tenant parameter passed
+    if (req.query.tenantId) {
+      list = list.filter(inv => String(inv.tenantId || '').toLowerCase() === String(req.query.tenantId).toLowerCase());
+    }
+  }
+
+  const sorted = list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json({ success: true, invoices: sorted });
+});
+
+// POST /api/admin/invoices (Create new invoice)
+app.post('/api/admin/invoices', express.json(), (req, res) => {
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const reseller = getResellerFromHost(host);
+  const tenantId = reseller ? reseller.id : 'default';
+  const tenantDomain = reseller ? (reseller.domain || reseller.subdomain || reseller.name) : 'callio.in';
+
+  const {
+    clientId,
+    clientName,
+    clientEmail,
+    clientPhone,
+    clientCompany,
+    clientAddress,
+    planName,
+    description,
+    subtotal,
+    taxRate,
+    paymentMethod,
+    status,
+    dueDate
+  } = req.body;
+
+  if (!clientName || subtotal === undefined) {
+    return res.status(400).json({ success: false, error: 'Client Name and Subtotal amount are required.' });
+  }
+
+  const numSubtotal = Math.max(0, Number(subtotal) || 0);
+  const numTaxRate = Number(taxRate !== undefined ? taxRate : 18);
+  const numTaxAmount = Math.round((numSubtotal * (numTaxRate / 100)) * 100) / 100;
+  const numTotalAmount = Math.round((numSubtotal + numTaxAmount) * 100) / 100;
+
+  const invoiceId = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const newInvoice = {
+    id: invoiceId,
+    tenantId,
+    tenantDomain,
+    clientId: clientId || `client_${Date.now()}`,
+    clientName,
+    clientEmail: clientEmail || '',
+    clientPhone: clientPhone || '',
+    clientCompany: clientCompany || clientName,
+    clientAddress: clientAddress || 'India',
+    planName: planName || 'AI Voice Subscription Plan',
+    description: description || 'Monthly Subscription + Calling Credits',
+    subtotal: numSubtotal,
+    taxRate: numTaxRate,
+    taxAmount: numTaxAmount,
+    totalAmount: numTotalAmount,
+    currency: 'INR',
+    status: status || 'paid',
+    paymentMethod: paymentMethod || 'Online Payment',
+    createdAt: new Date().toISOString(),
+    dueDate: dueDate ? new Date(dueDate).toISOString() : new Date(Date.now() + 7 * 86400000).toISOString()
+  };
+
+  invoicesDb.unshift(newInvoice);
+  saveInvoices();
+  console.log(`[Invoices] Created new invoice ${newInvoice.id} for ${clientName} (${numTotalAmount} INR) under tenant ${tenantId}`);
+  res.json({ success: true, invoice: newInvoice });
+});
+
+// PUT /api/admin/invoices/:id/status (Toggle / update invoice status)
+app.put('/api/admin/invoices/:id/status', express.json(), (req, res) => {
+  const inv = invoicesDb.find(i => i.id === req.params.id);
+  if (!inv) return res.status(404).json({ success: false, error: 'Invoice not found.' });
+
+  const { status } = req.body;
+  if (status) inv.status = status;
+
+  saveInvoices();
+  res.json({ success: true, invoice: inv });
+});
+
+// DELETE /api/admin/invoices/:id
+app.delete('/api/admin/invoices/:id', (req, res) => {
+  const idx = invoicesDb.findIndex(i => i.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ success: false, error: 'Invoice not found.' });
+
+  invoicesDb.splice(idx, 1);
+  saveInvoices();
+  res.json({ success: true });
+});
+
 // POST: trigger a live outbound trial call (max 2 per IP)
 app.post('/api/trial-call', express.json(), async (req, res) => {
   let { name, phone, prompt } = req.body;
