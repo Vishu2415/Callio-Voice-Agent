@@ -20,7 +20,29 @@ if (!GEMINI_API_KEY) {
   GEMINI_API_KEY = 'AQ.Ab8RN6I0ZOs9CRGzUNX3fQYn1e-FaGcdf_B3gjWRVDtpSF_4Zg';
 }
 const PORT = process.env.PORT || 5050;
-const CONFIG_FILE = './config.json';
+const CONFIG_FILE = path.join(__dirname, 'config.json');
+let config = {};
+
+function loadConfig() {
+  if (fs.existsSync(CONFIG_FILE)) {
+    try {
+      config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    } catch(e) {
+      console.error('Failed to load config.json:', e.message);
+      config = {};
+    }
+  }
+}
+loadConfig();
+
+function saveConfig() {
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+  } catch(e) {
+    console.error('Failed to save config.json:', e.message);
+  }
+}
+
 const CALLS_DB_FILE = './calls_db.json';
 const AGENTS_DB_FILE = './agents_db.json';
 const CONTACTS_DB_FILE = './contacts_db.json';
@@ -1935,10 +1957,7 @@ app.post('/api/admin/razorpay-config', express.json(), (req, res) => {
   // Super Admin Config
   if (keyId !== undefined) config.razorpayKeyId = keyId.trim();
   if (keySecret && keySecret !== '••••••••') config.razorpayKeySecret = keySecret.trim();
-  if (webhookSecret && webhookSecret !== '••••••••') config.razorpayWebhookSecret = webhookSecret.trim();
-  try {
-    fs.writeFileSync(path.join(__dirname, 'config.json'), JSON.stringify(config, null, 2));
-  } catch(e){}
+  saveConfig();
   res.json({ success: true, message: 'Super Admin Razorpay credentials updated successfully!' });
 });
 
