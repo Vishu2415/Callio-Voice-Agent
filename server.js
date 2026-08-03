@@ -2192,6 +2192,32 @@ app.post('/api/client/recharge', express.json(), (req, res) => {
     clientObj.gstin = String(customerGstin).trim().toUpperCase();
   }
 
+  // Server-side Razorpay auto-capture safety net if payment is in authorized state
+  if (razorpayPaymentId) {
+    try {
+      const keyId = reseller ? reseller.razorpayKeyId : (process.env.RAZORPAY_KEY_ID || config.razorpayKeyId);
+      const keySecret = reseller ? reseller.razorpayKeySecret : (process.env.RAZORPAY_KEY_SECRET || config.razorpayKeySecret);
+      if (keyId && keySecret) {
+        const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+        const rate = clientObj.plan === 'pro' ? 4.24 : (clientObj.plan === 'custom' ? 2.00 : 5.00);
+        const amountPaisa = Math.round(numAmount * rate * 100);
+        
+        fetch(`https://api.razorpay.com/v1/payments/${razorpayPaymentId}/capture`, {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ amount: amountPaisa, currency: 'INR' })
+        }).then(r => r.json()).then(capData => {
+          console.log(`[Razorpay Auto-Capture] Payment ${razorpayPaymentId} auto-capture result:`, capData.status || capData.error?.description || 'processed');
+        }).catch(err => {
+          console.warn('[Razorpay Auto-Capture Warn]:', err.message);
+        });
+      }
+    } catch(e) {}
+  }
+
   // Credit balance
   clientObj.balance = (clientObj.balance || 0) + numAmount;
 

@@ -11315,6 +11315,7 @@ window.initiateUserRecharge = async function() {
         key: rData.keyId,
         amount: totalRupees * 100, // amount in paisa
         currency: 'INR',
+        payment_capture: 1, // Auto-capture payment immediately upon completion
         name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
         description: `Wallet Recharge: ${amount} Minutes (@ ₹${rate.toFixed(2)}/min)`,
         image: window.BrandingContext?.logoUrl || '/logo_new.png',
