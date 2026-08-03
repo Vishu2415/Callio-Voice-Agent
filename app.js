@@ -11929,6 +11929,10 @@ window.handleSubscribePlanClick = async function(planId, planName, price) {
 // ─── Super Admin Razorpay Config Functions ────────────────────────────────────
 window.loadSuperAdminRazorpayConfig = async function() {
   try {
+    const tenantText = document.getElementById('razorpay-tenant-info-text');
+    if (tenantText) {
+      tenantText.textContent = `Configuring custom Razorpay API credentials for domain: ${window.location.host}`;
+    }
     const res = await fetch('/api/admin/razorpay-config');
     const data = await res.json();
     if (data.success) {
@@ -11944,10 +11948,10 @@ window.loadSuperAdminRazorpayConfig = async function() {
           badge.style.color = '#10b981';
           badge.style.borderColor = 'rgba(16,185,129,0.3)';
         } else {
-          badge.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span> Not Configured`;
-          badge.style.background = 'rgba(245,158,11,0.12)';
-          badge.style.color = '#f59e0b';
-          badge.style.borderColor = 'rgba(245,158,11,0.3)';
+          badge.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span> Disabled / Not Configured`;
+          badge.style.background = 'rgba(239,68,68,0.12)';
+          badge.style.color = '#ef4444';
+          badge.style.borderColor = 'rgba(239,68,68,0.3)';
         }
       }
     }
