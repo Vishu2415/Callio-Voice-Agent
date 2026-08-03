@@ -1969,6 +1969,26 @@
               </button>
             </div>
 
+            <!-- Platform / Reseller Admin GSTIN Config Card -->
+            <div style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px 20px; margin-bottom: 1.5rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h4 style="margin: 0; font-size: 0.92rem; color: var(--text-main); font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                    <span>🏛️</span> Tax Registration Number (Domain GSTIN)
+                  </h4>
+                  <p style="margin: 3px 0 0 0; font-size: 0.76rem; color: var(--text-muted);">
+                    Configured GSTIN will automatically print on all B2B tax invoices &amp; payment receipts issued from your domain.
+                  </p>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; width: 100%; max-width: 420px;">
+                  <input type="text" id="admin-gstin-input" placeholder="e.g. 07AAAAA0000A1Z5" style="flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-main); font-size: 0.85rem; outline: none; text-transform: uppercase; font-family: monospace; font-weight: 700;">
+                  <button onclick="window.saveAdminGstin()" class="btn btn-secondary" style="padding: 8px 16px; font-weight: 700; font-size: 0.82rem; border-radius: 8px; cursor: pointer; color: var(--color-cyan); border-color: rgba(6,182,212,0.3); background: rgba(6,182,212,0.08); white-space: nowrap;">
+                    💾 Save GSTIN
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- Summary Cards Bar -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 1.5rem;">
               <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 18px;">
@@ -2347,6 +2367,10 @@
                     <option value="Card">Card</option>
                     <option value="NetBanking">NetBanking</option>
                   </select>
+                </div>
+                <div style="margin-bottom: 10px;">
+                  <label style="display: block; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Customer GSTIN (Optional - For B2B Tax Claim):</label>
+                  <input type="text" id="user-gstin-input" placeholder="e.g. 27AAACW1234F1Z0" style="width: 100%; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-main); font-size: 0.82rem; outline: none; box-sizing: border-box; text-transform: uppercase; font-family: monospace; font-weight: 700;">
                 </div>
                 <button onclick="window.initiateUserRecharge()" class="btn" style="width: 100%; background: linear-gradient(135deg, #06b6d4, #8b5cf6); color: #ffffff; font-weight: 700; border: none; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
                   💳 Add Balance
@@ -3267,7 +3291,7 @@
   </div>
 
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script type="module" src="app.js?v=20260801_v79"></script>
+  <script type="module" src="app.js?v=20260801_v80"></script>
   <!-- Today's Calls & Summaries Modal -->
   <div id="today-calls-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="width: 90%; max-width: 700px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 25px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh;">

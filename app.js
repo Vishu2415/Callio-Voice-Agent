@@ -11123,6 +11123,17 @@ window.openInvoiceModal = function(txnId) {
   const gstTax = (amountPaid - Number(subtotal)).toFixed(2);
   const refId = txn.id || ('INV-' + Date.now().toString().slice(-6));
 
+  const customerGstin = txn.customerGstin || user.gstin || (document.getElementById('user-gstin-input')?.value.trim().toUpperCase()) || '';
+  const issuerGstin = txn.issuerGstin || window._domainGstin || '';
+
+  const customerGstinHtml = customerGstin 
+    ? `<div style="font-size: 0.82rem; color: #2563eb; font-weight: 700; margin-top: 3px; font-family: monospace;">Customer GSTIN: ${customerGstin}</div>` 
+    : `<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Customer GSTIN: Consumer / Unregistered</div>`;
+
+  const issuerGstinHtml = issuerGstin 
+    ? `<div style="font-size: 0.82rem; color: #059669; font-weight: 700; margin-top: 3px; font-family: monospace;">Merchant GSTIN: ${issuerGstin}</div>` 
+    : `<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Merchant GSTIN: Verified Provider</div>`;
+
   container.innerHTML = `
     <div style="padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; background: #ffffff; border-radius: 12px;">
       <!-- Header -->
@@ -11148,12 +11159,13 @@ window.openInvoiceModal = function(txnId) {
           <div style="font-size: 0.95rem; font-weight: 800; color: #0f172a;">${user.name || 'Client Account'}</div>
           <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">Email: ${user.email || 'N/A'}</div>
           <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">Account ID: ${user.id || 'N/A'}</div>
+          ${customerGstinHtml}
         </div>
         <div style="text-align: right;">
           <div style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Issued By (Platform):</div>
           <div style="font-size: 0.95rem; font-weight: 800; color: #0f172a;">${appName} Inc.</div>
           <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">Support: ${supportEmail}</div>
-          <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">Payment Gateway: Razorpay Verified</div>
+          ${issuerGstinHtml}
         </div>
       </div>
 
@@ -11251,6 +11263,13 @@ window.fetchClientTransactionsAndBalance = async function() {
     const res = await fetch(`/api/client/transactions?clientId=${encodeURIComponent(clientId)}`);
     const data = await res.json();
     if (data.success) {
+      if (data.customerGstin) {
+        const input = document.getElementById('user-gstin-input');
+        if (input && !input.value) input.value = data.customerGstin;
+      }
+      if (data.issuerGstin) {
+        window._domainGstin = data.issuerGstin;
+      }
       window.renderClientTransactionHistory(data.transactions || [], data.balance);
     }
   } catch (err) {
@@ -11276,6 +11295,7 @@ window.initiateUserRecharge = async function() {
   }
 
   const targetClientId = currentUser.id || currentUser.email || 'admin';
+  const customerGstin = document.getElementById('user-gstin-input')?.value.trim().toUpperCase() || '';
 
   // Calculate total price based on plan rate
   const plan = currentUser.plan || 'basic';
@@ -11300,7 +11320,8 @@ window.initiateUserRecharge = async function() {
         image: window.BrandingContext?.logoUrl || '/logo_new.png',
         notes: {
           clientId: targetClientId,
-          minutes: amount
+          minutes: amount,
+          customerGstin: customerGstin
         },
         handler: async function (response) {
           try {
@@ -11311,7 +11332,8 @@ window.initiateUserRecharge = async function() {
                 clientId: targetClientId,
                 amount: amount,
                 paymentMethod: method,
-                razorpayPaymentId: response.razorpay_payment_id
+                razorpayPaymentId: response.razorpay_payment_id,
+                customerGstin: customerGstin
               })
             });
             const rechargeData = await rechargeRes.json();
@@ -11320,6 +11342,7 @@ window.initiateUserRecharge = async function() {
               amountInput.value = '';
               if (window.loggedInUser) {
                 window.loggedInUser.balance = rechargeData.balance;
+                if (customerGstin) window.loggedInUser.gstin = customerGstin;
                 localStorage.setItem('user_session', JSON.stringify(window.loggedInUser));
               }
               window.fetchClientTransactionsAndBalance();
@@ -12217,6 +12240,39 @@ window.saveRazorpayConfig = async function(event) {
   }
 };
 
+window.loadAdminGstin = async function() {
+  try {
+    const res = await fetch('/api/admin/gstin');
+    const data = await res.json();
+    if (data.success && data.gstin) {
+      const input = document.getElementById('admin-gstin-input');
+      if (input) input.value = data.gstin;
+      window._domainGstin = data.gstin;
+    }
+  } catch(e) {}
+};
+
+window.saveAdminGstin = async function() {
+  const input = document.getElementById('admin-gstin-input');
+  const gstin = input ? input.value.trim().toUpperCase() : '';
+  try {
+    const res = await fetch('/api/admin/gstin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gstin })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`✅ ${data.message || 'Tax Registration Number (GSTIN) saved successfully!'}`);
+      window._domainGstin = gstin;
+    } else {
+      alert('Failed to save GSTIN: ' + (data.error || 'Unknown error'));
+    }
+  } catch(e) {
+    alert('Error saving GSTIN: ' + e.message);
+  }
+};
+
 window.testRazorpayConnection = function() {
   const keyId = document.getElementById('rzp-key-id')?.value.trim();
   if (!keyId) {
@@ -12235,10 +12291,12 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
     window.fetchAndRenderSubscriptionPlans();
     window.loadSuperAdminRazorpayConfig();
+    window.loadAdminGstin();
     window.fetchClientTransactionsAndBalance();
   });
 } else {
   window.fetchAndRenderSubscriptionPlans();
   window.loadSuperAdminRazorpayConfig();
+  window.loadAdminGstin();
   window.fetchClientTransactionsAndBalance();
 }

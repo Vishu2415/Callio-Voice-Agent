@@ -1994,6 +1994,33 @@ app.get('/api/user/me', (req, res) => {
   });
 });
 
+// GET /api/admin/gstin — Retrieve domain GSTIN
+app.get('/api/admin/gstin', (req, res) => {
+  const host = getRealHostFromRequest(req);
+  const reseller = getResellerFromHost(host);
+  const gstin = reseller ? (reseller.gstin || '') : (config.gstin || '');
+  res.json({ success: true, gstin });
+});
+
+// POST /api/admin/gstin — Save domain GSTIN
+app.post('/api/admin/gstin', express.json(), (req, res) => {
+  const { gstin } = req.body;
+  const host = getRealHostFromRequest(req);
+  const reseller = getResellerFromHost(host);
+  const cleanGstin = String(gstin || '').trim().toUpperCase();
+
+  if (reseller) {
+    reseller.gstin = cleanGstin;
+    resellersDb.set(reseller.id, reseller);
+    saveResellers();
+    return res.json({ success: true, message: 'Whitelabel Reseller GSTIN saved successfully!' });
+  }
+
+  config.gstin = cleanGstin;
+  saveConfig();
+  res.json({ success: true, message: 'Platform Super Admin GSTIN saved successfully!' });
+});
+
 // GET /api/client/transactions — Retrieve client balance & transaction history
 app.get('/api/client/transactions', (req, res) => {
   const clientId = req.query.clientId || req.query.client_id || '';
@@ -2010,23 +2037,27 @@ app.get('/api/client/transactions', (req, res) => {
   }
 
   if (!targetObj) {
-    return res.json({ success: true, balance: 0, transactions: [] });
+    return res.json({ success: true, balance: 0, transactions: [], customerGstin: '', issuerGstin: reseller ? (reseller.gstin || '') : (config.gstin || '') });
   }
 
   // Tenant / Domain Isolation Check
   if (reseller) {
     const clientResellerId = targetObj.resellerId || targetObj.reseller_id || (resellersDb.has(targetObj.id) ? targetObj.id : null);
     if (clientResellerId !== reseller.id && targetObj.id !== reseller.id) {
-      return res.json({ success: true, balance: 0, transactions: [] });
+      return res.json({ success: true, balance: 0, transactions: [], customerGstin: '', issuerGstin: reseller.gstin || '' });
     }
   } else if (targetObj.resellerId && targetObj.resellerId !== 'default' && targetObj.resellerId !== 'main') {
-    return res.json({ success: true, balance: 0, transactions: [] });
+    return res.json({ success: true, balance: 0, transactions: [], customerGstin: '', issuerGstin: config.gstin || '' });
   }
+
+  const issuerGstin = reseller ? (reseller.gstin || '') : (config.gstin || '');
 
   res.json({
     success: true,
     balance: targetObj.balance || 0,
-    transactions: targetObj.transactions || []
+    transactions: targetObj.transactions || [],
+    customerGstin: targetObj.gstin || '',
+    issuerGstin: issuerGstin
   });
 });
 
@@ -2069,6 +2100,7 @@ app.post('/api/razorpay/webhook', express.json(), (req, res) => {
         const notes = payment.notes || {};
         const clientId = notes.clientId || notes.client_id;
         const boughtMinutes = Number(notes.minutes) || Math.round(amountPaidInRs / 5);
+        const customerGstin = notes.customerGstin || notes.gstin || '';
 
         console.log(`[Razorpay Webhook] Payment ${paymentId} captured! Amount: ₹${amountPaidInRs}, Client: ${clientId || 'unbound'}`);
 
@@ -2076,7 +2108,10 @@ app.post('/api/razorpay/webhook', express.json(), (req, res) => {
           let clientObj = clientsDb.get(clientId) || resellersDb.get(clientId);
           if (clientObj) {
             clientObj.balance = (clientObj.balance || 0) + boughtMinutes;
+            if (customerGstin) clientObj.gstin = String(customerGstin).trim().toUpperCase();
             
+            const issuerGstin = reseller ? (reseller.gstin || '') : (config.gstin || '');
+
             if (!clientObj.transactions) clientObj.transactions = [];
             clientObj.transactions.unshift({
               id: 'TXN_WH_' + Date.now(),
@@ -2085,7 +2120,9 @@ app.post('/api/razorpay/webhook', express.json(), (req, res) => {
               details: `Webhook Verified Recharge: +${boughtMinutes} Mins (Paid ₹${amountPaidInRs} | Ref: ${paymentId})`,
               duration: `${boughtMinutes} Mins`,
               usage: `+${boughtMinutes} Mins`,
-              amountPaid: amountPaidInRs
+              amountPaid: amountPaidInRs,
+              customerGstin: clientObj.gstin || '',
+              issuerGstin: issuerGstin
             });
 
             if (clientsDb.has(clientId)) saveClients();
@@ -2105,7 +2142,7 @@ app.post('/api/razorpay/webhook', express.json(), (req, res) => {
 
 // POST /api/client/recharge — Wallet Minute Recharge with Razorpay Verification
 app.post('/api/client/recharge', express.json(), (req, res) => {
-  const { clientId, amount, paymentMethod, razorpayPaymentId, isAdminManual } = req.body;
+  const { clientId, amount, paymentMethod, razorpayPaymentId, isAdminManual, customerGstin } = req.body;
   const numAmount = Number(amount);
 
   if (isNaN(numAmount) || numAmount <= 0) {
@@ -2145,17 +2182,20 @@ app.post('/api/client/recharge', express.json(), (req, res) => {
     }
   }
 
-  if (!clientObj) {
-    return res.status(404).json({ success: false, error: 'Target user account not found.' });
-  }
-
   // Security Check: Require Razorpay payment ID for non-admin users
   if (!isAdminManual && !razorpayPaymentId) {
     return res.status(400).json({ success: false, error: 'Payment verification failed. No Razorpay payment ID provided.' });
   }
 
+  // Save Customer GSTIN if provided
+  if (customerGstin) {
+    clientObj.gstin = String(customerGstin).trim().toUpperCase();
+  }
+
   // Credit balance
   clientObj.balance = (clientObj.balance || 0) + numAmount;
+
+  const issuerGstin = reseller ? (reseller.gstin || '') : (config.gstin || '');
 
   // Add ledger transaction entry
   if (!clientObj.transactions) clientObj.transactions = [];
@@ -2170,7 +2210,9 @@ app.post('/api/client/recharge', express.json(), (req, res) => {
     details: `Wallet Recharge of ${numAmount} Minutes via ${paymentMethod || 'Razorpay'}${razorpayPaymentId ? ` (Paid ₹${paidCost} | Ref: ${razorpayPaymentId})` : ' (Admin Manual Top-Up)'}`,
     duration: `${numAmount} Mins`,
     usage: `+${numAmount} Mins`,
-    amountPaid: Number(paidCost)
+    amountPaid: Number(paidCost),
+    customerGstin: clientObj.gstin || (customerGstin ? String(customerGstin).trim().toUpperCase() : ''),
+    issuerGstin: issuerGstin
   });
 
   if (clientsDb.has(targetId)) {
@@ -2182,7 +2224,7 @@ app.post('/api/client/recharge', express.json(), (req, res) => {
   }
 
   console.log(`[Wallet Recharge] Successfully credited ${numAmount} Mins to ${clientObj.name || targetId}. New Balance: ${clientObj.balance}`);
-  res.json({ success: true, balance: clientObj.balance, transactionId: txnId });
+  res.json({ success: true, balance: clientObj.balance, transactionId: txnId, customerGstin: clientObj.gstin || '' });
 });
 
 // ─── Enterprise Inquiry Endpoints ─────────────────────────────────────────────
