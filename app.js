@@ -8556,6 +8556,7 @@ window.switchAdminSubtab = function(tabName) {
     'logs': 'admin-panel-section-logs',
     'plans': 'admin-panel-section-plans',
     'invoices': 'admin-panel-section-invoices',
+    'razorpay': 'admin-panel-section-razorpay',
     'trial-leads': 'admin-panel-section-trial-leads',
     'enterprise-inquiries': 'admin-panel-section-enterprise-inquiries',
     'branding': 'admin-panel-section-branding',
@@ -8567,6 +8568,7 @@ window.switchAdminSubtab = function(tabName) {
     'logs': 'admin-subtab-logs',
     'plans': 'admin-subtab-plans',
     'invoices': 'admin-subtab-invoices',
+    'razorpay': 'admin-subtab-razorpay',
     'trial-leads': 'admin-subtab-trial-leads',
     'enterprise-inquiries': 'admin-subtab-enterprise-inquiries',
     'branding': 'admin-subtab-branding',
@@ -8590,6 +8592,9 @@ window.switchAdminSubtab = function(tabName) {
       }
       if (key === 'invoices') {
         window.fetchAdminInvoices();
+      }
+      if (key === 'razorpay') {
+        window.fetchRazorpayConfig();
       }
       if (key === 'trial-leads') {
         window.fetchTrialLeads();
@@ -9205,6 +9210,7 @@ window.renderAdminInvoicesTable = function(invoices) {
         <td>${statusBadge}</td>
         <td style="text-align: right; white-space: nowrap;">
           <button onclick="window.openViewInvoiceModal('${inv.id}')" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; margin-right: 4px; font-weight: 700; background: rgba(6,182,212,0.12); color: #06b6d4; border-color: rgba(6,182,212,0.3);">👁️ View & Print</button>
+          <button onclick="window.openEditInvoiceModal('${inv.id}')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px; font-weight: 700; background: rgba(139,92,246,0.12); color: #a78bfa; border-color: rgba(139,92,246,0.3);">✏️ Edit</button>
           <button onclick="window.toggleInvoiceStatus('${inv.id}', '${inv.status}')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">${isPaid ? 'Mark Unpaid' : 'Mark Paid'}</button>
           <button onclick="window.deleteInvoice('${inv.id}')" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3);">Delete</button>
         </td>
@@ -9240,7 +9246,10 @@ window.filterAdminInvoices = function() {
   window.renderAdminInvoicesTable(filtered);
 };
 
+window.editingInvoiceId = null;
+
 window.openCreateInvoiceModal = async function() {
+  window.editingInvoiceId = null;
   const modal = document.getElementById('admin-create-invoice-modal');
   if (!modal) return;
 
@@ -9270,6 +9279,40 @@ window.openCreateInvoiceModal = async function() {
   document.getElementById('ci-status').value = 'paid';
   document.getElementById('ci-payment-method').value = 'UPI / Razorpay';
   
+  window.calcInvoiceTotals();
+  modal.style.display = 'flex';
+};
+
+window.openEditInvoiceModal = function(invoiceId) {
+  const inv = (window._cachedInvoices || []).find(i => i.id === invoiceId);
+  if (!inv) return;
+
+  window.editingInvoiceId = invoiceId;
+  const modal = document.getElementById('admin-create-invoice-modal');
+  if (!modal) return;
+
+  // Populate client dropdown
+  const select = document.getElementById('ci-client-select');
+  if (select) {
+    const clients = window.activeClients || [];
+    let opts = '<option value="">-- Choose Client --</option>';
+    clients.forEach(c => {
+      const sel = c.id === inv.clientId ? 'selected' : '';
+      opts += `<option value="${c.id}" ${sel}>${escapeHtml(c.name)} (${c.email || c.phone_number || 'Client'})</option>`;
+    });
+    select.innerHTML = opts;
+  }
+
+  document.getElementById('ci-client-name').value = inv.clientName || '';
+  document.getElementById('ci-client-company').value = inv.clientCompany || '';
+  document.getElementById('ci-client-email').value = inv.clientEmail || '';
+  document.getElementById('ci-client-phone').value = inv.clientPhone || '';
+  document.getElementById('ci-description').value = inv.description || inv.planName || '';
+  document.getElementById('ci-subtotal').value = inv.subtotal || 0;
+  document.getElementById('ci-tax-rate').value = inv.taxRate !== undefined ? inv.taxRate : 18;
+  document.getElementById('ci-status').value = inv.status || 'paid';
+  document.getElementById('ci-payment-method').value = inv.paymentMethod || 'UPI / Razorpay';
+
   window.calcInvoiceTotals();
   modal.style.display = 'flex';
 };
@@ -9311,9 +9354,13 @@ window.submitCreateInvoice = async function(event) {
   const paymentMethod = document.getElementById('ci-payment-method').value.trim();
   const clientId = document.getElementById('ci-client-select').value;
 
+  const isEdit = !!window.editingInvoiceId;
+  const url = isEdit ? `/api/admin/invoices/${window.editingInvoiceId}` : '/api/admin/invoices';
+  const method = isEdit ? 'PUT' : 'POST';
+
   try {
-    const res = await fetch('/api/admin/invoices', {
-      method: 'POST',
+    const res = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         clientId,
@@ -9333,13 +9380,94 @@ window.submitCreateInvoice = async function(event) {
     const data = await res.json();
     if (data.success) {
       document.getElementById('admin-create-invoice-modal').style.display = 'none';
+      window.editingInvoiceId = null;
       window.fetchAdminInvoices();
     } else {
-      alert('Error creating invoice: ' + (data.error || 'Unknown error'));
+      alert('Error saving invoice: ' + (data.error || 'Unknown error'));
     }
   } catch (e) {
-    alert('Failed to create invoice: ' + e.message);
+    alert('Failed to save invoice: ' + e.message);
   }
+};
+
+// --- Razorpay Payment Gateway Functions ---
+window.fetchRazorpayConfig = async function() {
+  try {
+    const res = await fetch('/api/admin/razorpay-config');
+    const data = await res.json();
+    if (!data.success) return;
+
+    const cfg = data.config || {};
+    document.getElementById('rzp-status').value = cfg.status || 'active';
+    document.getElementById('rzp-key-id').value = cfg.keyId || '';
+    document.getElementById('rzp-key-secret').value = cfg.keySecretMasked || '';
+    document.getElementById('rzp-webhook-secret').value = cfg.webhookSecret || '';
+    document.getElementById('rzp-currency').value = cfg.currency || 'INR';
+    document.getElementById('rzp-auto-invoice').checked = cfg.autoInvoice !== false;
+
+    const badge = document.getElementById('razorpay-status-badge');
+    if (badge) {
+      if (cfg.status === 'active' && cfg.keyId) {
+        badge.style.background = 'rgba(16,185,129,0.15)';
+        badge.style.color = '#10b981';
+        badge.style.borderColor = 'rgba(16,185,129,0.3)';
+        badge.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span> Active & Connected`;
+      } else {
+        badge.style.background = 'rgba(239,68,68,0.15)';
+        badge.style.color = '#ef4444';
+        badge.style.borderColor = 'rgba(239,68,68,0.3)';
+        badge.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span> Disabled / Not Configured`;
+      }
+    }
+
+    const tenantInfo = document.getElementById('razorpay-tenant-info-text');
+    if (tenantInfo) {
+      tenantInfo.textContent = `Configuring custom Razorpay credentials for: ${data.tenantName || 'Current Domain Host'}`;
+    }
+  } catch (e) {
+    console.error('Failed to fetch Razorpay config:', e);
+  }
+};
+
+window.saveRazorpayConfig = async function(event) {
+  event.preventDefault();
+  const status = document.getElementById('rzp-status').value;
+  const keyId = document.getElementById('rzp-key-id').value.trim();
+  const keySecret = document.getElementById('rzp-key-secret').value.trim();
+  const webhookSecret = document.getElementById('rzp-webhook-secret').value.trim();
+  const currency = document.getElementById('rzp-currency').value;
+  const autoInvoice = document.getElementById('rzp-auto-invoice').checked;
+
+  try {
+    const res = await fetch('/api/admin/razorpay-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, keyId, keySecret, webhookSecret, currency, autoInvoice })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      alert('✅ Razorpay Gateway credentials saved successfully!');
+      window.fetchRazorpayConfig();
+    } else {
+      alert('Error saving Razorpay settings: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    alert('Failed to save Razorpay settings: ' + e.message);
+  }
+};
+
+window.testRazorpayConnection = function() {
+  const keyId = document.getElementById('rzp-key-id').value.trim();
+  if (!keyId) {
+    alert('Please enter a Razorpay Key ID first.');
+    return;
+  }
+  if (!keyId.startsWith('rzp_live_') && !keyId.startsWith('rzp_test_')) {
+    alert('⚠️ Invalid Key ID format. Razorpay Key IDs usually start with "rzp_live_" or "rzp_test_".');
+    return;
+  }
+  alert(`✅ Razorpay Key ID format is valid! Key ID: ${keyId}`);
 };
 
 window.toggleInvoiceStatus = async function(invoiceId, currentStatus) {

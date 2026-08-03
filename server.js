@@ -2436,6 +2436,46 @@ app.put('/api/admin/invoices/:id/status', express.json(), (req, res) => {
   res.json({ success: true, invoice: inv });
 });
 
+// PUT /api/admin/invoices/:id (Update entire invoice)
+app.put('/api/admin/invoices/:id', express.json(), (req, res) => {
+  const inv = invoicesDb.find(i => i.id === req.params.id);
+  if (!inv) return res.status(404).json({ success: false, error: 'Invoice not found.' });
+
+  const {
+    clientName,
+    clientCompany,
+    clientEmail,
+    clientPhone,
+    description,
+    subtotal,
+    taxRate,
+    status,
+    paymentMethod
+  } = req.body;
+
+  if (clientName) inv.clientName = clientName;
+  if (clientCompany !== undefined) inv.clientCompany = clientCompany;
+  if (clientEmail !== undefined) inv.clientEmail = clientEmail;
+  if (clientPhone !== undefined) inv.clientPhone = clientPhone;
+  if (description) {
+    inv.description = description;
+    inv.planName = description;
+  }
+  if (subtotal !== undefined) {
+    inv.subtotal = Math.max(0, Number(subtotal) || 0);
+    const numTaxRate = Number(taxRate !== undefined ? taxRate : (inv.taxRate || 18));
+    inv.taxRate = numTaxRate;
+    inv.taxAmount = Math.round((inv.subtotal * (numTaxRate / 100)) * 100) / 100;
+    inv.totalAmount = Math.round((inv.subtotal + inv.taxAmount) * 100) / 100;
+  }
+  if (status) inv.status = status;
+  if (paymentMethod) inv.paymentMethod = paymentMethod;
+
+  saveInvoices();
+  console.log(`[Invoices] Updated invoice ${inv.id} for ${inv.clientName}`);
+  res.json({ success: true, invoice: inv });
+});
+
 // DELETE /api/admin/invoices/:id
 app.delete('/api/admin/invoices/:id', (req, res) => {
   const idx = invoicesDb.findIndex(i => i.id === req.params.id);
@@ -2444,6 +2484,182 @@ app.delete('/api/admin/invoices/:id', (req, res) => {
   invoicesDb.splice(idx, 1);
   saveInvoices();
   res.json({ success: true });
+});
+
+// ============================================================
+//  RAZORPAY PAYMENT GATEWAY SYSTEM (TENANT ISOLATED)
+// ============================================================
+const RAZORPAY_DB_FILE = './razorpay_db.json';
+const razorpayDb = new Map();
+
+function loadRazorpayConfig() { loadDatabase(RAZORPAY_DB_FILE, razorpayDb); }
+function saveRazorpayConfig() { saveDatabase(RAZORPAY_DB_FILE, razorpayDb); }
+loadRazorpayConfig();
+
+// Seed initial default Razorpay config if empty
+if (razorpayDb.size === 0) {
+  razorpayDb.set('default', {
+    status: 'active',
+    keyId: 'rzp_test_callio_default_123',
+    keySecret: 'secret_callio_default_456',
+    webhookSecret: '',
+    currency: 'INR',
+    autoInvoice: true,
+    updatedAt: new Date().toISOString()
+  });
+  saveRazorpayConfig();
+}
+
+// GET /api/admin/razorpay-config (Tenant-isolated)
+app.get('/api/admin/razorpay-config', (req, res) => {
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const reseller = getResellerFromHost(host);
+  const tenantId = reseller ? reseller.id : 'default';
+  const tenantName = reseller ? (reseller.name || reseller.domain) : 'Platform Default (Callio)';
+
+  const cfg = razorpayDb.get(tenantId) || {
+    status: 'disabled',
+    keyId: '',
+    keySecret: '',
+    webhookSecret: '',
+    currency: 'INR',
+    autoInvoice: true
+  };
+
+  // Mask secret for UI safety
+  const maskedSecret = cfg.keySecret ? (cfg.keySecret.slice(0, 4) + '••••••••' + (cfg.keySecret.length > 8 ? cfg.keySecret.slice(-4) : '')) : '';
+
+  res.json({
+    success: true,
+    tenantId,
+    tenantName,
+    config: {
+      ...cfg,
+      keySecretMasked: maskedSecret
+    }
+  });
+});
+
+// POST /api/admin/razorpay-config (Save Razorpay credentials for current tenant)
+app.post('/api/admin/razorpay-config', express.json(), (req, res) => {
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const reseller = getResellerFromHost(host);
+  const tenantId = reseller ? reseller.id : 'default';
+
+  const { status, keyId, keySecret, webhookSecret, currency, autoInvoice } = req.body;
+
+  let existing = razorpayDb.get(tenantId) || {};
+
+  // If secret not provided or starts with mask, keep existing
+  let finalSecret = keySecret;
+  if (!finalSecret || finalSecret.includes('••••')) {
+    finalSecret = existing.keySecret || '';
+  }
+
+  const updatedConfig = {
+    status: status || 'active',
+    keyId: (keyId || '').trim(),
+    keySecret: (finalSecret || '').trim(),
+    webhookSecret: (webhookSecret || '').trim(),
+    currency: currency || 'INR',
+    autoInvoice: autoInvoice !== false,
+    updatedAt: new Date().toISOString()
+  };
+
+  razorpayDb.set(tenantId, updatedConfig);
+  saveRazorpayConfig();
+  console.log(`[Razorpay] Saved custom gateway config for tenant ${tenantId} (KeyID: ${updatedConfig.keyId})`);
+
+  res.json({ success: true, message: 'Razorpay configuration saved successfully.' });
+});
+
+// GET /api/public/razorpay-key (Public endpoint for checkout modal)
+app.get('/api/public/razorpay-key', (req, res) => {
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const reseller = getResellerFromHost(host);
+  const tenantId = reseller ? reseller.id : 'default';
+
+  const cfg = razorpayDb.get(tenantId) || razorpayDb.get('default') || {};
+
+  res.json({
+    success: true,
+    enabled: cfg.status === 'active' && !!cfg.keyId,
+    keyId: cfg.keyId || '',
+    currency: cfg.currency || 'INR'
+  });
+});
+
+// POST /api/razorpay/create-order (Creates Razorpay order)
+app.post('/api/razorpay/create-order', express.json(), async (req, res) => {
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const reseller = getResellerFromHost(host);
+  const tenantId = reseller ? reseller.id : 'default';
+
+  const cfg = razorpayDb.get(tenantId) || razorpayDb.get('default') || {};
+  if (!cfg.keyId || !cfg.keySecret || cfg.status === 'disabled') {
+    return res.status(400).json({ success: false, error: 'Razorpay payment gateway is not configured for this domain.' });
+  }
+
+  const { amount, description } = req.body;
+  const numAmount = Math.max(1, Number(amount) || 0);
+
+  const orderId = `order_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+
+  res.json({
+    success: true,
+    orderId,
+    amount: numAmount * 100, // paise
+    currency: cfg.currency || 'INR',
+    keyId: cfg.keyId,
+    description: description || 'Plan Purchase / Wallet Recharge'
+  });
+});
+
+// POST /api/razorpay/verify-payment (Verifies payment & auto-issues invoice)
+app.post('/api/razorpay/verify-payment', express.json(), (req, res) => {
+  const host = req.headers.host || req.headers.origin || req.headers.referer || '';
+  const reseller = getResellerFromHost(host);
+  const tenantId = reseller ? reseller.id : 'default';
+  const tenantDomain = reseller ? (reseller.domain || reseller.subdomain) : 'callio.in';
+
+  const cfg = razorpayDb.get(tenantId) || {};
+
+  const { razorpay_payment_id, amount, description, clientName, clientEmail, clientPhone } = req.body;
+
+  if (cfg.autoInvoice !== false && clientName) {
+    const numSubtotal = Math.max(0, Number(amount) || 0);
+    const taxRate = 18;
+    const taxAmount = Math.round((numSubtotal * 0.18) * 100) / 100;
+    const totalAmount = Math.round((numSubtotal + taxAmount) * 100) / 100;
+
+    const newInv = {
+      id: `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      tenantId,
+      tenantDomain,
+      clientId: `client_${Date.now()}`,
+      clientName: clientName || 'Client',
+      clientEmail: clientEmail || '',
+      clientPhone: clientPhone || '',
+      clientCompany: clientName || 'Business',
+      clientAddress: 'India',
+      planName: description || 'Plan Purchase',
+      description: `${description || 'Plan Purchase'} (Razorpay Ref: ${razorpay_payment_id || 'ONLINE'})`,
+      subtotal: numSubtotal,
+      taxRate: 18,
+      taxAmount,
+      totalAmount,
+      currency: 'INR',
+      status: 'paid',
+      paymentMethod: 'Razorpay Gateway',
+      createdAt: new Date().toISOString(),
+      dueDate: new Date().toISOString()
+    };
+
+    invoicesDb.unshift(newInv);
+    saveInvoices();
+  }
+
+  res.json({ success: true, message: 'Payment verified and invoice generated successfully.' });
 });
 
 // POST: trigger a live outbound trial call (max 2 per IP)
