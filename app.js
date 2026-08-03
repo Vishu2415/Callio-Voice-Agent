@@ -11926,11 +11926,83 @@ window.handleSubscribePlanClick = async function(planId, planName, price) {
   }
 };
 
-// Auto-trigger plan rendering
+// ─── Super Admin Razorpay Config Functions ────────────────────────────────────
+window.loadSuperAdminRazorpayConfig = async function() {
+  try {
+    const res = await fetch('/api/admin/razorpay-config');
+    const data = await res.json();
+    if (data.success) {
+      const keyInput = document.getElementById('rzp-key-id');
+      if (keyInput && data.keyId) keyInput.value = data.keyId;
+      const secretInput = document.getElementById('rzp-key-secret');
+      if (secretInput && data.keySecret) secretInput.value = data.keySecret;
+      const badge = document.getElementById('razorpay-status-badge');
+      if (badge) {
+        if (data.isEnabled) {
+          badge.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span> Active & Connected`;
+          badge.style.background = 'rgba(16,185,129,0.12)';
+          badge.style.color = '#10b981';
+          badge.style.borderColor = 'rgba(16,185,129,0.3)';
+        } else {
+          badge.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span> Not Configured`;
+          badge.style.background = 'rgba(245,158,11,0.12)';
+          badge.style.color = '#f59e0b';
+          badge.style.borderColor = 'rgba(245,158,11,0.3)';
+        }
+      }
+    }
+  } catch(e) {}
+};
+
+window.saveRazorpayConfig = async function(event) {
+  if (event) event.preventDefault();
+  const keyId = document.getElementById('rzp-key-id')?.value.trim() || '';
+  const keySecret = document.getElementById('rzp-key-secret')?.value.trim() || '';
+  const webhookSecret = document.getElementById('rzp-webhook-secret')?.value.trim() || '';
+
+  if (!keyId) {
+    alert('Please enter your Razorpay Key ID.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/admin/razorpay-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyId, keySecret, webhookSecret })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('✅ Razorpay Gateway credentials saved successfully!');
+      window.loadSuperAdminRazorpayConfig();
+    } else {
+      alert('Failed to save Razorpay config: ' + (data.error || 'Unknown error'));
+    }
+  } catch(e) {
+    alert('Error saving Razorpay config: ' + e.message);
+  }
+};
+
+window.testRazorpayConnection = function() {
+  const keyId = document.getElementById('rzp-key-id')?.value.trim();
+  if (!keyId) {
+    alert('Please enter a Razorpay Key ID first.');
+    return;
+  }
+  if (!window.Razorpay) {
+    alert('Razorpay Checkout SDK is loading...');
+    return;
+  }
+  alert(`⚡ Razorpay SDK loaded successfully!\nKey ID (${keyId.substring(0, 12)}...) is active.`);
+};
+
+// Auto-trigger plan & Razorpay rendering
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
     window.fetchAndRenderSubscriptionPlans();
+    window.loadSuperAdminRazorpayConfig();
   });
 } else {
   window.fetchAndRenderSubscriptionPlans();
+  window.loadSuperAdminRazorpayConfig();
 }

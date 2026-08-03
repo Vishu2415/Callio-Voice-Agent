@@ -254,7 +254,30 @@
               </div>
             </div>
           </div>
-          <button class="btn-primary" onclick="saveBranding()" style="padding: 11px;">Save Branding</button>
+
+          <!-- 💳 Razorpay Payment Gateway Credentials -->
+          <div class="card" style="padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div style="font-weight: 600;">💳 Payment Gateway (Razorpay)</div>
+              <span id="reseller-rzp-status-badge" style="font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);">NOT CONFIGURED</span>
+            </div>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 14px; line-height: 1.4;">
+              All subscription plan purchases and wallet recharges from your white-label domain will be deposited directly into your own Razorpay account.
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div>
+                <label>Razorpay Key ID</label>
+                <input id="reseller_rzp_key_id" placeholder="e.g. rzp_live_xxxxxxxxxxxx">
+              </div>
+              <div>
+                <label>Razorpay Key Secret</label>
+                <input id="reseller_rzp_key_secret" type="password" placeholder="••••••••••••" autocomplete="current-password">
+              </div>
+              <button type="button" class="btn-primary" onclick="saveResellerRazorpayKeys()" style="padding: 9px; font-weight: 700; font-size: 0.85rem; margin-top: 4px;">💾 Save Payment Credentials</button>
+            </div>
+          </div>
+
+          <button class="btn-primary" onclick="saveBranding()" style="padding: 11px;">Save Branding Settings</button>
           <div id="brandingMsg" style="font-size: 0.82rem; text-align: center; display: none;"></div>
         </div>
 
@@ -775,11 +798,53 @@
   };
 
 
-  document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  window.loadResellerRazorpayKeys = async function() {
+    try {
+      const res = await fetch('/api/admin/razorpay-config');
+      const data = await res.json();
+      if (data.success) {
+        if (data.keyId) {
+          const keyInput = document.getElementById('reseller_rzp_key_id');
+          if (keyInput) keyInput.value = data.keyId;
+          const badge = document.getElementById('reseller-rzp-status-badge');
+          if (badge) {
+            badge.textContent = '🟢 ACTIVE';
+            badge.style.background = 'rgba(16,185,129,0.15)';
+            badge.style.color = '#10b981';
+            badge.style.borderColor = 'rgba(16,185,129,0.3)';
+          }
+        }
+      }
+    } catch(e) {}
+  };
 
+  window.saveResellerRazorpayKeys = async function() {
+    const keyId = document.getElementById('reseller_rzp_key_id').value.trim();
+    const keySecret = document.getElementById('reseller_rzp_key_secret').value.trim();
+
+    try {
+      const res = await fetch('/api/admin/razorpay-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyId, keySecret })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('✅ Payment Gateway Credentials saved successfully!');
+        window.loadResellerRazorpayKeys();
+      } else {
+        alert('Failed to save payment credentials: ' + (data.error || 'Unknown error'));
+      }
+    } catch(e) {
+      alert('Error saving credentials: ' + e.message);
+    }
+  };
+
+  document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
   // Auto-login from localStorage
   window.addEventListener('load', () => {
+    window.loadResellerRazorpayKeys();
     const saved = localStorage.getItem('reseller_session');
     if (saved) {
       try {
