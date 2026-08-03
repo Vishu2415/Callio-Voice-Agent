@@ -10681,8 +10681,8 @@ window.applyBranding = function(branding) {
     img.style.setProperty('height', logoH, 'important');
     img.style.setProperty('max-height', logoH, 'important');
     img.style.width = 'auto';
-    img.style.objectFit = 'contain';
   });
+};
 
 window.updateLiveLogoHeight = function(val) {
   const h = (val || 36) + 'px';
@@ -10698,88 +10698,26 @@ window.updateLiveLogoHeight = function(val) {
   }
 };
 
-  // 4b. Update Login Right Hero Graphic
-  const heroImg = document.getElementById('auth-hero-graphic-img');
-  if (heroImg) {
-    heroImg.src = branding.authHeroUrl || branding.auth_hero_url || 'auth_right_bg.png';
-  }
-
-  // 5. Update app names
-  document.querySelectorAll('.brand-name').forEach(el => {
-    el.textContent = branding.appName;
-  });
-
-  // 6. Update copyright footers
-  document.querySelectorAll('.brand-copyright').forEach(el => {
-    el.textContent = branding.copyrightText;
-  });
-
-  // 7. Apply Whitelabel UI restrictions & title customization
-  if (typeof window.applyWhitelabelUiRestrictions === 'function') {
-    window.applyWhitelabelUiRestrictions();
-  }
-};
-
-
 window.handleBrandingFileUpload = function(inputEl, targetInputId) {
   const file = inputEl.files && inputEl.files[0];
   if (!file) return;
 
   const targetInput = document.getElementById(targetInputId);
   if (targetInput) {
-    targetInput.value = 'Uploading High Resolution Image...';
+    targetInput.value = 'Uploading Image...';
     targetInput.disabled = true;
   }
-
-  const sendFileToServer = (base64Data, rawFallbackDataUrl) => {
-    fetch('/api/upload-branding-asset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileName: file.name,
-        fileData: base64Data
-      })
-    })
-    .then(res => res.json())
-    .then(data => {
-      const finalUrl = (data && data.success && data.url) ? data.url : rawFallbackDataUrl;
-      if (targetInput) {
-        targetInput.value = finalUrl;
-        targetInput.disabled = false;
-        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-        targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      if (typeof window.updateBrandPreview === 'function') window.updateBrandPreview();
-    })
-    .catch(err => {
-      console.warn('Server upload error, using Data URL fallback:', err);
-      if (targetInput) {
-        targetInput.value = rawFallbackDataUrl;
-        targetInput.disabled = false;
-        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-        targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      if (typeof window.updateBrandPreview === 'function') window.updateBrandPreview();
-    });
-  };
 
   const reader = new FileReader();
   reader.onload = function(e) {
     const rawDataUrl = e.target.result;
-
-    // For files under 8MB, upload 100% original file directly without any lossy canvas downscaling
-    if (file.size <= 8 * 1024 * 1024) {
-      const base64Data = rawDataUrl.split(',')[1];
-      sendFileToServer(base64Data, rawDataUrl);
-      return;
-    }
-
-    // For oversized files (>8MB), downscale gracefully to max 2400px preserving HD clarity
     const img = new Image();
+
     img.onload = function() {
+      // Downscale to max 1600px for crystal-clear HD quality while keeping file under 300KB
       let width = img.width;
       let height = img.height;
-      const maxDim = 2400; // 2K/HD resolution limit
+      const maxDim = 1600;
 
       if (width > maxDim || height > maxDim) {
         if (width > height) {
@@ -10800,14 +10738,55 @@ window.handleBrandingFileUpload = function(inputEl, targetInputId) {
       ctx.drawImage(img, 0, 0, width, height);
 
       const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-      const compressedDataUrl = canvas.toDataURL(mimeType, 0.95);
+      const compressedDataUrl = canvas.toDataURL(mimeType, 0.88);
       const base64Data = compressedDataUrl.split(',')[1];
-      sendFileToServer(base64Data, compressedDataUrl);
+
+      fetch('/api/upload-branding-asset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileData: base64Data
+        })
+      })
+      .then(async res => {
+        if (!res.ok) {
+          const errText = await res.text();
+          let errJson;
+          try { errJson = JSON.parse(errText); } catch(e){}
+          throw new Error(errJson?.error || `Upload failed with HTTP ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (data && data.success && data.url) {
+          if (targetInput) {
+            targetInput.value = data.url;
+            targetInput.disabled = false;
+            targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+            targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          if (typeof window.updateBrandPreview === 'function') window.updateBrandPreview();
+        } else {
+          throw new Error(data.error || 'Upload failed');
+        }
+      })
+      .catch(err => {
+        console.error('Image upload failed:', err);
+        alert('Image upload failed: ' + (err.message || 'File too large. Please select a smaller image.'));
+        if (targetInput) {
+          targetInput.value = '';
+          targetInput.disabled = false;
+        }
+      });
     };
 
     img.onerror = function() {
-      const base64Data = rawDataUrl.split(',')[1];
-      sendFileToServer(base64Data, rawDataUrl);
+      alert('Invalid image file format.');
+      if (targetInput) {
+        targetInput.value = '';
+        targetInput.disabled = false;
+      }
     };
 
     img.src = rawDataUrl;
@@ -10815,8 +10794,6 @@ window.handleBrandingFileUpload = function(inputEl, targetInputId) {
 
   reader.readAsDataURL(file);
 };
-
-
 
 window.saveBrandingSettings = async function(event) {
   event.preventDefault();
@@ -10852,17 +10829,27 @@ window.saveBrandingSettings = async function(event) {
         id, customDomain, subdomain, appName, logoUrl, logoHeight, faviconUrl, authHeroUrl, primaryColor, secondaryColor, supportEmail, supportPhone, copyrightText, demoSystemPrompt
       })
     });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      let errJson;
+      try { errJson = JSON.parse(errText); } catch(e){}
+      const msg = errJson?.error || `HTTP ${res.status} ${res.statusText}`;
+      alert('Failed to save branding: ' + msg);
+      return;
+    }
+
     const data = await res.json();
     if (data.success) {
-      alert('Branding & White Labeling settings saved successfully!');
+      alert('✅ Branding & White Labeling settings saved successfully!');
       window.BrandingContext = data.branding;
       window.applyBranding(data.branding);
     } else {
-      alert('Failed to save branding: ' + data.error);
+      alert('Failed to save branding: ' + (data.error || 'Unknown error'));
     }
   } catch (err) {
     console.error('Error saving branding:', err);
-    alert('Communication error saving branding.');
+    alert('Communication error saving branding: ' + err.message);
   }
 };
 
