@@ -2764,7 +2764,21 @@ app.get('/api/admin/invoices', (req, res) => {
     }
   }
 
-  const sorted = list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const issuerGstin = reseller ? (reseller.gstin || '') : (config.gstin || '');
+
+  const mappedInvoices = list.map(inv => {
+    let customerGstin = inv.customerGstin || inv.clientGstin || '';
+    if (!customerGstin && inv.clientId && clientsDb.has(inv.clientId)) {
+      customerGstin = clientsDb.get(inv.clientId).gstin || '';
+    }
+    return {
+      ...inv,
+      issuerGstin: inv.issuerGstin || issuerGstin,
+      customerGstin: customerGstin
+    };
+  });
+
+  const sorted = mappedInvoices.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.json({ success: true, invoices: sorted });
 });
 
@@ -2788,7 +2802,8 @@ app.post('/api/admin/invoices', express.json(), (req, res) => {
     taxRate,
     paymentMethod,
     status,
-    dueDate
+    dueDate,
+    customerGstin
   } = req.body;
 
   if (!clientName || subtotal === undefined) {
@@ -2801,6 +2816,7 @@ app.post('/api/admin/invoices', express.json(), (req, res) => {
   const numTotalAmount = Math.round((numSubtotal + numTaxAmount) * 100) / 100;
 
   const invoiceId = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const issuerGstin = reseller ? (reseller.gstin || '') : (config.gstin || '');
 
   const newInvoice = {
     id: invoiceId,
@@ -2821,6 +2837,8 @@ app.post('/api/admin/invoices', express.json(), (req, res) => {
     currency: 'INR',
     status: status || 'paid',
     paymentMethod: paymentMethod || 'Online Payment',
+    customerGstin: customerGstin || (clientId && clientsDb.has(clientId) ? (clientsDb.get(clientId).gstin || '') : ''),
+    issuerGstin: issuerGstin,
     createdAt: new Date().toISOString(),
     dueDate: dueDate ? new Date(dueDate).toISOString() : new Date(Date.now() + 7 * 86400000).toISOString()
   };

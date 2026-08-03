@@ -9542,6 +9542,7 @@ window.openViewInvoiceModal = function(invoiceId) {
         <div style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${escapeHtml(brandName)}</div>
         <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">Domain: ${escapeHtml(inv.tenantDomain || window.location.host)}</div>
         <div style="font-size: 0.82rem; color: #475569;">Email: ${escapeHtml(brand.supportEmail || 'support@' + window.location.host)}</div>
+        ${inv.issuerGstin || window._domainGstin ? `<div style="font-size: 0.82rem; color: #059669; font-weight: 700; margin-top: 3px; font-family: monospace;">GSTIN: ${escapeHtml(inv.issuerGstin || window._domainGstin)}</div>` : `<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">GSTIN: Provider / Unregistered</div>`}
       </div>
       <div>
         <div style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">BILLED TO (CUSTOMER)</div>
@@ -9549,6 +9550,7 @@ window.openViewInvoiceModal = function(invoiceId) {
         ${inv.clientCompany && inv.clientCompany !== inv.clientName ? `<div style="font-size: 0.82rem; color: #475569;">${escapeHtml(inv.clientCompany)}</div>` : ''}
         <div style="font-size: 0.82rem; color: #475569;">${escapeHtml(inv.clientEmail || '—')} | ${escapeHtml(inv.clientPhone || '—')}</div>
         <div style="font-size: 0.82rem; color: #475569;">${escapeHtml(inv.clientAddress || 'India')}</div>
+        ${inv.customerGstin || inv.clientGstin ? `<div style="font-size: 0.82rem; color: #2563eb; font-weight: 700; margin-top: 3px; font-family: monospace;">GSTIN: ${escapeHtml(inv.customerGstin || inv.clientGstin)}</div>` : `<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">GSTIN: Consumer / Unregistered</div>`}
       </div>
     </div>
 
