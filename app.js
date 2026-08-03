@@ -10727,20 +10727,59 @@ window.handleBrandingFileUpload = function(inputEl, targetInputId) {
 
   const targetInput = document.getElementById(targetInputId);
   if (targetInput) {
-    targetInput.value = 'Compressing & Uploading...';
+    targetInput.value = 'Uploading High Resolution Image...';
     targetInput.disabled = true;
   }
+
+  const sendFileToServer = (base64Data, rawFallbackDataUrl) => {
+    fetch('/api/upload-branding-asset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: file.name,
+        fileData: base64Data
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      const finalUrl = (data && data.success && data.url) ? data.url : rawFallbackDataUrl;
+      if (targetInput) {
+        targetInput.value = finalUrl;
+        targetInput.disabled = false;
+        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+        targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (typeof window.updateBrandPreview === 'function') window.updateBrandPreview();
+    })
+    .catch(err => {
+      console.warn('Server upload error, using Data URL fallback:', err);
+      if (targetInput) {
+        targetInput.value = rawFallbackDataUrl;
+        targetInput.disabled = false;
+        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+        targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (typeof window.updateBrandPreview === 'function') window.updateBrandPreview();
+    });
+  };
 
   const reader = new FileReader();
   reader.onload = function(e) {
     const rawDataUrl = e.target.result;
-    const img = new Image();
 
+    // For files under 8MB, upload 100% original file directly without any lossy canvas downscaling
+    if (file.size <= 8 * 1024 * 1024) {
+      const base64Data = rawDataUrl.split(',')[1];
+      sendFileToServer(base64Data, rawDataUrl);
+      return;
+    }
+
+    // For oversized files (>8MB), downscale gracefully to max 2400px preserving HD clarity
+    const img = new Image();
     img.onload = function() {
-      // Downscale image to max 600px width/height for optimal web performance
       let width = img.width;
       let height = img.height;
-      const maxDim = 600;
+      const maxDim = 2400; // 2K/HD resolution limit
 
       if (width > maxDim || height > maxDim) {
         if (width > height) {
@@ -10756,48 +10795,19 @@ window.handleBrandingFileUpload = function(inputEl, targetInputId) {
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, width, height);
 
       const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-      const compressedDataUrl = canvas.toDataURL(mimeType, 0.85);
+      const compressedDataUrl = canvas.toDataURL(mimeType, 0.95);
       const base64Data = compressedDataUrl.split(',')[1];
-
-      fetch('/api/upload-branding-asset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileData: base64Data
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        const finalUrl = (data && data.success && data.url) ? data.url : compressedDataUrl;
-        if (targetInput) {
-          targetInput.value = finalUrl;
-          targetInput.disabled = false;
-          targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-          targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        if (typeof window.updateBrandPreview === 'function') window.updateBrandPreview();
-      })
-      .catch(err => {
-        console.warn('Server upload error, using compressed Data URL fallback:', err);
-        if (targetInput) {
-          targetInput.value = compressedDataUrl;
-          targetInput.disabled = false;
-          targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-          targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        if (typeof window.updateBrandPreview === 'function') window.updateBrandPreview();
-      });
+      sendFileToServer(base64Data, compressedDataUrl);
     };
 
     img.onerror = function() {
-      if (targetInput) {
-        targetInput.value = rawDataUrl;
-        targetInput.disabled = false;
-      }
+      const base64Data = rawDataUrl.split(',')[1];
+      sendFileToServer(base64Data, rawDataUrl);
     };
 
     img.src = rawDataUrl;

@@ -1919,7 +1919,7 @@ app.post('/api/admin/enterprise-inquiry/update-status', express.json(), (req, re
   res.json({ success: true, inquiry });
 });
 
-app.post('/api/upload-branding-asset', (req, res) => {
+app.post('/api/upload-branding-asset', express.json({ limit: '50mb' }), (req, res) => {
   const { fileName, fileData } = req.body;
   if (!fileName || !fileData) {
     return res.status(400).json({ success: false, error: 'File name and data are required.' });
