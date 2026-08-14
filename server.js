@@ -4493,6 +4493,71 @@ app.post('/api/contacts/batch', authMiddleware('contacts'), (req, res) => {
   res.json({ success: true, added });
 });
 
+// POST /api/contacts/single — Add a single contact (creates group/tag automatically if needed)
+app.post('/api/contacts/single', express.json(), (req, res) => {
+  try {
+    let { name, phone, tag, clientId } = req.body;
+    phone = phone ? String(phone).trim() : '';
+    name = name ? String(name).trim() : '';
+    tag = tag ? String(tag).trim() : 'Default';
+
+    if (!phone) {
+      return res.status(400).json({ success: false, error: 'Phone number is required.' });
+    }
+
+    // Resolve client ID for isolation
+    if (!clientId && req.user) clientId = req.user.id;
+    if (!clientId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        const session = sessionsDb.get(token);
+        if (session) clientId = session.userId;
+      }
+    }
+
+    // Find or create group for this tag
+    let targetGroup = Array.from(groupsDb.values()).find(g => 
+      (g.name || '').toLowerCase() === tag.toLowerCase() && (!clientId || g.clientId === clientId || g.clientId === 'admin')
+    );
+
+    let groupId;
+    if (targetGroup) {
+      groupId = targetGroup.id;
+    } else {
+      groupId = `grp_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+      const newGroup = {
+        id: groupId,
+        name: tag,
+        clientId: clientId || null,
+        createdAt: Date.now()
+      };
+      groupsDb.set(groupId, newGroup);
+      saveGroups();
+    }
+
+    // Create & save contact
+    const contactId = `cont_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const newContact = {
+      id: contactId,
+      groupId,
+      phone,
+      name,
+      tag,
+      createdAt: Date.now()
+    };
+
+    contactsDb.set(contactId, newContact);
+    saveContacts();
+
+    console.log(`[Single Contact Added] ${name} (${phone}) [Tag: ${tag}] under group ${groupId} (Client: ${clientId || 'unbound'})`);
+    res.json({ success: true, contact: newContact, groupId });
+  } catch (err) {
+    console.error('[Add Single Contact Error]:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/contacts', express.json(), authMiddleware('contacts'), (req, res) => {
   const { groupId, name, phone, tag } = req.body;
   if (!groupId || !groupsDb.has(groupId) || !phone) {

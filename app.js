@@ -3956,7 +3956,7 @@ window.addSingleContactFromSidebar = async function() {
   const phoneInput = document.getElementById('single-contact-phone');
   const tagInput = document.getElementById('single-contact-tag');
   
-  if (!nameInput || !phoneInput) return;
+  if (!nameInput || !phoneInput) return false;
   
   const name = nameInput.value.trim();
   const phone = phoneInput.value.trim();
@@ -3965,48 +3965,31 @@ window.addSingleContactFromSidebar = async function() {
   
   if (!phone) {
     alert("Phone number is required.");
-    return;
+    return false;
   }
   
   try {
-    const clientId = loggedInUser ? loggedInUser.id : null;
-    let targetGroup = (localGroupsCache || []).find(g => g.name.toLowerCase() === tag.toLowerCase());
-    let groupId = targetGroup ? targetGroup.id : null;
+    const clientId = (loggedInUser && loggedInUser.id) ? loggedInUser.id : (window.CurrentClient?.id || (JSON.parse(localStorage.getItem('user_session') || '{}').id || ''));
 
-    if (!groupId) {
-      const groupRes = await fetch('/api/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: tag, clientId })
-      });
-      const groupData = await groupRes.json();
-      if (groupData.success) {
-        groupId = groupData.group.id;
-      } else {
-        alert("Failed to create tag category: " + groupData.error);
-        return;
-      }
-    }
-
-    const res = await fetch('/api/contacts', {
+    const res = await fetch('/api/contacts/single', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ groupId, name, phone, tag })
+      body: JSON.stringify({ name, phone, tag, clientId })
     });
     const data = await res.json();
     if (data.success) {
       nameInput.value = '';
       phoneInput.value = '';
       if (tagInput) tagInput.value = '';
-      fetchGroups();
+      if (typeof fetchGroups === 'function') fetchGroups();
       alert("✅ Contact added successfully!");
       return true;
     } else {
-      alert("Error adding contact: " + data.error);
+      alert("Error adding contact: " + (data.error || 'Failed to save contact'));
       return false;
     }
   } catch (e) {
-    console.error(e);
+    console.error("Add single contact exception:", e);
     alert("Error adding contact: " + e.message);
     return false;
   }
@@ -4022,7 +4005,7 @@ window.openAddSingleContactModal = function() {
     if (n) n.value = '';
     if (p) p.value = '';
     if (t) t.value = '';
-    if (n) n.focus();
+    setTimeout(() => { if (n) n.focus(); }, 100);
   }
 };
 
@@ -4032,10 +4015,20 @@ window.closeAddSingleContactModal = function() {
 };
 
 window.submitSingleContactFromModal = async function() {
-  if (typeof window.addSingleContactFromSidebar === 'function') {
+  const btn = document.querySelector('#modal-add-single-contact button.btn-primary');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = '💾 Saving...';
+  }
+  try {
     const success = await window.addSingleContactFromSidebar();
-    if (success !== false) {
+    if (success) {
       window.closeAddSingleContactModal();
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = '💾 Save Contact';
     }
   }
 };
