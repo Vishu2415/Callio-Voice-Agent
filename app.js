@@ -10134,7 +10134,7 @@ window.viewClientCallDetail = function(callSid) {
   elTabSummary.click();
 };
 
-window.renderAdminPlansTable = async function() {
+window.fetchAdminPlans = window.renderAdminPlansTable = async function() {
   try {
     const isReseller = loggedInUser && loggedInUser.role === 'reseller';
     
