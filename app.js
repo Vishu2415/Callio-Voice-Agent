@@ -12239,40 +12239,205 @@ window.fetchAndRenderSubscriptionPlans = async function() {
   }
 };
 
-window.handleSubscribePlanClick = async function(planId, planName, price) {
-  if (confirm(`Do you want to subscribe to ${planName} for ₹${price.toLocaleString('en-IN')}/month?`)) {
-    try {
-      const rRes = await fetch('/api/admin/razorpay-config');
-      const rData = await rRes.json();
-      
-      if (rData.success && rData.isEnabled && window.Razorpay && rData.keyId) {
-        const options = {
-          key: rData.keyId,
-          amount: price * 100,
-          currency: 'INR',
-          name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
-          description: `Subscription for ${planName}`,
-          image: window.BrandingContext?.logoUrl || '/logo_new.png',
-          handler: function (response) {
-            alert(`✅ Payment Successful! Payment ID: ${response.razorpay_payment_id}\nYour account is now upgraded to ${planName}.`);
+window.handleSubscribePlanClick = function(planId, planName, basePrice) {
+  const gstRate = 0.18;
+  const gstAmount = Number((basePrice * gstRate).toFixed(2));
+  const totalAmount = Number((basePrice + gstAmount).toFixed(2));
+
+  // Remove existing modal if present
+  const existingModal = document.getElementById('subscription-checkout-modal-overlay');
+  if (existingModal) existingModal.remove();
+
+  const modalHtml = `
+    <div id="subscription-checkout-modal-overlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: 'Plus Jakarta Sans', sans-serif; box-sizing: border-box; animation: fadeIn 0.2s ease-out;">
+      <div style="background: var(--bg-surface, #0B0F19); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)); border-radius: 24px; width: 100%; max-width: 480px; padding: 28px 24px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); color: var(--text-main, #F9FAFB); position: relative; box-sizing: border-box;">
+        
+        <!-- Close Button -->
+        <button onclick="window.closeCheckoutModal()" style="position: absolute; top: 18px; right: 18px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted, #9CA3AF); border-radius: 50%; width: 32px; height: 32px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</button>
+
+        <!-- Header -->
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+          <div style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, rgba(234, 88, 12, 0.2), rgba(249, 115, 22, 0.1)); border: 1px solid rgba(234, 88, 12, 0.3); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+            ⚡
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 1.25rem; font-weight: 800; color: var(--text-main, #fff); font-family: var(--font-title);">Subscription Summary</h3>
+            <span style="font-size: 0.78rem; color: var(--text-muted, #9ca3af);">Review tax invoice & payable amount</span>
+          </div>
+        </div>
+
+        <!-- Selected Plan Banner -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--color-cyan, #38bdf8); font-weight: 700; letter-spacing: 0.5px;">Selected Plan</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-main, #fff); margin-top: 2px;">${escapeHtml(planName)}</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.72rem; color: var(--text-muted, #9ca3af);">Billing Cycle</div>
+            <div style="font-size: 0.85rem; font-weight: 700; color: #10b981;">Monthly Auto-Debit</div>
+          </div>
+        </div>
+
+        <!-- Tax & Cost Breakdown -->
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 18px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 10px; color: var(--text-muted, #9ca3af);">
+            <span>Base Subscription Price</span>
+            <span style="font-weight: 700; color: var(--text-main, #fff);">₹${Number(basePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 14px; color: var(--text-muted, #9ca3af);">
+            <span style="display: flex; align-items: center; gap: 4px;">
+              <span>Government GST (18%)</span>
+              <span style="font-size: 0.65rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: 700;">Tax</span>
+            </span>
+            <span style="font-weight: 700; color: #38bdf8;">+ ₹${Number(gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div style="border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 12px; display: flex; justify-content: space-between; align-items: baseline;">
+            <span style="font-size: 0.95rem; font-weight: 800; color: var(--text-main, #fff);">Total Payable Amount</span>
+            <span style="font-size: 1.45rem; font-weight: 900; color: #10b981; font-family: var(--font-title);">₹${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} <span style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted);">/ mo</span></span>
+          </div>
+        </div>
+
+        <!-- Optional GSTIN Input for B2B Input Tax Credit -->
+        <div style="margin-bottom: 24px;">
+          <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--text-muted, #9ca3af); margin-bottom: 6px;">Business GSTIN <span style="font-weight: 400; opacity: 0.7;">(Optional for GST Invoice Claim)</span></label>
+          <input type="text" id="checkout-user-gstin" placeholder="e.g. 07AAAAA0000A1Z5" style="width: 100%; height: 42px; padding: 0 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 0.85rem; font-family: monospace; outline: none; box-sizing: border-box; text-transform: uppercase;" />
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 12px;">
+          <button onclick="window.closeCheckoutModal()" class="btn" style="flex: 1; height: 46px; border-radius: 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main, #fff); font-weight: 700; cursor: pointer; transition: all 0.2s;">Cancel</button>
+          <button id="btn-proceed-razorpay-pay" onclick="window.proceedToRazorpayCheckout('${planId}', '${escapeHtml(planName)}', ${basePrice}, ${totalAmount})" class="btn" style="flex: 2; height: 46px; border-radius: 14px; background: linear-gradient(135deg, #FF6B4A, #ea580c); border: none; color: #fff; font-weight: 800; font-size: 0.92rem; cursor: pointer; box-shadow: 0 8px 24px rgba(234, 88, 12, 0.4); transition: all 0.2s;">
+            🔒 Pay ₹${Number(totalAmount).toLocaleString('en-IN')}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+};
+
+window.closeCheckoutModal = function() {
+  const modal = document.getElementById('subscription-checkout-modal-overlay');
+  if (modal) modal.remove();
+};
+
+window.proceedToRazorpayCheckout = async function(planId, planName, basePrice, totalAmount) {
+  const gstinInput = document.getElementById('checkout-user-gstin');
+  const customerGstin = gstinInput ? gstinInput.value.trim().toUpperCase() : '';
+
+  const btnPay = document.getElementById('btn-proceed-razorpay-pay');
+  if (btnPay) {
+    btnPay.disabled = true;
+    btnPay.innerText = '⏳ Initializing Gateway...';
+  }
+
+  const clientId = (loggedInUser && loggedInUser.id) ? loggedInUser.id : (window.CurrentClient?.id || '');
+
+  try {
+    // 1. Attempt Razorpay Subscription API
+    const subRes = await fetch('/api/payments/subscriptions/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planId, clientId, customerGstin })
+    });
+
+    const subData = await subRes.json();
+
+    if (subData.success && subData.subscriptionId && window.Razorpay) {
+      window.closeCheckoutModal();
+
+      const options = {
+        key: subData.keyId,
+        subscription_id: subData.subscriptionId,
+        name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
+        description: `${planName} Subscription (₹${basePrice} + 18% GST)`,
+        image: window.BrandingContext?.logoUrl || '/logo_new.png',
+        handler: async function (response) {
+          try {
+            const verifyRes = await fetch('/api/payments/subscriptions/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature: response.razorpay_signature,
+                planId,
+                clientId,
+                customerGstin
+              })
+            });
+            const vData = await verifyRes.json();
+            if (vData.success) {
+              alert(`🎉 Subscription Activated!\n\nSuccessfully subscribed to ${planName} for ₹${Number(totalAmount).toLocaleString('en-IN')}/month (including 18% GST).`);
+              location.reload();
+            } else {
+              alert(vData.error || 'Verification failed. Please contact support.');
+            }
+          } catch(e) {
+            alert('Payment completed! Refreshing workspace...');
             location.reload();
-          },
-          prefill: {
-            name: window.CurrentClient?.name || '',
-            email: window.CurrentClient?.email || ''
-          },
-          theme: {
-            color: window.BrandingContext?.primaryColor || '#ea580c'
           }
-        };
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-      } else {
-        alert(`Plan Upgrade Request Submitted!\nPlease contact support/admin to activate ${planName} for ₹${price.toLocaleString('en-IN')}/mo.`);
-      }
-    } catch(e) {
-      alert(`Plan Upgrade Request Received for ${planName}. Support team will assist you shortly.`);
+        },
+        prefill: {
+          name: loggedInUser?.name || window.CurrentClient?.name || '',
+          email: loggedInUser?.email || window.CurrentClient?.email || ''
+        },
+        theme: { color: '#ea580c' }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      return;
     }
+
+    // 2. Fallback to Standard Razorpay Payment Gateway Modal
+    const rRes = await fetch('/api/admin/razorpay-config');
+    const rData = await rRes.json();
+
+    if (rData.success && rData.isEnabled && window.Razorpay && rData.keyId) {
+      window.closeCheckoutModal();
+
+      const options = {
+        key: rData.keyId,
+        amount: Math.round(totalAmount * 100),
+        currency: 'INR',
+        name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
+        description: `Subscription for ${planName} (Incl. 18% GST)`,
+        image: window.BrandingContext?.logoUrl || '/logo_new.png',
+        handler: async function (response) {
+          try {
+            await fetch('/api/payments/subscriptions/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                planId,
+                clientId,
+                customerGstin
+              })
+            });
+          } catch(e) {}
+          alert(`✅ Payment Successful! Payment ID: ${response.razorpay_payment_id}\nYour account is now upgraded to ${planName}.`);
+          location.reload();
+        },
+        prefill: {
+          name: loggedInUser?.name || window.CurrentClient?.name || '',
+          email: loggedInUser?.email || window.CurrentClient?.email || ''
+        },
+        theme: { color: '#ea580c' }
+      };
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } else {
+      alert(`Plan Upgrade Request Received for ${planName}.\nTotal Amount: ₹${Number(totalAmount).toLocaleString('en-IN')}/mo (Incl. 18% GST).\nPlease configure Razorpay Key ID in Admin Panel or contact support.`);
+      window.closeCheckoutModal();
+    }
+  } catch (err) {
+    console.error('Checkout Exception:', err);
+    alert(`Could not initiate payment gateway. Please try again or contact support.`);
+    window.closeCheckoutModal();
   }
 };
 
