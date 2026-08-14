@@ -8006,6 +8006,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
         
         // Audio Response from Gemini
         if (response.serverContent?.modelTurn) {
+          ws.hasFirstAudioChunkSent = true;
           ws.isInterrupted = false; // Reset interruption flag since a new turn has started
           if (ws.greetingTimeout) {
             clearTimeout(ws.greetingTimeout);
@@ -8184,6 +8185,10 @@ Follow these rules strictly to sound completely human, lively, and emotional:
       // Only handle as binary if: (1) ws library flags it as binary, AND (2) we already
       // received the 'start' event (ws.provider is set), AND (3) Gemini is ready.
       if (isBinary && ws.provider === 'vobiz' && isGeminiReady) {
+        // Suppress incoming carrier audio noise while initial greeting turn is generating to eliminate 14s VAD delay
+        if (ws.hasGreetingSent && !ws.hasFirstAudioChunkSent) {
+          return;
+        }
         const audioBuffer = Buffer.isBuffer(message) ? message : Buffer.from(message);
         let pcm16Buf;
         if (audioBuffer.length <= 160) {
