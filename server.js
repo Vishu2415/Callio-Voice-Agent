@@ -1269,10 +1269,10 @@ ${formattedTranscript}`;
         }
 
         callState.customerName = extractedName;
-        if (callState.callSid && callsDb.has(callState.callSid)) {
-          const cRecord = callsDb.get(callState.callSid);
+        if (callState.callSid && activeCalls.has(callState.callSid)) {
+          const cRecord = activeCalls.get(callState.callSid);
           cRecord.customerName = extractedName;
-          callsDb.set(callState.callSid, cRecord);
+          activeCalls.set(callState.callSid, cRecord);
         }
       }
     }
