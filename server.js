@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import dotenv from 'dotenv';
@@ -1615,6 +1616,7 @@ function getIncomingCallConfig(query = {}, fromNum = '', clientId = '', toNum = 
 
 
 const app = express();
+app.use(compression());
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.json({ limit: '50mb' }));
 
@@ -2417,13 +2419,21 @@ app.get('/reseller', (req, res) => {
   res.sendFile(path.join(__dirname, 'reseller.html'));
 });
 
-// Serving the static front-end files for fallback UI (with no-cache headers)
+// Serving static front-end files with smart caching headers
 app.use(express.static('./', {
+  maxAge: '1h',
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js') || filePath.endsWith('.html') || filePath.endsWith('.css')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
+    // Images & Fonts: Cache for 1 day in browser
+    if (/\.(png|jpg|jpeg|gif|ico|svg|webp|woff2?|ttf|eot)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+    }
+    // CSS & JS files: Cache for 1 hour
+    else if (/\.(css|js)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+    // HTML files: Quick revalidation check
+    else if (/\.html$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
     }
   }
 }));

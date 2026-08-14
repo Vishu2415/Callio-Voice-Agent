@@ -23,17 +23,39 @@
                 }
             } catch (e) {}
 
-            // 2. Synchronous fresh fetch if no cache
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', '/api/public/branding?domain=' + encodeURIComponent(hostname), false);
-            try {
-                xhr.send();
-                if (xhr.status === 200) {
-                    branding = JSON.parse(xhr.responseText);
-                    window.BrandingContext = branding;
-                    try { localStorage.setItem('cached_domain_branding_' + hostname, JSON.stringify(branding)); } catch (e) {}
+            function applyBrandingStyles(b) {
+                if (!b) return;
+                let styleTag = document.getElementById('dynamic-branding-colors');
+                if (!styleTag) {
+                    styleTag = document.createElement('style');
+                    styleTag.id = 'dynamic-branding-colors';
+                    document.head.appendChild(styleTag);
                 }
-            } catch (e) {}
+                styleTag.innerHTML = `
+                    :root {
+                        --color-primary: ${b.primaryColor || '#FF6B4A'} !important;
+                        --color-secondary: ${b.secondaryColor || '#ae3115'} !important;
+                        --color-primary-btn: ${b.primaryColor || '#FF6B4A'} !important;
+                        --color-primary-btn-hover: ${b.secondaryColor || '#ae3115'} !important;
+                    }
+                `;
+            }
+
+            if (branding) {
+                applyBrandingStyles(branding);
+            }
+
+            // 2. Non-blocking Async fetch to update branding cache
+            fetch('/api/public/branding?domain=' + encodeURIComponent(hostname))
+                .then(r => r.json())
+                .then(fresh => {
+                    if (fresh) {
+                        window.BrandingContext = fresh;
+                        applyBrandingStyles(fresh);
+                        try { localStorage.setItem('cached_domain_branding_' + hostname, JSON.stringify(fresh)); } catch (e) {}
+                    }
+                })
+                .catch(() => {});
 
             if (branding) {
                 const logoH = (branding.logoHeight || branding.logo_height || 36) + 'px';
