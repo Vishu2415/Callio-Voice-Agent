@@ -630,6 +630,7 @@ loadCalls();
 loadAgents();
 loadContacts();
 loadGroups();
+loadBroadcasts();
 loadCrmRules();
 loadCrmLogs();
 loadClients();
