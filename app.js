@@ -6069,10 +6069,20 @@ function applyUserPlanAndLimits(user) {
   const moodLabel = moodSelect?.previousElementSibling;
 
   if (user.role === 'client') {
-    const plan = user.plan || 'basic';
+    const rawPlan = (user.plan || 'none').toLowerCase();
+    const isNoPlan = (!rawPlan || rawPlan === 'none' || rawPlan === 'no_plan' || rawPlan === 'inactive');
+    const plan = isNoPlan ? 'none' : rawPlan;
     
     // Find active plan details
-    const planDetails = (window.activePlans || []).find(p => p.id.toLowerCase() === plan.toLowerCase()) || {
+    const planDetails = (window.activePlans || []).find(p => p.id.toLowerCase() === plan.toLowerCase()) || (isNoPlan ? {
+      id: 'none',
+      name: 'No Active Subscription',
+      max_minutes: 0,
+      max_agents: 0,
+      rate_per_minute: 0,
+      crm_integration: false,
+      api_sharing: false
+    } : {
       id: 'basic',
       name: 'Basic Plan',
       max_minutes: 100,
@@ -6080,20 +6090,27 @@ function applyUserPlanAndLimits(user) {
       rate_per_minute: 5,
       crm_integration: false,
       api_sharing: false
-    };
+    });
 
     // Update active plan UI elements
     const planBadge = document.getElementById('active-plan-badge');
     if (planBadge) {
-      planBadge.textContent = `${planDetails.name.toUpperCase()}`;
-      if (planDetails.id === 'basic') {
-        planBadge.style.background = 'rgba(255, 152, 0, 0.12)';
-        planBadge.style.color = '#ff9800';
-        planBadge.style.borderColor = 'rgba(255, 152, 0, 0.25)';
+      if (isNoPlan) {
+        planBadge.textContent = 'NO ACTIVE PLAN';
+        planBadge.style.background = 'rgba(239, 68, 68, 0.12)';
+        planBadge.style.color = '#ef4444';
+        planBadge.style.borderColor = 'rgba(239, 68, 68, 0.25)';
       } else {
-        planBadge.style.background = 'rgba(76, 175, 80, 0.12)';
-        planBadge.style.color = '#4caf50';
-        planBadge.style.borderColor = 'rgba(76, 175, 80, 0.25)';
+        planBadge.textContent = `${planDetails.name.toUpperCase()}`;
+        if (planDetails.id === 'basic') {
+          planBadge.style.background = 'rgba(255, 152, 0, 0.12)';
+          planBadge.style.color = '#ff9800';
+          planBadge.style.borderColor = 'rgba(255, 152, 0, 0.25)';
+        } else {
+          planBadge.style.background = 'rgba(76, 175, 80, 0.12)';
+          planBadge.style.color = '#4caf50';
+          planBadge.style.borderColor = 'rgba(76, 175, 80, 0.25)';
+        }
       }
     }
     
@@ -12173,7 +12190,9 @@ window.fetchAndRenderSubscriptionPlans = async function() {
       return;
     }
 
-    const currentClientPlan = (window.CurrentClient && window.CurrentClient.plan) ? window.CurrentClient.plan.toLowerCase() : 'basic';
+    const activeUser = loggedInUser || window.CurrentClient;
+    const rawUserPlan = (activeUser && activeUser.plan) ? String(activeUser.plan).trim().toLowerCase() : 'none';
+    const currentClientPlan = (rawUserPlan === 'none' || rawUserPlan === 'no_plan' || rawUserPlan === 'inactive' || !rawUserPlan) ? '' : rawUserPlan;
 
     container.innerHTML = data.plans.map(p => {
       const isCurrent = (currentClientPlan === p.id.toLowerCase());

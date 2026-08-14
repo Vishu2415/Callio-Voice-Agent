@@ -4461,10 +4461,10 @@ body.light-theme .input-action-btn:hover,
     display: inline-flex !important;
     flex-direction: row !important;
     align-items: center !important;
-    gap: 5px !important;
-    font-size: 0.76rem !important;
-    padding: 4px 10px !important;
-    height: 28px !important;
+    gap: 6px !important;
+    font-size: 0.78rem !important;
+    padding: 6px 12px !important;
+    height: 32px !important;
     background: transparent !important;
     border: none !important;
     border-radius: 9999px !important;
@@ -4472,7 +4472,16 @@ body.light-theme .input-action-btn:hover,
     text-transform: none !important;
     font-weight: 500 !important;
     letter-spacing: 0 !important;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
     transition: all 0.2s ease !important;
+  }
+  
+  .glass-navbar .nav-btn span {
+    white-space: nowrap !important;
+    display: inline-block !important;
+    word-break: keep-all !important;
+    line-height: 1 !important;
   }
   
   html[data-theme="light"] .glass-navbar .nav-btn {
@@ -4494,12 +4503,13 @@ body.light-theme .input-action-btn:hover,
   }
   
   .glass-navbar .nav-btn svg {
-    width: 13px !important;
-    height: 13px !important;
+    width: 14px !important;
+    height: 14px !important;
     margin: 0 !important;
     display: block !important;
     top: 0 !important; /* Reset desktop top offset */
     stroke-width: 2.5px !important;
+    flex-shrink: 0 !important;
   }
   
   .glass-navbar .nav-btn::after {
@@ -4513,6 +4523,11 @@ body.light-theme .input-action-btn:hover,
   /* Make sure cards stretch full-width on mobile */
   .client-number-card {
     width: 100% !important;
+    min-height: 220px !important;
+    height: auto !important;
+    padding: 1.25rem !important;
+    box-sizing: border-box !important;
+  }
     max-width: 100% !important;
   }
   
