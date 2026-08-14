@@ -998,81 +998,11 @@
             <span class="font-label-md text-label-md text-on-surface font-bold">Yearly <span class="text-primary text-[10px] ml-1">Save 20%</span></span>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter text-left items-stretch">
-            <!-- Tier 1 -->
-            <div class="bento-card p-8 flex flex-col" style="background: var(--color-card-teal);">
-                <div class="mb-8">
-                    <div class="text-secondary font-label-sm text-label-sm mb-2">Starter</div>
-                    <div class="text-display-lg font-bold text-on-surface">$49<span class="text-label-md font-medium text-secondary">/mo</span></div>
-                </div>
-                <ul class="space-y-4 mb-12 flex-1">
-                    <li class="flex items-start gap-2 text-body-md text-secondary">
-                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
-                        Up to 100 calls/mo
-                    </li>
-                    <li class="flex items-start gap-2 text-body-md text-secondary">
-                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
-                        Standard Voice Engine
-                    </li>
-                </ul>
-                <a href="/app" class="w-full py-4 text-center border rounded-full font-label-md text-label-md hover:opacity-85 transition-all" style="border-color: var(--color-btn-outline-border); color: var(--color-on-surface);">Choose Starter</a>
-            </div>
-            
-            <!-- Tier 2 (Highlighted) -->
-            <div class="bento-card p-8 border-2 flex flex-col relative transform lg:scale-105 shadow-2xl z-10" style="background: var(--color-card-rose); border-color: var(--color-card-rose-border);">
-                <div class="absolute top-0 right-8 -translate-y-1/2 bg-primary text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Most Popular</div>
-                <div class="mb-8">
-                    <div class="text-secondary font-label-sm text-label-sm mb-2">Growth</div>
-                    <div class="text-display-lg font-bold text-on-surface">$199<span class="text-label-md font-medium text-secondary">/mo</span></div>
-                </div>
-                <ul class="space-y-4 mb-12 flex-1">
-                    <li class="flex items-start gap-2 text-body-md text-secondary">
-                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
-                        Up to 1,000 calls/mo
-                    </li>
-                    <li class="flex items-start gap-2 text-body-md text-secondary">
-                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
-                        Premium Natural Latency
-                    </li>
-                    <li class="flex items-start gap-2 text-body-md text-secondary">
-                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
-                        CRM Integrations
-                    </li>
-                </ul>
-                <a href="/app" class="w-full py-4 text-center bg-primary-btn hover:bg-primary-btn-hover text-white rounded-full font-label-md text-label-md hover:opacity-90 shadow-lg">Choose Growth</a>
-            </div>
-            
-            <!-- Tier 3 -->
-            <div class="bento-card p-8 flex flex-col" style="background: var(--color-card-lavender);">
-                <div class="mb-8">
-                    <div class="text-secondary font-label-sm text-label-sm mb-2">Scale</div>
-                    <div class="text-display-lg font-bold text-on-surface">$599<span class="text-label-md font-medium text-secondary">/mo</span></div>
-                </div>
-                <ul class="space-y-4 mb-12 flex-1">
-                    <li class="flex items-start gap-2 text-body-md text-secondary">
-                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
-                        Unlimited calls
-                    </li>
-                    <li class="flex items-start gap-2 text-body-md text-secondary">
-                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
-                        Custom Voice Training
-                    </li>
-                    <li class="flex items-start gap-2 text-body-md text-secondary">
-                        <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
-                        Priority 24/7 Support
-                    </li>
-                </ul>
-                <a href="/app" class="w-full py-4 text-center border rounded-full font-label-md text-label-md hover:opacity-85 transition-all" style="border-color: var(--color-btn-outline-border); color: var(--color-on-surface);">Choose Scale</a>
-            </div>
-            
-            <!-- Tier 4 -->
-            <div class="bento-card p-8 flex flex-col border" style="background: var(--color-card-enterprise); color: var(--color-text-enterprise); border-color: var(--color-border-enterprise);">
-                <div class="mb-8">
-                    <div class="text-secondary font-label-sm text-label-sm mb-2" style="color: inherit; opacity: 0.8;">Custom</div>
-                    <div class="text-display-lg font-bold">Enterprise</div>
-                </div>
-                <p class="font-body-md text-body-md mb-12 flex-1" style="color: inherit; opacity: 0.8;">Dedicated infrastructure, white-labeling, and advanced compliance for global organizations.</p>
-                <button onclick="openEnterpriseInquiryModal()" class="w-full py-4 text-center rounded-full font-label-md text-label-md hover:opacity-90 transition-all shadow-md cursor-pointer" style="background: var(--color-btn-enterprise-bg); color: var(--color-btn-enterprise-text); border: none;">Contact Sales</button>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter text-left items-stretch" id="lp-dynamic-pricing-container">
+            <!-- Dynamic Pricing Cards rendered from /api/plans with Whitelabel Isolation -->
+            <div class="bento-card p-8 flex flex-col justify-center items-center text-center col-span-full py-16" style="background: var(--color-card-teal);">
+                <div class="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+                <div class="font-label-md text-secondary">Loading latest pricing plans...</div>
             </div>
         </div>
     </div>
@@ -2057,6 +1987,148 @@
             }
         }
     })();
+</script>
+
+
+<script>
+  let lpBillingIsYearly = false;
+  let lpLoadedPlansData = null;
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  async function loadLandingPricingPlans() {
+    const container = document.getElementById('lp-dynamic-pricing-container');
+    if (!container) return;
+
+    try {
+      const res = await fetch('/api/plans');
+      const data = await res.json();
+      if (data.success && data.plans) {
+        lpLoadedPlansData = data;
+        renderLandingPricingCards();
+      }
+    } catch(e) {
+      console.error('Failed to load dynamic pricing plans:', e);
+    }
+  }
+
+  function renderLandingPricingCards() {
+    const container = document.getElementById('lp-dynamic-pricing-container');
+    if (!container || !lpLoadedPlansData || !lpLoadedPlansData.plans) return;
+
+    const symbol = lpLoadedPlansData.symbol || '₹';
+    const plans = lpLoadedPlansData.plans;
+
+    container.innerHTML = '';
+
+    const themes = [
+      { bg: 'var(--color-card-teal)', border: 'transparent', isPopular: false },
+      { bg: 'var(--color-card-rose)', border: 'var(--color-card-rose-border)', isPopular: true },
+      { bg: 'var(--color-card-lavender)', border: 'transparent', isPopular: false }
+    ];
+
+    plans.forEach((plan, idx) => {
+      const theme = themes[idx % themes.length];
+      const isPopular = idx === 1 || theme.isPopular;
+
+      let priceVal = Number(plan.price_per_month || 0);
+      if (lpBillingIsYearly) {
+        priceVal = Math.round(priceVal * 0.8);
+      }
+      const formattedPrice = priceVal > 0 ? `${symbol}${priceVal.toLocaleString('en-IN')}` : 'Custom';
+      const periodStr = priceVal > 0 ? '/mo' : '';
+
+      const minsText = plan.max_minutes >= 99999 ? 'Unlimited call minutes' : `Up to ${plan.max_minutes.toLocaleString('en-IN')} mins/mo`;
+      const agentsText = plan.max_agents >= 99999 ? 'Unlimited AI Voice Agents' : `Up to ${plan.max_agents} AI Voice Agents`;
+      const callingRateText = plan.rate_per_minute ? `${symbol}${plan.rate_per_minute}/min calling rate` : null;
+
+      const card = document.createElement('div');
+      if (isPopular) {
+        card.className = "bento-card p-8 border-2 flex flex-col relative transform lg:scale-105 shadow-2xl z-10";
+        card.style.cssText = `background: ${theme.bg}; border-color: ${theme.border};`;
+      } else {
+        card.className = "bento-card p-8 flex flex-col";
+        card.style.cssText = `background: ${theme.bg};`;
+      }
+
+      let popularBadge = isPopular ? `<div class="absolute top-0 right-8 -translate-y-1/2 bg-primary text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Most Popular</div>` : '';
+
+      card.innerHTML = `
+        ${popularBadge}
+        <div class="mb-8">
+          <div class="text-secondary font-label-sm text-label-sm mb-2">${escapeHtml(plan.name)}</div>
+          <div class="text-display-lg font-bold text-on-surface">${formattedPrice}<span class="text-label-md font-medium text-secondary">${periodStr}</span></div>
+        </div>
+        <ul class="space-y-4 mb-12 flex-1">
+          <li class="flex items-start gap-2 text-body-md text-secondary">
+            <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+            ${minsText}
+          </li>
+          <li class="flex items-start gap-2 text-body-md text-secondary">
+            <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+            ${agentsText}
+          </li>
+          ${callingRateText ? `
+          <li class="flex items-start gap-2 text-body-md text-secondary">
+            <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+            ${callingRateText}
+          </li>` : ''}
+          ${plan.crm_integration ? `
+          <li class="flex items-start gap-2 text-body-md text-secondary">
+            <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+            CRM Integrations
+          </li>` : ''}
+          ${plan.api_sharing ? `
+          <li class="flex items-start gap-2 text-body-md text-secondary">
+            <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+            API Access & Webhooks
+          </li>` : ''}
+        </ul>
+        <a href="/app" class="w-full py-4 text-center ${isPopular ? 'bg-primary-btn hover:bg-primary-btn-hover text-white rounded-full font-label-md text-label-md hover:opacity-90 shadow-lg' : 'border rounded-full font-label-md text-label-md hover:opacity-85 transition-all'}" style="${!isPopular ? 'border-color: var(--color-btn-outline-border); color: var(--color-on-surface);' : ''}">Choose ${escapeHtml(plan.name)}</a>
+      `;
+
+      container.appendChild(card);
+    });
+
+    // Enterprise Card
+    const entCard = document.createElement('div');
+    entCard.className = "bento-card p-8 flex flex-col border";
+    entCard.style.cssText = "background: var(--color-card-enterprise); color: var(--color-text-enterprise); border-color: var(--color-border-enterprise);";
+    entCard.innerHTML = `
+      <div class="mb-8">
+        <div class="text-secondary font-label-sm text-label-sm mb-2" style="color: inherit; opacity: 0.8;">Custom</div>
+        <div class="text-display-lg font-bold">Enterprise</div>
+      </div>
+      <p class="font-body-md text-body-md mb-12 flex-1" style="color: inherit; opacity: 0.8;">Dedicated infrastructure, white-labeling, custom LLM fine-tuning and advanced compliance for global organizations.</p>
+      <button onclick="openEnterpriseInquiryModal()" class="w-full py-4 text-center rounded-full font-label-md text-label-md hover:opacity-90 transition-all shadow-md cursor-pointer" style="background: var(--color-btn-enterprise-bg); color: var(--color-btn-enterprise-text); border: none;">Contact Sales</button>
+    `;
+    container.appendChild(entCard);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadLandingPricingPlans();
+
+    const toggleBtn = document.getElementById('billingToggle');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        lpBillingIsYearly = !lpBillingIsYearly;
+        const knob = toggleBtn.querySelector('div');
+        if (knob) {
+          if (lpBillingIsYearly) {
+            knob.classList.remove('translate-x-6');
+            knob.classList.add('translate-x-0');
+          } else {
+            knob.classList.remove('translate-x-0');
+            knob.classList.add('translate-x-6');
+          }
+        }
+        renderLandingPricingCards();
+      });
+    }
+  });
 </script>
 
 <!-- ─── Enterprise Inquiry Modal (Landing Page) ────────────────── -->

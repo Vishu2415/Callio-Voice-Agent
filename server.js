@@ -1901,20 +1901,75 @@ function saveSubscriptionPlans() {
   }
 }
 
-// GET /api/plans - Public endpoint to retrieve active subscription plans
+// GET /api/plans - Public endpoint to retrieve active subscription plans with Whitelabel isolation
 app.get('/api/plans', (req, res) => {
-  const host = req.headers.host || req.headers.origin || '';
+  const host = req.headers.host || req.headers['x-forwarded-host'] || req.headers.origin || req.headers.referer || '';
   const reseller = getResellerFromHost(host);
-  const plansArray = Array.from(plansDb.values());
+  const basePlans = Array.from(plansDb.values());
+
+  if (reseller) {
+    // Isolated pricing for Whitelabel Reseller domain
+    const customRates = reseller.wholesale_plan_rates || {};
+    const wholesaleRatePerMin = reseller.quota?.wholesale_rate_per_minute || 2.0;
+    const markups = reseller.markups || { per_minute_markup: 0, plan_markups: {} };
+
+    const resellerPlans = basePlans.map(p => {
+      const planKey = (p.id || '').toLowerCase();
+      const customBasePrice = customRates[planKey] !== undefined ? Number(customRates[planKey]) : (p.base_price_per_month !== undefined ? Number(p.base_price_per_month) : Number(p.price_per_month || 0));
+      const planMarkup = markups.plan_markups?.[planKey] ? Number(markups.plan_markups[planKey]) : 0;
+      const finalMonthlyPrice = customBasePrice + planMarkup;
+
+      const perMinMarkup = markups.per_minute_markup ? Number(markups.per_minute_markup) : 0;
+      const finalRatePerMin = Number((wholesaleRatePerMin + perMinMarkup).toFixed(2));
+
+      return {
+        id: p.id,
+        name: p.name,
+        price_per_month: finalMonthlyPrice,
+        base_price_per_month: customBasePrice,
+        reseller_markup_monthly: planMarkup,
+        rate_per_minute: finalRatePerMin,
+        max_minutes: p.max_minutes !== undefined ? Number(p.max_minutes) : 99999,
+        max_agents: p.max_agents !== undefined ? Number(p.max_agents) : 99999,
+        crm_integration: !!p.crm_integration,
+        api_sharing: !!p.api_sharing,
+        description: p.description || ''
+      };
+    });
+
+    return res.json({
+      success: true,
+      plans: resellerPlans,
+      isWhitelabel: true,
+      resellerName: reseller.companyName || reseller.name || 'Whitelabel Partner',
+      currency: reseller.currency || 'INR',
+      symbol: reseller.currency_symbol || '₹'
+    });
+  }
+
+  // Main Platform (Admin) Base Plans
+  const formattedPlans = basePlans.map(p => ({
+    id: p.id,
+    name: p.name,
+    price_per_month: Number(p.price_per_month !== undefined ? p.price_per_month : (p.base_price_per_month !== undefined ? p.base_price_per_month : 0)),
+    rate_per_minute: Number(p.rate_per_minute || 5),
+    max_minutes: p.max_minutes !== undefined ? Number(p.max_minutes) : 99999,
+    max_agents: p.max_agents !== undefined ? Number(p.max_agents) : 99999,
+    crm_integration: !!p.crm_integration,
+    api_sharing: !!p.api_sharing,
+    description: p.description || ''
+  }));
+
   res.json({
     success: true,
-    plans: plansArray,
-    isWhitelabel: !!reseller,
-    resellerName: reseller ? (reseller.companyName || reseller.name) : null,
+    plans: formattedPlans,
+    isWhitelabel: false,
+    resellerName: null,
     currency: 'INR',
     symbol: '₹'
   });
 });
+
 
 // GET /api/admin/razorpay-config
 app.get('/api/admin/razorpay-config', (req, res) => {
@@ -5912,10 +5967,7 @@ app.post('/api/admin/sync-telephony-webhooks', async (req, res) => {
 });
 
 // 11A3. Plans Database API routes
-app.get('/api/plans', (req, res) => {
-  const list = Array.from(plansDb.values());
-  res.json({ success: true, plans: list });
-});
+
 
 app.post('/api/admin/plans/save', express.json(), (req, res) => {
   const { id, name, price_per_month, max_minutes, max_agents, rate_per_minute, crm_integration, api_sharing, description } = req.body;
