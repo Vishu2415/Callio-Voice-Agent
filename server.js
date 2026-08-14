@@ -8042,8 +8042,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
         }
         
         if (response.serverContent?.modelTurn?.parts) {
-          if (ws.isInterrupted) {
-            console.log(`[Call ${callSid}] Discarding audio chunk because turn was interrupted.`);
+          if (ws.isInterrupted && ws.userHasSpoken) {
+            console.log(`[Call ${callSid}] Discarding audio chunk because turn was interrupted after user spoke.`);
             return;
           }
           let agentText = '';
@@ -8140,8 +8140,12 @@ Follow these rules strictly to sound completely human, lively, and emotional:
         
         // Interruption handling
         if (response.serverContent?.interrupted) {
-          console.log('Gemini speaker interrupted by user voice.');
-          ws.isInterrupted = true;
+          if (ws.userHasSpoken) {
+            console.log('Gemini speaker interrupted by user voice.');
+            ws.isInterrupted = true;
+          } else {
+            console.log('Suppressed premature carrier noise interruption before user spoke.');
+          }
           // Reset agentSpeakingUntil to now so inactivity timer gives a FULL fresh 10s
           // for the user to finish speaking and Gemini to respond
           agentSpeakingUntil = Date.now();
