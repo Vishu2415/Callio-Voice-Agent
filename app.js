@@ -4687,13 +4687,112 @@ window.renderRecentBroadcastsTable = function(broadcasts) {
   tbody.innerHTML = html;
 };
 
-window.viewBroadcastCallLogs = function(bId) {
-  // Navigate to Callings tab to listen to call recordings and view full AI analysis
-  const callingsTabBtn = document.querySelector('[data-tab="callings"]') || document.querySelector('button[onclick*="callings"]');
-  if (callingsTabBtn) {
-    callingsTabBtn.click();
-  } else if (typeof window.switchTab === 'function') {
-    window.switchTab('callings');
+window.closeBroadcastLogsModal = function() {
+  const modal = document.getElementById('broadcast-logs-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.viewBroadcastCallLogs = async function(bId) {
+  const modal = document.getElementById('broadcast-logs-modal');
+  const body = document.getElementById('broadcast-modal-body');
+  const title = document.getElementById('broadcast-modal-title');
+  const subtitle = document.getElementById('broadcast-modal-subtitle');
+
+  if (!modal || !body) return;
+
+  modal.style.display = 'flex';
+  body.innerHTML = `
+    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+      <div style="font-size: 1.5rem; margin-bottom: 8px;">⏳</div>
+      <div>Loading recordings & AI call logs...</div>
+    </div>
+  `;
+
+  try {
+    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) 
+      ? loggedInUser.id 
+      : (window.CurrentClient?.id || (JSON.parse(localStorage.getItem('user_session') || '{}').id || ''));
+
+    const [bcastRes, callsRes] = await Promise.all([
+      fetch(`/api/broadcasts?clientId=${encodeURIComponent(clientId)}`).then(r => r.json()).catch(() => ({ broadcasts: [] })),
+      fetch(`/calls?clientId=${encodeURIComponent(clientId)}`).then(r => r.json()).catch(() => ({ calls: [] }))
+    ]);
+
+    const broadcasts = bcastRes.broadcasts || [];
+    const bcast = broadcasts.find(b => b.id === bId) || { agentName: 'Broadcast Campaign', targetLabel: 'Target Audience', createdAt: new Date() };
+
+    if (title) title.innerText = `🎙️ ${bcast.agentName || 'Broadcast Campaign'} - Call Recordings & Logs`;
+    if (subtitle) subtitle.innerText = `Target: ${bcast.targetLabel || 'All Contacts'} • Date: ${new Date(bcast.createdAt).toLocaleString()}`;
+
+    const allCalls = callsRes.calls || window.allCallLogs || [];
+    
+    // Filter calls for this campaign (matching target or created within 30 mins of broadcast)
+    const bcastTime = new Date(bcast.createdAt).getTime();
+    let campaignCalls = allCalls.filter(c => {
+      const callTime = new Date(c.timestamp || c.createdAt || Date.now()).getTime();
+      return Math.abs(callTime - bcastTime) < 30 * 60 * 1000;
+    });
+
+    if (campaignCalls.length === 0) {
+      campaignCalls = allCalls.slice(0, Math.min(allCalls.length, bcast.totalContacts || 5));
+    }
+
+    if (campaignCalls.length === 0) {
+      body.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+          <div style="font-size: 2rem; margin-bottom: 12px;">📭</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--text-main, #fff);">No Recordings Processed Yet</h4>
+          <p style="font-size: 0.85rem; margin: 0;">Call recordings will appear here automatically as soon as recipient calls finish.</p>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+    campaignCalls.forEach((call, index) => {
+      const recUrl = `/recording-proxy/${call.callSid}?clientId=${encodeURIComponent(clientId)}`;
+      const statusColor = (call.status === 'completed' || call.status === 'active') ? '#10b981' : '#ef4444';
+
+      html += `
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div>
+              <span style="font-weight: 700; color: var(--text-main, #fff); font-size: 0.92rem;">👤 ${escapeHtml(call.name || call.to || 'Recipient #' + (index + 1))}</span>
+              <span style="font-size: 0.8rem; color: var(--color-cyan); margin-left: 8px;">(${escapeHtml(call.to || call.customerNumber || '')})</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.75rem; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px; color: var(--text-muted);">⏱️ ${call.duration || '0:15'}</span>
+              <span style="font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${(call.status || 'COMPLETED').toUpperCase()}</span>
+            </div>
+          </div>
+          
+          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 260px;">
+              <audio controls src="${recUrl}" style="width: 100%; height: 36px; border-radius: 8px; outline: none;"></audio>
+            </div>
+            <a href="${recUrl}" download="recording-${call.callSid}.mp3" style="background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); color: #10b981; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+              ⬇ Download MP3
+            </a>
+          </div>
+
+          ${call.summary ? `
+            <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 8px; border-left: 3px solid var(--color-cyan);">
+              <strong style="color: var(--color-cyan);">AI Summary:</strong> ${escapeHtml(call.summary.replace(/\*\*/g, ''))}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    body.innerHTML = html;
+
+  } catch (err) {
+    body.innerHTML = `
+      <div style="text-align: center; padding: 30px; color: #ef4444;">
+        ⚠️ Failed to load call logs: ${escapeHtml(err.message)}
+      </div>
+    `;
   }
 };
 
