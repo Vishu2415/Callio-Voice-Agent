@@ -7984,6 +7984,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           const sendGreetingNow = () => {
             if (geminiWs && geminiWs.readyState === WebSocket.OPEN && !ws.hasGreetingSent) {
               ws.hasGreetingSent = true;
+              ws.greetingSentTime = Date.now();
               const cleanName = name ? name.trim() : '';
               const isPhoneNumber = /^[+\d\s\-\(\)]+$/.test(cleanName);
               const isDefaultLead = cleanName.toLowerCase() === 'saas lead' || cleanName.toLowerCase() === 'saas' || cleanName.toLowerCase() === 'customer' || cleanName.toLowerCase() === 'a customer';
@@ -8456,8 +8457,9 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           }
           
           if (isGeminiReady) {
-            // Suppress incoming carrier audio noise while initial greeting turn is generating to eliminate VAD delay
-            if (ws.hasGreetingSent && !ws.hasFirstAudioChunkSent) {
+            // Suppress incoming carrier audio noise for only 800ms after greeting prompt is sent to avoid audio collision
+            const timeSinceGreeting = ws.greetingSentTime ? (Date.now() - ws.greetingSentTime) : 9999;
+            if (ws.hasGreetingSent && !ws.hasFirstAudioChunkSent && timeSinceGreeting < 800) {
               break;
             }
             sendAudioToGemini(pcm16Base64);
