@@ -4003,6 +4003,9 @@ window.openSingleContactModalV2 = function() {
     console.error('[Single Contact Modal V2] Error: Element #new-single-contact-modal not found in DOM!');
     return;
   }
+  if (modal.parentElement !== document.body) {
+    document.body.appendChild(modal);
+  }
   modal.style.setProperty('display', 'flex', 'important');
   modal.style.setProperty('opacity', '1', 'important');
   modal.style.setProperty('visibility', 'visible', 'important');
@@ -8161,6 +8164,7 @@ async function fetchAdminRequests() {
       const phoneStr = kyc.phone || req.phone_number || '';
       const numType = kyc.number_type || req.requested_number || 'Virtual Mobile';
       const useCase = kyc.use_case || 'Sales & Support';
+      const resellerName = req.reseller_name || kyc.reseller_name || '';
       let docUrls = [];
       if (Array.isArray(kyc.document_urls) && kyc.document_urls.length > 0) {
         docUrls = kyc.document_urls;

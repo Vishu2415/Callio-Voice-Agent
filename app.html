@@ -3712,6 +3712,9 @@
     window.openSingleContactModalV2 = function() {
       var modal = document.getElementById('new-single-contact-modal');
       if (modal) {
+        if (modal.parentElement !== document.body) {
+          document.body.appendChild(modal);
+        }
         modal.style.setProperty('display', 'flex', 'important');
         modal.style.setProperty('opacity', '1', 'important');
         modal.style.setProperty('visibility', 'visible', 'important');
