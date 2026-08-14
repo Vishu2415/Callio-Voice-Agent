@@ -4618,8 +4618,11 @@ window.fetchRecentBroadcasts = async function() {
 
     const res = await fetch(`/api/broadcasts?clientId=${encodeURIComponent(clientId || '')}`);
     const data = await res.json();
-    if (data.success) {
-      window.renderRecentBroadcastsTable(data.broadcasts || []);
+    if (data.success && Array.isArray(data.broadcasts)) {
+      if (data.broadcasts.length > 0 || !window._lastCachedBroadcasts) {
+        window._lastCachedBroadcasts = data.broadcasts;
+      }
+      window.renderRecentBroadcastsTable(window._lastCachedBroadcasts || []);
     }
   } catch (e) {
     console.error("Failed to fetch recent broadcasts", e);

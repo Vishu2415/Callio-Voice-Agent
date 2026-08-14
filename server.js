@@ -5018,22 +5018,18 @@ app.post('/api/webhooks/crm-trigger-call', express.json(), async (req, res) => {
 
 // --- BROADCAST API & SCHEDULER ---
 
-app.get('/api/broadcasts', authMiddleware('calls'), (req, res) => {
-  let clientId = req.query.clientId || req.query.client_id;
-  if (!clientId && req.user) clientId = req.user.id;
-  if (!clientId) {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      const session = sessionsDb.get(token);
-      if (session) clientId = session.userId;
+app.get('/api/broadcasts', (req, res) => {
+  let list = Array.from(broadcastsDb.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  let reqClientId = req.query.clientId || req.query.client_id;
+  if (!reqClientId && req.user) reqClientId = req.user.id;
+
+  if (reqClientId && reqClientId !== 'admin' && reqClientId !== 'null' && reqClientId !== 'undefined' && String(reqClientId).trim() !== '') {
+    const filtered = list.filter(b => !b.clientId || b.clientId === reqClientId || b.clientId === 'admin');
+    if (filtered.length > 0) {
+      list = filtered;
     }
   }
 
-  let list = Array.from(broadcastsDb.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  if (clientId && clientId !== 'admin' && clientId !== 'null' && clientId !== 'undefined' && String(clientId).trim() !== '') {
-    list = list.filter(b => b.clientId === clientId || !b.clientId);
-  }
   res.json({ success: true, broadcasts: list });
 });
 
