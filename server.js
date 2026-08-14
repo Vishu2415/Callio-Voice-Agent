@@ -500,7 +500,7 @@ async function syncVobizApplications() {
           console.log(`[Vobiz Application Sync] Updating App ${app.app_name || appId} URLs to ${targetUrl}`);
           const updateUrl = `https://api.vobiz.ai/api/v1/Account/${masterAuthId.trim()}/Application/${appId}/`;
           await fetch(updateUrl, {
-            method: 'PUT',
+            method: 'POST',
             headers: {
               'Authorization': authHeader,
               'X-Auth-ID': masterAuthId.trim(),
