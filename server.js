@@ -382,7 +382,19 @@ function loadCalls() {
 }
 function saveCalls() { saveDatabase(CALLS_DB_FILE, activeCalls); }
 
-function loadAgents() { loadDatabase(AGENTS_DB_FILE, agentsDb); }
+function loadAgents() {
+  loadDatabase(AGENTS_DB_FILE, agentsDb);
+  const validModels = ['gemini-2.0-flash-exp', 'gemini-3.1-flash-live-preview', 'gemini-2.0-flash-realtime-exp'];
+  let updated = false;
+  for (const agent of agentsDb.values()) {
+    if (agent && agent.model && !validModels.includes(agent.model.trim())) {
+      console.log(`[AgentsDB Sanitizer] Auto-correcting agent "${agent.name}" (ID: ${agent.id}) invalid model "${agent.model}" -> "gemini-3.1-flash-live-preview"`);
+      agent.model = 'gemini-3.1-flash-live-preview';
+      updated = true;
+    }
+  }
+  if (updated) saveAgents();
+}
 function saveAgents() { saveDatabase(AGENTS_DB_FILE, agentsDb); }
 
 function loadContacts() { loadDatabase(CONTACTS_DB_FILE, contactsDb); }
@@ -7482,8 +7494,9 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     const instantGreetingRule = `\n\n[CRITICAL INSTANT GREETING RULE]: As soon as the call connects, IMMEDIATELY speak your opening greeting within 0.5 seconds! Do NOT delay or wait. Speak your opening hello instantly.`;
     const finalInstruction = `${systemInstruction}${greetingInstruction}${toolRule}${instantGreetingRule}\n\n[CRITICAL GRAMMAR RULE]: ${genderRule}`;
     
-    let resolvedModel = model || 'gemini-3.1-flash-live-preview';
-    console.log(`[WebSocket Stream Setup] Voice: ${voice}, CustomerName: "${cleanName}", Model: ${resolvedModel}, Instruction: ${finalInstruction.substring(0, 75)}...`);
+    const validLiveModels = ['gemini-2.0-flash-exp', 'gemini-3.1-flash-live-preview', 'gemini-2.0-flash-realtime-exp'];
+    let resolvedModel = (model && validLiveModels.includes(model.trim())) ? model.trim() : 'gemini-3.1-flash-live-preview';
+    console.log(`[WebSocket Stream Setup] Voice: ${voice}, CustomerName: "${cleanName}", Model: ${resolvedModel} (Requested: "${model}"), Instruction: ${finalInstruction.substring(0, 75)}...`);
 
     const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
     
@@ -8436,6 +8449,10 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           }
           
           if (isGeminiReady) {
+            // Suppress incoming carrier audio noise while initial greeting turn is generating to eliminate VAD delay
+            if (ws.hasGreetingSent && !ws.hasFirstAudioChunkSent) {
+              break;
+            }
             sendAudioToGemini(pcm16Base64);
           }
           break;
