@@ -10183,6 +10183,39 @@ window.fetchAdminPlans = window.renderAdminPlansTable = async function() {
       const btnCreatePlan = document.getElementById('btn-create-new-plan-admin');
       if (btnCreatePlan) btnCreatePlan.style.display = isReseller ? 'none' : 'inline-flex';
 
+      const thead = document.getElementById('admin-plans-table-head');
+      if (thead) {
+        if (isReseller) {
+          thead.innerHTML = `
+            <tr>
+              <th>Plan Name</th>
+              <th>Plan ID</th>
+              <th>Fixed Base Cost</th>
+              <th>Your Commission Markup</th>
+              <th>Final Retail Price</th>
+              <th>Minutes Limit</th>
+              <th>Agents Limit</th>
+              <th>Base Calling Price</th>
+              <th>Retail Calling Price</th>
+              <th style="text-align: right;">Status</th>
+            </tr>`;
+        } else {
+          thead.innerHTML = `
+            <tr>
+              <th>Plan Name</th>
+              <th>Plan ID</th>
+              <th>Monthly Price</th>
+              <th>Minutes Limit</th>
+              <th>Agents Limit</th>
+              <th>Calling Rate</th>
+              <th>CRM Integration</th>
+              <th>API Access</th>
+              <th>Razorpay Plan ID</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>`;
+        }
+      }
+
       const tbody = document.getElementById('admin-plans-table-body');
       if (tbody) {
         tbody.innerHTML = '';
@@ -10192,39 +10225,67 @@ window.fetchAdminPlans = window.renderAdminPlansTable = async function() {
         }
         data.plans.forEach(p => {
           const row = document.createElement('tr');
-          
-          const basePrice = p.base_price_per_month !== undefined ? p.base_price_per_month : p.price_per_month;
-          const baseCalling = p.base_rate_per_minute !== undefined ? p.base_rate_per_minute : (p.rate_per_minute || 5);
-          const markupMonthly = p.reseller_markup_monthly || (resellerConfig?.markups?.plan_markups?.[p.id] || 0);
-          const markupPerMin = p.reseller_markup_per_minute || (resellerConfig?.markups?.per_minute_markup || 0);
-          const finalRetailMonthly = basePrice + markupMonthly;
-          const finalRetailCalling = Number((baseCalling + markupPerMin).toFixed(2));
 
-          const basePriceStr = `₹${Number(basePrice).toLocaleString('en-IN')}`;
-          const markupMonthlyStr = `+₹${Number(markupMonthly).toLocaleString('en-IN')}`;
-          const finalRetailMonthlyStr = `₹${Number(finalRetailMonthly).toLocaleString('en-IN')}`;
-          const minsStr = p.max_minutes >= 99999 ? 'Unlimited' : `${p.max_minutes} mins`;
-          const agentsStr = p.max_agents >= 99999 ? 'Unlimited' : p.max_agents;
-          const baseCallingStr = `₹${baseCalling}/min`;
-          const retailCallingStr = `₹${finalRetailCalling}/min`;
-          
-          const actionButtons = isReseller 
-            ? `<span style="font-size: 0.72rem; color: var(--color-cyan); font-weight: 700;">🔒 Platform Fixed Base</span>` 
-            : `<button onclick="window.openEditPlanModal('${p.id}')" class="admin-action-btn" style="margin-right: 6px;">Edit Base</button>
-               ${p.id === 'basic' ? `<button disabled class="admin-action-btn admin-action-btn-delete" style="opacity:0.5;">Delete</button>` : `<button onclick="window.deletePlan('${p.id}')" class="admin-action-btn admin-action-btn-delete">Delete</button>`}`;
-            
-          row.innerHTML = `
-            <td style="font-weight: 700; color: var(--text-main);">${escapeHtml(p.name)}</td>
-            <td style="font-family: monospace; font-size: 0.82rem; color: var(--color-cyan);">${escapeHtml(p.id)}</td>
-            <td style="font-weight: 600; color: var(--text-muted);">${basePriceStr}</td>
-            <td style="font-weight: 700; color: var(--color-cyan);">${markupMonthlyStr} <span style="font-size:0.68rem; opacity:0.8;">(Profit)</span></td>
-            <td style="font-weight: 800; color: var(--color-green, #10b981);">${finalRetailMonthlyStr}</td>
-            <td>${minsStr}</td>
-            <td>${agentsStr}</td>
-            <td style="font-weight: 500; color: var(--text-muted);">${baseCallingStr}</td>
-            <td style="font-weight: 800; color: var(--color-green, #10b981);">${retailCallingStr}</td>
-            <td style="text-align: right; white-space: nowrap;">${actionButtons}</td>
-          `;
+          if (isReseller) {
+            const basePrice = p.base_price_per_month !== undefined ? p.base_price_per_month : p.price_per_month;
+            const baseCalling = p.base_rate_per_minute !== undefined ? p.base_rate_per_minute : (p.rate_per_minute || 5);
+            const markupMonthly = p.reseller_markup_monthly || (resellerConfig?.markups?.plan_markups?.[p.id] || 0);
+            const markupPerMin = p.reseller_markup_per_minute || (resellerConfig?.markups?.per_minute_markup || 0);
+            const finalRetailMonthly = basePrice + markupMonthly;
+            const finalRetailCalling = Number((baseCalling + markupPerMin).toFixed(2));
+
+            const basePriceStr = `₹${Number(basePrice).toLocaleString('en-IN')}`;
+            const markupMonthlyStr = `+₹${Number(markupMonthly).toLocaleString('en-IN')}`;
+            const finalRetailMonthlyStr = `₹${Number(finalRetailMonthly).toLocaleString('en-IN')}`;
+            const minsStr = p.max_minutes >= 99999 ? 'Unlimited' : `${p.max_minutes} mins`;
+            const agentsStr = p.max_agents >= 99999 ? 'Unlimited' : p.max_agents;
+            const baseCallingStr = `₹${baseCalling}/min`;
+            const retailCallingStr = `₹${finalRetailCalling}/min`;
+
+            row.innerHTML = `
+              <td style="font-weight: 700; color: var(--text-main);">${escapeHtml(p.name)}</td>
+              <td style="font-family: monospace; font-size: 0.82rem; color: var(--color-cyan);">${escapeHtml(p.id)}</td>
+              <td style="font-weight: 600; color: var(--text-muted);">${basePriceStr}</td>
+              <td style="font-weight: 700; color: var(--color-cyan);">${markupMonthlyStr} <span style="font-size:0.68rem; opacity:0.8;">(Profit)</span></td>
+              <td style="font-weight: 800; color: var(--color-green, #10b981);">${finalRetailMonthlyStr}</td>
+              <td>${minsStr}</td>
+              <td>${agentsStr}</td>
+              <td style="font-weight: 500; color: var(--text-muted);">${baseCallingStr}</td>
+              <td style="font-weight: 800; color: var(--color-green, #10b981);">${retailCallingStr}</td>
+              <td style="text-align: right; white-space: nowrap;"><span style="font-size: 0.72rem; color: var(--color-cyan); font-weight: 700;">🔒 Platform Fixed Base</span></td>
+            `;
+          } else {
+            // Super Admin View (Direct price, limits, features & Razorpay Plan ID)
+            const priceStr = `₹${Number(p.price_per_month).toLocaleString('en-IN')}/mo`;
+            const minsStr = p.max_minutes >= 99999 ? 'Unlimited' : `${p.max_minutes} mins`;
+            const agentsStr = p.max_agents >= 99999 ? 'Unlimited' : `${p.max_agents} Agents`;
+            const rateStr = `₹${p.rate_per_minute}/min`;
+            const crmBadge = p.crm_integration 
+              ? `<span style="color: var(--color-green, #10b981); font-weight: bold;">✓ Enabled</span>` 
+              : `<span style="color: var(--text-muted); font-size: 0.85rem;">🔒 Locked</span>`;
+            const apiBadge = p.api_sharing 
+              ? `<span style="color: var(--color-green, #10b981); font-weight: bold;">✓ Enabled</span>` 
+              : `<span style="color: var(--text-muted); font-size: 0.85rem;">🔒 Locked</span>`;
+            const rzpPlanId = p.razorpay_plan_id 
+              ? `<span style="font-family: monospace; font-size: 0.78rem; color: var(--color-cyan);">${escapeHtml(p.razorpay_plan_id)}</span>` 
+              : `<span style="color: var(--text-muted); font-size: 0.78rem;">Not Set</span>`;
+
+            const actionButtons = `<button onclick="window.openEditPlanModal('${p.id}')" class="admin-action-btn" style="margin-right: 6px;">Edit</button>
+               ${p.id === 'basic' ? `<button disabled class="admin-action-btn admin-action-btn-delete" style="opacity:0.5; cursor:not-allowed;">Delete</button>` : `<button onclick="window.deletePlan('${p.id}')" class="admin-action-btn admin-action-btn-delete">Delete</button>`}`;
+
+            row.innerHTML = `
+              <td style="font-weight: 700; color: var(--text-main);">${escapeHtml(p.name)}</td>
+              <td style="font-family: monospace; font-size: 0.82rem; color: var(--color-cyan);">${escapeHtml(p.id)}</td>
+              <td style="font-weight: 800; color: var(--color-green, #10b981);">${priceStr}</td>
+              <td>${minsStr}</td>
+              <td>${agentsStr}</td>
+              <td style="font-weight: 600;">${rateStr}</td>
+              <td>${crmBadge}</td>
+              <td>${apiBadge}</td>
+              <td>${rzpPlanId}</td>
+              <td style="text-align: right; white-space: nowrap;">${actionButtons}</td>
+            `;
+          }
           tbody.appendChild(row);
         });
       }
