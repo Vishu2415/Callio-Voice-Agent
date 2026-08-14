@@ -5031,7 +5031,7 @@ app.get('/api/broadcasts', authMiddleware('calls'), (req, res) => {
   }
 
   let list = Array.from(broadcastsDb.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  if (clientId && clientId !== 'admin') {
+  if (clientId && clientId !== 'admin' && clientId !== 'null' && clientId !== 'undefined' && String(clientId).trim() !== '') {
     list = list.filter(b => b.clientId === clientId || !b.clientId);
   }
   res.json({ success: true, broadcasts: list });

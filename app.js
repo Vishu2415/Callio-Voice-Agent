@@ -4609,10 +4609,10 @@ window.handleStartBroadcastClick = async function() {
 
 window.fetchRecentBroadcasts = async function() {
   try {
-    let clientId = (typeof currentUser !== 'undefined' && currentUser) ? (currentUser.id || currentUser.email) : '';
-    if (!clientId && typeof loggedInUser !== 'undefined' && loggedInUser) {
-      clientId = loggedInUser.id;
-    }
+    let clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) 
+      ? loggedInUser.id 
+      : (window.CurrentClient?.id || (JSON.parse(localStorage.getItem('user_session') || '{}').id || (JSON.parse(localStorage.getItem('callio_user') || '{}').id || '')));
+
     const res = await fetch(`/api/broadcasts?clientId=${encodeURIComponent(clientId || '')}`);
     const data = await res.json();
     if (data.success) {
