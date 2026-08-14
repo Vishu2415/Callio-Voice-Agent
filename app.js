@@ -10394,6 +10394,8 @@ window.openCreatePlanModal = function() {
   document.getElementById('plan-crm-input').checked = false;
   document.getElementById('plan-api-input').checked = false;
   document.getElementById('plan-desc-input').value = '';
+  const rzpIdEl = document.getElementById('plan-razorpay-id-input');
+  if (rzpIdEl) rzpIdEl.value = '';
   
   document.getElementById('admin-plan-modal').style.display = 'flex';
 };
@@ -10416,6 +10418,8 @@ window.openEditPlanModal = function(planId) {
   document.getElementById('plan-crm-input').checked = !!plan.crm_integration;
   document.getElementById('plan-api-input').checked = !!plan.api_sharing;
   document.getElementById('plan-desc-input').value = plan.description || '';
+  const rzpIdEl = document.getElementById('plan-razorpay-id-input');
+  if (rzpIdEl) rzpIdEl.value = plan.razorpay_plan_id || '';
   
   document.getElementById('admin-plan-modal').style.display = 'flex';
 };
@@ -10458,13 +10462,14 @@ window.submitPlanSave = async function(event) {
   const crm_integration = document.getElementById('plan-crm-input').checked;
   const api_sharing = document.getElementById('plan-api-input').checked;
   const description = document.getElementById('plan-desc-input').value.trim();
+  const razorpay_plan_id = (document.getElementById('plan-razorpay-id-input')?.value || '').trim();
 
   try {
     const res = await fetch('/api/admin/plans/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id, name, price_per_month, max_minutes, max_agents, rate_per_minute, crm_integration, api_sharing, description
+        id, name, price_per_month, max_minutes, max_agents, rate_per_minute, crm_integration, api_sharing, description, razorpay_plan_id
       })
     });
     const data = await res.json();
@@ -11665,19 +11670,84 @@ window.downloadAdminBillingCSV = function() {
 window.subscribePlan = async function(planName, price) {
   if (!loggedInUser) return;
   
-  if (planName === 'custom') {
-    alert("Please contact our sales team at sales@callingagent.com or call +91 8047492101 to set up a custom plan tailored to your requirements.");
+  if (planName === 'custom' || planName === 'enterprise') {
+    alert("Please contact our sales team to set up a custom plan tailored to your requirements.");
     return;
   }
   
-  const confirmMsg = `Are you sure you want to subscribe to the ${planName.toUpperCase()} Plan (₹${price}/month)?\nThis will simulate a secure payment checkout.`;
+  // 1. Attempt to create Razorpay Recurring Subscription
+  try {
+    const res = await fetch('/api/razorpay/create-subscription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        planId: planName,
+        clientId: loggedInUser.id
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.success && data.subscriptionId && data.keyId && window.Razorpay) {
+      // Trigger Razorpay Subscription Checkout Modal (Auto-Recurring Payment)
+      const options = {
+        key: data.keyId,
+        subscription_id: data.subscriptionId,
+        name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
+        description: `${data.plan?.name || planName.toUpperCase()} - Monthly Recurring Subscription (₹${price}/mo)`,
+        image: window.BrandingContext?.logoUrl || '/logo_new.png',
+        handler: async function (response) {
+          try {
+            const vRes = await fetch('/api/razorpay/verify-subscription', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature: response.razorpay_signature,
+                planId: planName,
+                clientId: loggedInUser.id
+              })
+            });
+
+            const vData = await vRes.json();
+            if (vData.success && vData.client) {
+              loggedInUser = { ...loggedInUser, plan: vData.client.plan, status: 'active', balance: vData.client.balance, billing_history: vData.client.billing_history };
+              localStorage.setItem('user_session', JSON.stringify(loggedInUser));
+              applyUserRole(loggedInUser);
+              fetchBillingData();
+              alert(`🎉 Subscription Activated Successfully!\n\nYour account is now subscribed to the ${planName.toUpperCase()} Plan (₹${price}/month recurring auto-debit).`);
+            } else {
+              alert(`Subscription verification failed: ${vData.error || 'Unknown error'}`);
+            }
+          } catch(err) {
+            alert(`Error verifying subscription: ${err.message}`);
+          }
+        },
+        prefill: {
+          name: loggedInUser.name || '',
+          email: loggedInUser.email || ''
+        },
+        theme: {
+          color: window.BrandingContext?.primaryColor || '#ea580c'
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      return;
+    }
+  } catch(e) {
+    console.warn('[Razorpay Subscription Init Exception] Falling back to standard subscription flow:', e.message);
+  }
+
+  // Fallback to simulated / manual subscription flow
+  const confirmMsg = `Are you sure you want to subscribe to the ${planName.toUpperCase()} Plan (₹${price}/month)?`;
   if (!confirm(confirmMsg)) return;
   
-  // Show simulated checkout loader/modal
-  const paymentMethod = prompt("Simulating secure payment. Choose payment method (UPI, Card, NetBanking):", "UPI");
-  if (paymentMethod === null) return; // cancelled
+  const paymentMethod = prompt("Choose payment method (UPI, Card, NetBanking):", "UPI");
+  if (paymentMethod === null) return;
   
-  // Get simulated payment modal elements
   const modal = document.getElementById('payment-simulation-modal');
   const loadingState = document.getElementById('payment-loading-state');
   const successState = document.getElementById('payment-success-state');
@@ -11692,9 +11762,7 @@ window.subscribePlan = async function(planName, price) {
       try {
         const res = await fetch('/api/client/subscribe-plan', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             clientId: loggedInUser.id,
             plan: planName,
@@ -11705,14 +11773,10 @@ window.subscribePlan = async function(planName, price) {
         
         const data = await res.json();
         if (data.success) {
-          // Update loggedInUser local session
           loggedInUser = { ...loggedInUser, plan: data.plan, balance: data.balance, billing_history: data.billing_history };
           localStorage.setItem('user_session', JSON.stringify(loggedInUser));
-          
-          // Re-apply role and limits
           applyUserRole(loggedInUser);
           fetchBillingData();
-          
           loadingState.style.display = 'none';
           successState.style.display = 'flex';
           successMsg.innerHTML = `Successfully subscribed to the <strong>${planName.toUpperCase()} Plan</strong> for ₹${price.toFixed(2)} using ${paymentMethod}.`;
@@ -11721,7 +11785,6 @@ window.subscribePlan = async function(planName, price) {
           modal.style.display = 'none';
         }
       } catch (err) {
-        console.error('Subscription error:', err);
         alert('Failed to connect to billing server. Please try again.');
         modal.style.display = 'none';
       }

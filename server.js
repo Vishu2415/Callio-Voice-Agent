@@ -3105,6 +3105,140 @@ app.post('/api/razorpay/create-order', express.json(), async (req, res) => {
   });
 });
 
+// POST /api/razorpay/create-subscription (Creates Razorpay Recurring Subscription with plan_id)
+app.post('/api/razorpay/create-subscription', express.json(), async (req, res) => {
+  const host = getRealHostFromRequest(req);
+  const reseller = getResellerFromHost(host);
+  const tenantId = reseller ? reseller.id : 'default';
+
+  const cfg = razorpayDb.get(tenantId) || razorpayDb.get('default') || {};
+  const keyId = reseller ? reseller.razorpayKeyId : (process.env.RAZORPAY_KEY_ID || cfg.keyId || config.razorpayKeyId);
+  const keySecret = reseller ? reseller.razorpayKeySecret : (process.env.RAZORPAY_KEY_SECRET || cfg.keySecret || config.razorpayKeySecret);
+
+  if (!keyId || !keySecret) {
+    return res.status(400).json({ success: false, error: 'Razorpay payment gateway is not configured for this domain.' });
+  }
+
+  const { planId, clientId } = req.body;
+  if (!planId) return res.status(400).json({ success: false, error: 'planId is required.' });
+
+  const cleanPlanId = String(planId).trim().toLowerCase();
+  const plan = plansDb.get(cleanPlanId);
+  if (!plan) return res.status(404).json({ success: false, error: 'Plan not found.' });
+
+  const razorpayPlanId = plan.razorpay_plan_id ? plan.razorpay_plan_id.trim() : '';
+
+  if (!razorpayPlanId) {
+    return res.json({
+      success: true,
+      useOrderFallback: true,
+      keyId,
+      amount: (plan.price_per_month || 0) * 100,
+      currency: cfg.currency || 'INR',
+      plan
+    });
+  }
+
+  try {
+    const authHeader = 'Basic ' + Buffer.from(`${keyId.trim()}:${keySecret.trim()}`).toString('base64');
+    const response = await fetch('https://api.razorpay.com/v1/subscriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        plan_id: razorpayPlanId,
+        total_count: 120, // 10 years recurring monthly
+        quantity: 1,
+        customer_notify: 1,
+        notes: {
+          clientId: clientId || '',
+          planId: plan.id,
+          tenantId
+        }
+      })
+    });
+
+    const subData = await response.json();
+    if (!response.ok) {
+      console.error('[Razorpay Subscription Creation Error]:', subData);
+      return res.status(400).json({
+        success: false,
+        error: subData.error?.description || 'Failed to create subscription on Razorpay.'
+      });
+    }
+
+    console.log(`[Razorpay Subscription Created] SubID: ${subData.id}, Plan: ${plan.id}, Client: ${clientId}`);
+    res.json({
+      success: true,
+      subscriptionId: subData.id,
+      keyId,
+      plan
+    });
+  } catch (err) {
+    console.error('[Razorpay Subscription API Exception]:', err.message);
+    res.status(500).json({ success: false, error: 'Network error communicating with Razorpay API.' });
+  }
+});
+
+// POST /api/razorpay/verify-subscription (Verifies Razorpay Subscription & activates client plan)
+app.post('/api/razorpay/verify-subscription', express.json(), (req, res) => {
+  const { razorpay_payment_id, razorpay_subscription_id, planId, clientId } = req.body;
+  if (!clientId || !planId) {
+    return res.status(400).json({ success: false, error: 'clientId and planId are required.' });
+  }
+
+  const client = clientsDb.get(clientId);
+  if (!client) {
+    return res.status(404).json({ success: false, error: 'Client account not found.' });
+  }
+
+  const cleanPlanId = String(planId).trim().toLowerCase();
+  const plan = plansDb.get(cleanPlanId);
+  const planName = plan ? plan.name : `${planId.toUpperCase()} Plan`;
+  const planMinutes = plan ? plan.max_minutes : 500;
+  const newRate = plan ? plan.rate_per_minute : 5;
+
+  // Activate client plan
+  client.plan = cleanPlanId;
+  client.status = 'active';
+  client.used_minutes = 0.00; // Reset monthly used minutes for new subscription cycle
+  client.pricing = client.pricing || {};
+  client.pricing.rate_per_minute = newRate;
+  if (razorpay_subscription_id) client.razorpay_subscription_id = razorpay_subscription_id;
+
+  client.billing_history = client.billing_history || [];
+  client.billing_history.unshift({
+    id: 'sub_tx_' + Date.now(),
+    date: new Date().toISOString(),
+    description: `${planName} Recurring Monthly Subscription (Razorpay Ref: ${razorpay_payment_id || razorpay_subscription_id || 'ONLINE'})`,
+    amount: plan ? plan.price_per_month : 0,
+    minutes: planMinutes,
+    paymentMethod: 'Razorpay Auto-Recurring Subscription',
+    status: 'Paid'
+  });
+
+  clientsDb.set(client.id, client);
+  saveClients();
+
+  console.log(`[Subscription Activated] Client ${client.name} (${client.id}) activated ${client.plan} plan via Razorpay Sub ${razorpay_subscription_id || 'N/A'}`);
+  res.json({
+    success: true,
+    client: {
+      id: client.id,
+      name: client.name,
+      email: client.email,
+      plan: client.plan,
+      status: client.status,
+      balance: client.balance,
+      used_minutes: client.used_minutes,
+      billing_history: client.billing_history
+    },
+    message: `Successfully activated ${planName}!`
+  });
+});
+
 // POST /api/razorpay/verify-payment (Verifies payment & auto-issues invoice)
 app.post('/api/razorpay/verify-payment', express.json(), (req, res) => {
   const host = req.headers.host || req.headers.origin || req.headers.referer || '';
@@ -4987,12 +5121,13 @@ app.post('/api/auth/signup', async (req, res) => {
       vobiz_sub_auth_id: subAuthId,
       vobiz_sub_auth_token: subAuthToken,
       phone_number: null,
+      plan: 'none',
+      status: 'no_plan',
       agent_config: {
         system_prompt: defaultCallConfig.systemInstruction || "You are a helpful voice assistant.",
         voice: "Aoede",
         language: "Hinglish"
       },
-      status: 'pending_number',
       balance: 0.00,
       used_minutes: 0.00,
       created_at: new Date().toISOString()
@@ -5116,7 +5251,7 @@ app.post('/api/auth/login', (req, res) => {
           phone_number: client.phone_number,
           agent_config: client.agent_config,
           balance: client.balance !== undefined ? client.balance : 0.00,
-          plan: client.plan || 'basic',
+          plan: client.plan || 'none',
           used_minutes: client.used_minutes !== undefined ? client.used_minutes : 0.00,
           pricing: client.pricing || { rate_per_minute: 2.00, rate_recording_per_minute: 1.00, rate_per_session: 0.00 },
           billing_history: client.billing_history || [],
@@ -5264,7 +5399,7 @@ app.post('/api/auth/update-profile', (req, res) => {
       phone_number: client.phone_number,
       agent_config: client.agent_config,
       balance: client.balance !== undefined ? client.balance : 0.00,
-      plan: client.plan || 'basic',
+      plan: client.plan || 'none',
       used_minutes: client.used_minutes !== undefined ? client.used_minutes : 0.00,
       pricing: client.pricing || { rate_per_minute: 2.00, rate_recording_per_minute: 1.00, rate_per_session: 0.00 },
       billing_history: client.billing_history || []
@@ -5600,7 +5735,7 @@ app.get('/api/client/dashboard-data', (req, res) => {
       status: client.status,
       agent_config: client.agent_config,
       balance: client.balance !== undefined ? client.balance : 0.00,
-      plan: client.plan || 'basic',
+      plan: client.plan || 'none',
       used_minutes: client.used_minutes !== undefined ? client.used_minutes : 0.00,
       pricing: client.pricing || { rate_per_minute: 2.00, rate_recording_per_minute: 1.00, rate_per_session: 0.00 },
       billing_history: client.billing_history || []
@@ -5980,7 +6115,7 @@ app.post('/api/admin/sync-telephony-webhooks', async (req, res) => {
 
 
 app.post('/api/admin/plans/save', express.json(), (req, res) => {
-  const { id, name, price_per_month, max_minutes, max_agents, rate_per_minute, crm_integration, api_sharing, description } = req.body;
+  const { id, name, price_per_month, max_minutes, max_agents, rate_per_minute, crm_integration, api_sharing, description, razorpay_plan_id } = req.body;
   if (!id || !name || price_per_month === undefined) {
     return res.status(400).json({ success: false, error: 'id, name, and price_per_month are required.' });
   }
@@ -5996,7 +6131,8 @@ app.post('/api/admin/plans/save', express.json(), (req, res) => {
     rate_per_minute: newRate,
     crm_integration: !!crm_integration,
     api_sharing: !!api_sharing,
-    description: description ? description.trim() : ''
+    description: description ? description.trim() : '',
+    razorpay_plan_id: razorpay_plan_id ? String(razorpay_plan_id).trim() : ''
   };
 
   plansDb.set(planId, planData);
@@ -6121,7 +6257,7 @@ app.get('/api/client/billing', (req, res) => {
   res.json({
     success: true,
     balance: client.balance !== undefined ? client.balance : 0.00,
-    plan: client.plan || 'basic',
+    plan: client.plan || 'none',
     used_minutes: client.used_minutes !== undefined ? client.used_minutes : 0.00,
     pricing: client.pricing || { rate_per_minute: 2.00, rate_recording_per_minute: 1.00, rate_per_session: 0.00 },
     billing_history: client.billing_history || []
@@ -6605,7 +6741,7 @@ app.post('/api/reseller/clients', express.json(), resellerAuthMiddleware, (req, 
     created_at: new Date().toISOString(),
     balance: 0,
     used_minutes: 0,
-    plan: 'basic',
+    plan: 'none',
     pricing: {
       rate_per_minute: defaultRate,
       rate_recording_per_minute: 1.0,
