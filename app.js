@@ -3998,7 +3998,15 @@ window.addSingleContactFromSidebar = async function() {
 window.openAddSingleContactModal = function() {
   const modal = document.getElementById('modal-add-single-contact');
   if (modal) {
+    modal.classList.add('active');
     modal.style.display = 'flex';
+    modal.style.opacity = '1';
+    modal.style.visibility = 'visible';
+    modal.style.pointerEvents = 'auto';
+
+    const modalContent = modal.querySelector('.modal-content');
+    if (modalContent) modalContent.style.transform = 'translateY(0)';
+
     const n = document.getElementById('single-contact-name');
     const p = document.getElementById('single-contact-phone');
     const t = document.getElementById('single-contact-tag');
@@ -4011,7 +4019,13 @@ window.openAddSingleContactModal = function() {
 
 window.closeAddSingleContactModal = function() {
   const modal = document.getElementById('modal-add-single-contact');
-  if (modal) modal.style.display = 'none';
+  if (modal) {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+    modal.style.opacity = '0';
+    modal.style.visibility = 'hidden';
+    modal.style.pointerEvents = 'none';
+  }
 };
 
 window.submitSingleContactFromModal = async function() {
