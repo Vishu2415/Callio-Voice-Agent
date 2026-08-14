@@ -1935,7 +1935,8 @@ app.get('/api/plans', (req, res) => {
         max_agents: p.max_agents !== undefined ? Number(p.max_agents) : 99999,
         crm_integration: !!p.crm_integration,
         api_sharing: !!p.api_sharing,
-        description: p.description || ''
+        description: p.description || '',
+        razorpay_plan_id: p.razorpay_plan_id || ''
       };
     });
 
@@ -1959,7 +1960,8 @@ app.get('/api/plans', (req, res) => {
     max_agents: p.max_agents !== undefined ? Number(p.max_agents) : 99999,
     crm_integration: !!p.crm_integration,
     api_sharing: !!p.api_sharing,
-    description: p.description || ''
+    description: p.description || '',
+    razorpay_plan_id: p.razorpay_plan_id || ''
   }));
 
   res.json({
