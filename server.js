@@ -2468,9 +2468,11 @@ app.use(express.static('./', {
     if (/\.(png|jpg|jpeg|gif|ico|svg|webp|woff2?|ttf|eot)$/i.test(filePath)) {
       res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
     }
-    // CSS & JS files: Cache for 1 hour
+    // CSS & JS files: Instant revalidation (no-cache)
     else if (/\.(css|js)$/i.test(filePath)) {
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     }
     // HTML files: Quick revalidation check
     else if (/\.html$/i.test(filePath)) {
