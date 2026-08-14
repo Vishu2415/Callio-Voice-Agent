@@ -5075,18 +5075,27 @@ async function executeBroadcastCalls(broadcastId, agent, contacts, reqBody = {})
       break;
     }
 
-    console.log(`[Broadcast Engine ${broadcastId}] Queuing call to ${contact.phone} (${i+1}/${contacts.length})...`);
+    let resolvedName = contact.name || '';
+    if (!resolvedName || /^[+\d\s\-\(\)]+$/.test(resolvedName)) {
+      const matched = findContactByPhone(contact.phone, reqBody.clientId);
+      if (matched && matched.name && !/^[+\d\s\-\(\)]+$/.test(matched.name)) {
+        resolvedName = matched.name;
+      }
+    }
+
+    console.log(`[Broadcast Engine ${broadcastId}] Queuing call to ${contact.phone} (${resolvedName}) (${i+1}/${contacts.length})...`);
 
     const callPayload = {
       provider: defaultCallConfig.telephonyProvider || 'vobiz',
       to: contact.phone,
-      name: contact.name || 'Customer',
+      name: resolvedName || 'Customer',
       publicUrl: reqBody.publicUrl || defaultCallConfig.publicUrl || '',
       voice: agent.voice || defaultCallConfig.voice,
       systemInstruction: finalInstruction,
       recordCall: true,
       model: agent.model || defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
       clientId: reqBody.clientId || agent.clientId || null,
+      broadcastId: broadcastId,
 
       exotelApiKey: reqBody.exotelApiKey || defaultCallConfig.exotelApiKey,
       exotelApiToken: reqBody.exotelApiToken || defaultCallConfig.exotelApiToken,
@@ -5109,6 +5118,12 @@ async function executeBroadcastCalls(broadcastId, agent, contacts, reqBody = {})
       if (callData && callData.success) {
         record.dialedCount = (record.dialedCount || 0) + 1;
         record.connectedCount = (record.connectedCount || 0) + 1;
+        if (callData.callSid) {
+          record.callSids = record.callSids || [];
+          if (!record.callSids.includes(callData.callSid)) {
+            record.callSids.push(callData.callSid);
+          }
+        }
         console.log(`[Broadcast Engine ${broadcastId}] Call successfully initiated to ${contact.phone} (CallSid: ${callData.callSid || 'N/A'})`);
       } else {
         record.failedCount = (record.failedCount || 0) + 1;

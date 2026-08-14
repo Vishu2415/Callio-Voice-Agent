@@ -4719,7 +4719,7 @@ window.viewBroadcastCallLogs = async function(bId) {
 
   modal.style.display = 'flex';
   body.innerHTML = `
-    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+    <div style="text-align: center; padding: 40px; color: var(--text-muted, #6b7280);">
       <div style="font-size: 1.5rem; margin-bottom: 8px;">⏳</div>
       <div>Loading recordings & AI call logs...</div>
     </div>
@@ -4742,23 +4742,34 @@ window.viewBroadcastCallLogs = async function(bId) {
     if (subtitle) subtitle.innerText = `Target: ${bcast.targetLabel || 'All Contacts'} • Date: ${new Date(bcast.createdAt).toLocaleString()}`;
 
     const allCalls = callsRes.calls || window.allCallLogs || [];
-    
-    // Filter calls for this campaign (matching target or created within 30 mins of broadcast)
-    const bcastTime = new Date(bcast.createdAt).getTime();
-    let campaignCalls = allCalls.filter(c => {
-      const callTime = new Date(c.timestamp || c.createdAt || Date.now()).getTime();
-      return Math.abs(callTime - bcastTime) < 30 * 60 * 1000;
-    });
+    let campaignCalls = [];
 
-    if (campaignCalls.length === 0) {
-      campaignCalls = allCalls.slice(0, Math.min(allCalls.length, bcast.totalContacts || 5));
+    if (Array.isArray(bcast.callSids) && bcast.callSids.length > 0) {
+      campaignCalls = allCalls.filter(c => bcast.callSids.includes(c.callSid) || c.broadcastId === bId);
     }
 
     if (campaignCalls.length === 0) {
+      const bcastTime = new Date(bcast.createdAt).getTime();
+      campaignCalls = allCalls.filter(c => {
+        const callTime = new Date(c.timestamp || c.createdAt || Date.now()).getTime();
+        return Math.abs(callTime - bcastTime) < 20 * 60 * 1000;
+      });
+    }
+
+    // Deduplicate calls by callSid
+    const seenSids = new Set();
+    campaignCalls = campaignCalls.filter(c => {
+      if (!c || !c.callSid) return false;
+      if (seenSids.has(c.callSid)) return false;
+      seenSids.add(c.callSid);
+      return true;
+    });
+
+    if (campaignCalls.length === 0) {
       body.innerHTML = `
-        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <div style="text-align: center; padding: 40px; color: var(--text-muted, #6b7280);">
           <div style="font-size: 2rem; margin-bottom: 12px;">📭</div>
-          <h4 style="margin: 0 0 6px 0; color: var(--text-main, #fff);">No Recordings Processed Yet</h4>
+          <h4 style="margin: 0 0 6px 0; color: var(--text-main, #111827);">No Recordings Processed Yet</h4>
           <p style="font-size: 0.85rem; margin: 0;">Call recordings will appear here automatically as soon as recipient calls finish.</p>
         </div>
       `;
@@ -4770,20 +4781,32 @@ window.viewBroadcastCallLogs = async function(bId) {
       const recUrl = `/recording-proxy/${call.callSid}?clientId=${encodeURIComponent(clientId)}`;
       const statusColor = (call.status === 'completed' || call.status === 'active') ? '#10b981' : '#ef4444';
 
+      let displayName = call.name || call.customerName || '';
+      const phoneNum = call.to || call.customerNumber || call.phone || '';
+
+      if (!displayName || /^[+\d\s\-\(\)]+$/.test(displayName) || displayName.toLowerCase() === 'customer') {
+        const matched = (window.allContactsList || []).find(c => c && c.phone && typeof cleanAndComparePhone === 'function' && cleanAndComparePhone(c.phone, phoneNum));
+        if (matched && matched.name && !/^[+\d\s\-\(\)]+$/.test(matched.name)) {
+          displayName = matched.name;
+        } else {
+          displayName = phoneNum ? `Contact` : `Recipient #${index + 1}`;
+        }
+      }
+
       html += `
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 16px;">
+        <div style="background: var(--bg-surface, rgba(0,0,0,0.03)); border: 1px solid var(--border-color, rgba(0,0,0,0.1)); border-radius: 12px; padding: 14px 16px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <div>
-              <span style="font-weight: 700; color: var(--text-main, #fff); font-size: 0.92rem;">👤 ${escapeHtml(call.name || call.to || 'Recipient #' + (index + 1))}</span>
-              <span style="font-size: 0.8rem; color: var(--color-cyan); margin-left: 8px;">(${escapeHtml(call.to || call.customerNumber || '')})</span>
+              <span style="font-weight: 700; color: var(--text-main, #111827); font-size: 0.92rem;">👤 ${escapeHtml(displayName)}</span>
+              ${phoneNum ? `<span style="font-size: 0.8rem; color: var(--color-cyan, #0891b2); font-weight: 600; margin-left: 6px;">(${escapeHtml(phoneNum)})</span>` : ''}
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 0.75rem; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px; color: var(--text-muted);">⏱️ ${call.duration || '0:15'}</span>
+              <span style="font-size: 0.75rem; background: var(--bg-hover, rgba(0,0,0,0.05)); padding: 3px 8px; border-radius: 6px; color: var(--text-muted, #6b7280);">⏱️ ${call.duration || '0:15'}</span>
               <span style="font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${(call.status || 'COMPLETED').toUpperCase()}</span>
             </div>
           </div>
           
-          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color, rgba(0,0,0,0.06)); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 260px;">
               <audio controls src="${recUrl}" style="width: 100%; height: 36px; border-radius: 8px; outline: none;"></audio>
             </div>
@@ -4793,8 +4816,8 @@ window.viewBroadcastCallLogs = async function(bId) {
           </div>
 
           ${call.summary ? `
-            <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 8px; border-left: 3px solid var(--color-cyan);">
-              <strong style="color: var(--color-cyan);">AI Summary:</strong> ${escapeHtml(call.summary.replace(/\*\*/g, ''))}
+            <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted, #4b5563); background: var(--bg-hover, rgba(0,0,0,0.04)); padding: 8px 12px; border-radius: 8px; border-left: 3px solid var(--color-cyan, #0891b2);">
+              <strong style="color: var(--color-cyan, #0891b2);">AI Summary:</strong> ${escapeHtml(call.summary.replace(/\*\*/g, ''))}
             </div>
           ` : ''}
         </div>

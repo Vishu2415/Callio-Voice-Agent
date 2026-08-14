@@ -1237,20 +1237,20 @@
         </div>
 
         <!-- Broadcast Call Logs & Recordings Modal -->
-        <div id="broadcast-logs-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 999999; align-items: center; justify-content: center; padding: 20px;">
-          <div style="background: var(--bg-card, #111827); border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; width: 100%; max-width: 850px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); overflow: hidden; animation: modalFadeIn 0.25s ease-out;">
+        <div id="broadcast-logs-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 999999; align-items: center; justify-content: center; padding: 20px;">
+          <div style="background: var(--bg-card, #ffffff); color: var(--text-main, #111827); border: 1px solid var(--border-color, rgba(0,0,0,0.12)); border-radius: 18px; width: 100%; max-width: 850px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35); overflow: hidden; animation: modalFadeIn 0.25s ease-out;">
             <!-- Modal Header -->
-            <div style="padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02);">
+            <div style="padding: 20px 24px; border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.08)); display: flex; align-items: center; justify-content: space-between; background: var(--bg-surface, rgba(0,0,0,0.02));">
               <div style="display: flex; align-items: center; gap: 12px;">
-                <div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: #10b981;">
+                <div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: #10b981;">
                   🎙️
                 </div>
                 <div>
-                  <h3 id="broadcast-modal-title" style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main, #fff);">Broadcast Campaign Call Logs &amp; Recordings</h3>
-                  <p id="broadcast-modal-subtitle" style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted, #9ca3af);">Listen to recordings &amp; view AI analysis for this campaign</p>
+                  <h3 id="broadcast-modal-title" style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main, #111827);">Broadcast Campaign Call Logs &amp; Recordings</h3>
+                  <p id="broadcast-modal-subtitle" style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted, #6b7280);">Listen to recordings &amp; view AI analysis for this campaign</p>
                 </div>
               </div>
-              <button onclick="window.closeBroadcastLogsModal()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted, #9ca3af); font-size: 1.2rem; cursor: pointer; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">✕</button>
+              <button onclick="window.closeBroadcastLogsModal()" style="background: var(--bg-surface, rgba(0,0,0,0.05)); border: 1px solid var(--border-color, rgba(0,0,0,0.1)); color: var(--text-main, #111827); font-size: 1.2rem; cursor: pointer; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">✕</button>
             </div>
             
             <!-- Modal Body -->
@@ -1259,11 +1259,11 @@
             </div>
             
             <!-- Modal Footer -->
-            <div style="padding: 14px 24px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
-              <button onclick="window.closeBroadcastLogsModal(); if (typeof window.switchTab === 'function') window.switchTab('callings');" style="background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3); color: var(--color-cyan); padding: 8px 16px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+            <div style="padding: 14px 24px; border-top: 1px solid var(--border-color, rgba(0,0,0,0.08)); display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface, rgba(0,0,0,0.02));">
+              <button onclick="window.closeBroadcastLogsModal(); if (typeof window.switchTab === 'function') window.switchTab('callings');" style="background: rgba(6,182,212,0.12); border: 1px solid rgba(6,182,212,0.3); color: var(--color-cyan, #0891b2); padding: 8px 16px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
                 Open Full Callings Console ➔
               </button>
-              <button onclick="window.closeBroadcastLogsModal()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 8px 18px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">Close</button>
+              <button onclick="window.closeBroadcastLogsModal()" style="background: var(--bg-surface, rgba(0,0,0,0.08)); border: 1px solid var(--border-color, rgba(0,0,0,0.15)); color: var(--text-main, #111827); padding: 8px 18px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">Close</button>
             </div>
           </div>
         </div>
