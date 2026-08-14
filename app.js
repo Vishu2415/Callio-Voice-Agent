@@ -3995,21 +3995,14 @@ window.addSingleContactFromSidebar = async function() {
   }
 };
 
-window.openAddSingleContactModal = function() {
-  const modal = document.getElementById('modal-add-single-contact');
+// ─── Single Contact Modal V2 Event Handlers & Delegation ─────────────────────
+window.openSingleContactModalV2 = function() {
+  const modal = document.getElementById('new-single-contact-modal');
   if (modal) {
-    modal.classList.add('active');
     modal.style.display = 'flex';
-    modal.style.opacity = '1';
-    modal.style.visibility = 'visible';
-    modal.style.pointerEvents = 'auto';
-
-    const modalContent = modal.querySelector('.modal-content');
-    if (modalContent) modalContent.style.transform = 'translateY(0)';
-
-    const n = document.getElementById('single-contact-name');
-    const p = document.getElementById('single-contact-phone');
-    const t = document.getElementById('single-contact-tag');
+    const n = document.getElementById('v2-contact-name');
+    const p = document.getElementById('v2-contact-phone');
+    const t = document.getElementById('v2-contact-tag');
     if (n) n.value = '';
     if (p) p.value = '';
     if (t) t.value = '';
@@ -4017,35 +4010,89 @@ window.openAddSingleContactModal = function() {
   }
 };
 
-window.closeAddSingleContactModal = function() {
-  const modal = document.getElementById('modal-add-single-contact');
-  if (modal) {
-    modal.classList.remove('active');
-    modal.style.display = 'none';
-    modal.style.opacity = '0';
-    modal.style.visibility = 'hidden';
-    modal.style.pointerEvents = 'none';
-  }
+window.closeSingleContactModalV2 = function() {
+  const modal = document.getElementById('new-single-contact-modal');
+  if (modal) modal.style.display = 'none';
 };
 
-window.submitSingleContactFromModal = async function() {
-  const btn = document.querySelector('#modal-add-single-contact button.btn-primary');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerText = '💾 Saving...';
+// Global Event Delegation for V2 Single Contact Button & Modal Triggers
+document.addEventListener('click', function(e) {
+  const btnOpen = e.target.closest('#btn-open-single-contact-modal-v2') || e.target.closest('[onclick*="AddSingleContact"]');
+  if (btnOpen) {
+    e.preventDefault();
+    e.stopPropagation();
+    window.openSingleContactModalV2();
+    return;
   }
-  try {
-    const success = await window.addSingleContactFromSidebar();
-    if (success) {
-      window.closeAddSingleContactModal();
+
+  const btnClose = e.target.closest('#btn-close-single-contact-modal-v2') || e.target.closest('#btn-cancel-single-contact-v2');
+  if (btnClose) {
+    e.preventDefault();
+    window.closeSingleContactModalV2();
+    return;
+  }
+
+  const modalOverlay = document.getElementById('new-single-contact-modal');
+  if (modalOverlay && e.target === modalOverlay) {
+    window.closeSingleContactModalV2();
+  }
+});
+
+// Form Submit Handler for V2 Single Contact Modal
+document.addEventListener('submit', async function(e) {
+  if (e.target && e.target.id === 'form-new-single-contact') {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const btnSubmit = document.getElementById('btn-save-single-contact-v2');
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.innerText = '💾 Saving...';
     }
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerText = '💾 Save Contact';
+
+    const name = (document.getElementById('v2-contact-name')?.value || '').trim();
+    const phone = (document.getElementById('v2-contact-phone')?.value || '').trim();
+    let tag = (document.getElementById('v2-contact-tag')?.value || '').trim();
+    if (!tag) tag = 'Default';
+
+    if (!phone) {
+      alert("Phone number is required.");
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = '💾 Save Contact';
+      }
+      return;
+    }
+
+    try {
+      const clientId = (loggedInUser && loggedInUser.id) ? loggedInUser.id : (window.CurrentClient?.id || (JSON.parse(localStorage.getItem('user_session') || '{}').id || ''));
+
+      const res = await fetch('/api/contacts/single', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone, tag, clientId })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        window.closeSingleContactModalV2();
+        if (typeof fetchGroups === 'function') fetchGroups();
+        alert("✅ Contact added successfully!");
+      } else {
+        alert("Error adding contact: " + (data.error || 'Failed to save contact'));
+      }
+    } catch(err) {
+      console.error("Save Single Contact V2 Error:", err);
+      alert("Error adding contact: " + err.message);
+    } finally {
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = '💾 Save Contact';
+      }
     }
   }
-};
+});
 
 // Event listener to close modal
 document.getElementById('btn-close-contacts-modal')?.addEventListener('click', () => {
