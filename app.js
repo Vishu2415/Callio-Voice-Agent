@@ -4609,8 +4609,11 @@ window.handleStartBroadcastClick = async function() {
 
 window.fetchRecentBroadcasts = async function() {
   try {
-    const clientId = loggedInUser ? loggedInUser.id : '';
-    const res = await fetch(`/api/broadcasts?clientId=${clientId}`);
+    let clientId = (typeof currentUser !== 'undefined' && currentUser) ? (currentUser.id || currentUser.email) : '';
+    if (!clientId && typeof loggedInUser !== 'undefined' && loggedInUser) {
+      clientId = loggedInUser.id;
+    }
+    const res = await fetch(`/api/broadcasts?clientId=${encodeURIComponent(clientId || '')}`);
     const data = await res.json();
     if (data.success) {
       window.renderRecentBroadcastsTable(data.broadcasts || []);
@@ -4669,7 +4672,10 @@ window.renderRecentBroadcastsTable = function(broadcasts) {
         </td>
         <td style="color: var(--text-muted); font-size: 0.8rem;">${dateStr}</td>
         <td>${statusPill}</td>
-        <td style="text-align: right;">
+        <td style="text-align: right; white-space: nowrap;">
+          <button onclick="window.viewBroadcastCallLogs('${b.id}')" title="View Call Logs & Recordings" style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: #10b981; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; margin-right: 6px;">
+            🎙 Call Logs & Recordings
+          </button>
           <button onclick="window.deleteBroadcastDirect('${b.id}')" title="Cancel/Delete" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
             Delete
           </button>
@@ -4679,6 +4685,16 @@ window.renderRecentBroadcastsTable = function(broadcasts) {
   });
 
   tbody.innerHTML = html;
+};
+
+window.viewBroadcastCallLogs = function(bId) {
+  // Navigate to Callings tab to listen to call recordings and view full AI analysis
+  const callingsTabBtn = document.querySelector('[data-tab="callings"]') || document.querySelector('button[onclick*="callings"]');
+  if (callingsTabBtn) {
+    callingsTabBtn.click();
+  } else if (typeof window.switchTab === 'function') {
+    window.switchTab('callings');
+  }
 };
 
 window.deleteBroadcastDirect = async function(id) {
