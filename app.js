@@ -10316,68 +10316,14 @@ async function fetchPlans() {
     const data = await res.json();
     if (data.success && data.plans) {
       window.activePlans = data.plans;
+      if (document.getElementById('admin-plans-table-body') && typeof window.fetchAdminPlans === 'function') {
+        window.fetchAdminPlans();
+      }
     }
   } catch (err) {
     console.error('Failed to fetch plans:', err);
   }
 }
-
-window.fetchAdminPlans = async function() {
-  try {
-    const res = await fetch('/api/plans');
-    const data = await res.json();
-    if (data.success && data.plans) {
-      window.activePlans = data.plans;
-      
-      const tbody = document.getElementById('admin-plans-table-body');
-      if (tbody) {
-        tbody.innerHTML = '';
-        if (data.plans.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">No plans configured.</td></tr>`;
-          return;
-        }
-        data.plans.forEach(p => {
-          const row = document.createElement('tr');
-          
-          const crmBadge = p.crm_integration 
-            ? `<span style="color: var(--color-green); font-weight: bold;">✓ Enabled</span>` 
-            : `<span style="color: var(--text-muted); font-size: 0.85rem;">🔒 Locked</span>`;
-            
-          const apiBadge = p.api_sharing 
-            ? `<span style="color: var(--color-green); font-weight: bold;">✓ Enabled</span>` 
-            : `<span style="color: var(--text-muted); font-size: 0.85rem;">🔒 Locked</span>`;
-            
-          const priceStr = `₹${Number(p.price_per_month).toLocaleString('en-IN')}`;
-          const minsStr = p.max_minutes >= 99999 ? 'Unlimited' : `${p.max_minutes} mins`;
-          const agentsStr = p.max_agents >= 99999 ? 'Unlimited' : p.max_agents;
-          const rateStr = `₹${p.rate_per_minute}/min`;
-          
-          const deleteBtn = p.id === 'basic' 
-            ? `<button disabled class="admin-action-btn admin-action-btn-delete" style="opacity: 0.5; cursor: not-allowed;">Delete</button>` 
-            : `<button onclick="window.deletePlan('${p.id}')" class="admin-action-btn admin-action-btn-delete">Delete</button>`;
-            
-          row.innerHTML = `
-            <td style="font-weight: 600; color: var(--text-main);">${escapeHtml(p.name)}</td>
-            <td style="font-family: monospace; font-size: 0.82rem; color: var(--color-cyan);">${escapeHtml(p.id)}</td>
-            <td style="font-weight: 500;">${priceStr}</td>
-            <td>${minsStr}</td>
-            <td>${agentsStr}</td>
-            <td>${rateStr}</td>
-            <td>${crmBadge}</td>
-            <td>${apiBadge}</td>
-            <td style="text-align: right; white-space: nowrap;">
-              <button onclick="window.openEditPlanModal('${p.id}')" class="admin-action-btn" style="margin-right: 6px;">Edit</button>
-              ${deleteBtn}
-            </td>
-          `;
-          tbody.appendChild(row);
-        });
-      }
-    }
-  } catch (err) {
-    console.error('Failed to fetch admin plans:', err);
-  }
-};
 
 window.openCreatePlanModal = function() {
   document.getElementById('plan-modal-title').textContent = 'Create Subscription Plan';
