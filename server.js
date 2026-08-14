@@ -3934,6 +3934,11 @@ app.post('/make-call', async (req, res) => {
     let activeVoice = voice;
     let activeInstruction = systemInstruction;
     let activeClientId = req.body.client_id || req.body.clientId || null;
+    let targetAgent = null;
+
+    if (req.body.agentId) {
+      targetAgent = agentsDb.get(req.body.agentId);
+    }
 
     if (activeClientId && clientsDb.has(activeClientId)) {
       const client = clientsDb.get(activeClientId);
@@ -3956,12 +3961,8 @@ app.post('/make-call', async (req, res) => {
         activeVobizAuthToken = masterAuthToken;
         activeVobizCallerId = (client.phone_number && client.phone_number.trim() !== '') ? client.phone_number : masterCallerId;
       }
-      // Resolve active agent for this call
-      let targetAgent = null;
-      if (req.body.agentId) {
-        targetAgent = agentsDb.get(req.body.agentId);
-      }
-      if (!targetAgent && activeClientId) {
+      
+      if (!targetAgent) {
         if (client.defaultAgentId) {
           targetAgent = agentsDb.get(client.defaultAgentId);
         }
@@ -3973,23 +3974,23 @@ app.post('/make-call', async (req, res) => {
         }
       }
 
-      if (targetAgent) {
-        if (!voice || voice === defaultCallConfig.voice) activeVoice = targetAgent.voice || activeVoice;
-        if (!systemInstruction) {
-          activeInstruction = targetAgent.systemInstruction || activeInstruction;
-          if (targetAgent.name) {
-            activeInstruction = `[IDENTITY DIRECTIVE: Your name is "${targetAgent.name}". You must introduce yourself as "${targetAgent.name}".]\n\n` + activeInstruction;
-          }
-          if (targetAgent.mood && targetAgent.mood !== 'Professional') {
-            activeInstruction = `[MOOD DIRECTIVE: You must act and speak in a ${targetAgent.mood.toUpperCase()} mood at all times.]\n\n` + activeInstruction;
-          }
-        }
-        console.log(`[Outbound Call Resolution] Resolved active agent "${targetAgent.name}" (ID: ${targetAgent.id}, Voice: ${activeVoice}) for client: ${activeClientId}`);
-      }
-
-      if (!activeVoice) activeVoice = client.agent_config?.voice || defaultCallConfig.voice || 'Aoede';
-      if (!activeInstruction) activeInstruction = client.agent_config?.system_prompt || defaultCallConfig.systemInstruction;
+      if (!activeVoice) activeVoice = client.agent_config?.voice;
+      if (!activeInstruction) activeInstruction = client.agent_config?.system_prompt;
       console.log(`[Vobiz REST API] ${hasValidSubCredentials ? 'Using sub-account' : 'Using admin master account'}: AuthID=${activeVobizAuthId}, CallerId=${activeVobizCallerId} for client: ${activeClientId}`);
+    }
+
+    if (targetAgent) {
+      if (!voice || voice === defaultCallConfig.voice) activeVoice = targetAgent.voice || activeVoice;
+      if (!systemInstruction) {
+        activeInstruction = targetAgent.systemInstruction || activeInstruction;
+        if (targetAgent.name) {
+          activeInstruction = `[IDENTITY DIRECTIVE: Your name is "${targetAgent.name}". You must introduce yourself as "${targetAgent.name}".]\n\n` + activeInstruction;
+        }
+        if (targetAgent.mood && targetAgent.mood !== 'Professional') {
+          activeInstruction = `[MOOD DIRECTIVE: You must act and speak in a ${targetAgent.mood.toUpperCase()} mood at all times.]\n\n` + activeInstruction;
+        }
+      }
+      console.log(`[Outbound Call Resolution] Resolved active agent "${targetAgent.name}" (ID: ${targetAgent.id}, Voice: ${activeVoice}) for client: ${activeClientId || 'default'}`);
     }
     
     if (!activeVobizAuthId || !activeVobizAuthToken || !activeVobizCallerId || activeVobizCallerId.trim() === '') {
