@@ -4217,10 +4217,11 @@ document.getElementById('btn-save-contacts')?.addEventListener('click', async ()
   
   try {
     // 1. Create Group
+    const clientId = (loggedInUser && loggedInUser.id) ? loggedInUser.id : (window.CurrentClient?.id || (JSON.parse(localStorage.getItem('user_session') || '{}').id || ''));
     const grpRes = await fetch('/api/groups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: groupName, clientId: loggedInUser ? loggedInUser.id : null })
+      body: JSON.stringify({ name: groupName, clientId })
     });
     const grpData = await grpRes.json();
     

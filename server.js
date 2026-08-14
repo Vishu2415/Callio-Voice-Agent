@@ -1587,7 +1587,44 @@ function getIncomingCallConfig(query = {}, fromNum = '', clientId = '', toNum = 
     }
   }
 
-  // ─── CLIENT FALLBACK PROMPT ──────────────────────────────────────────────────
+  // ─── CLIENT FALLBACK PROMPT & AGENT RESOLUTION ────────────────────────────────
+  if (effectiveClientId) {
+    let clientDefaultAgent = null;
+    if (clientObj && clientObj.defaultAgentId) {
+      clientDefaultAgent = agentsDb.get(clientObj.defaultAgentId);
+    }
+    if (!clientDefaultAgent) {
+      // Find agent marked as default or first agent created by this client
+      clientDefaultAgent = Array.from(agentsDb.values()).find(a => a.clientId === effectiveClientId && (a.isDefault || a.default));
+      if (!clientDefaultAgent) {
+        clientDefaultAgent = Array.from(agentsDb.values()).find(a => a.clientId === effectiveClientId);
+      }
+    }
+
+    if (clientDefaultAgent) {
+      console.log(`[Incoming Routing] Matched client's active agent "${clientDefaultAgent.name}" (ID: ${clientDefaultAgent.id}) for Client: ${effectiveClientId}`);
+      let systemInstruction = clientDefaultAgent.systemInstruction || '';
+      if (clientDefaultAgent.name) {
+        systemInstruction = `[IDENTITY DIRECTIVE: Your name is "${clientDefaultAgent.name}". You must introduce yourself as "${clientDefaultAgent.name}".]\n\n` + systemInstruction;
+      }
+      if (clientDefaultAgent.mood && clientDefaultAgent.mood !== 'Professional') {
+        systemInstruction = `[MOOD DIRECTIVE: You must act and speak in a ${clientDefaultAgent.mood.toUpperCase()} mood at all times.]\n\n` + systemInstruction;
+      }
+      return {
+        agentId: clientDefaultAgent.id,
+        voice: clientDefaultAgent.voice || clientObj?.agent_config?.voice || defaultCallConfig.voice || 'Aoede',
+        systemInstruction: systemInstruction || clientObj?.agent_config?.system_prompt || defaultCallConfig.systemInstruction,
+        model: clientDefaultAgent.model || defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
+        name: clientDefaultAgent.name || (clientObj ? clientObj.name : ''),
+        recordCall: recordCall,
+        clientId: effectiveClientId,
+        vobizAuthId: clientObj?.vobiz_sub_auth_id || defaultCallConfig.vobizAuthId,
+        vobizAuthToken: clientObj?.vobiz_sub_auth_token || defaultCallConfig.vobizAuthToken,
+        vobizCallerId: defaultCallConfig.vobizCallerId
+      };
+    }
+  }
+
   if (clientObj) {
     console.log(`[Incoming Routing] Routing call to client's saved system_prompt: ${clientObj.name}`);
     return {
@@ -3919,13 +3956,39 @@ app.post('/make-call', async (req, res) => {
         activeVobizAuthToken = masterAuthToken;
         activeVobizCallerId = (client.phone_number && client.phone_number.trim() !== '') ? client.phone_number : masterCallerId;
       }
-      // IMPORTANT: Only use client.agent_config as a last fallback.
-      if (!activeVoice) {
-        activeVoice = client.agent_config?.voice;
+      // Resolve active agent for this call
+      let targetAgent = null;
+      if (req.body.agentId) {
+        targetAgent = agentsDb.get(req.body.agentId);
       }
-      if (!activeInstruction) {
-        activeInstruction = client.agent_config?.system_prompt;
+      if (!targetAgent && activeClientId) {
+        if (client.defaultAgentId) {
+          targetAgent = agentsDb.get(client.defaultAgentId);
+        }
+        if (!targetAgent) {
+          targetAgent = Array.from(agentsDb.values()).find(a => a.clientId === activeClientId && (a.isDefault || a.default));
+          if (!targetAgent) {
+            targetAgent = Array.from(agentsDb.values()).find(a => a.clientId === activeClientId);
+          }
+        }
       }
+
+      if (targetAgent) {
+        if (!voice || voice === defaultCallConfig.voice) activeVoice = targetAgent.voice || activeVoice;
+        if (!systemInstruction) {
+          activeInstruction = targetAgent.systemInstruction || activeInstruction;
+          if (targetAgent.name) {
+            activeInstruction = `[IDENTITY DIRECTIVE: Your name is "${targetAgent.name}". You must introduce yourself as "${targetAgent.name}".]\n\n` + activeInstruction;
+          }
+          if (targetAgent.mood && targetAgent.mood !== 'Professional') {
+            activeInstruction = `[MOOD DIRECTIVE: You must act and speak in a ${targetAgent.mood.toUpperCase()} mood at all times.]\n\n` + activeInstruction;
+          }
+        }
+        console.log(`[Outbound Call Resolution] Resolved active agent "${targetAgent.name}" (ID: ${targetAgent.id}, Voice: ${activeVoice}) for client: ${activeClientId}`);
+      }
+
+      if (!activeVoice) activeVoice = client.agent_config?.voice || defaultCallConfig.voice || 'Aoede';
+      if (!activeInstruction) activeInstruction = client.agent_config?.system_prompt || defaultCallConfig.systemInstruction;
       console.log(`[Vobiz REST API] ${hasValidSubCredentials ? 'Using sub-account' : 'Using admin master account'}: AuthID=${activeVobizAuthId}, CallerId=${activeVobizCallerId} for client: ${activeClientId}`);
     }
     
@@ -3950,7 +4013,7 @@ app.post('/make-call', async (req, res) => {
         cleanCallerId = '91' + cleanCallerId;
       }
 
-      const answerUrl = `${callbackUrl}/incoming-call-vobiz?voice=${encodeURIComponent(activeVoice || 'Aoede')}${activeClientId ? `&client_id=${activeClientId}` : ''}`;
+      const answerUrl = `${callbackUrl}/incoming-call-vobiz?voice=${encodeURIComponent(activeVoice || 'Aoede')}${activeClientId ? `&client_id=${activeClientId}` : ''}${targetAgent ? `&agentId=${targetAgent.id}` : ''}`;
       
       const bodyPayload = {
         from: cleanCallerId,
@@ -4428,11 +4491,21 @@ app.get('/api/groups', authMiddleware('contacts'), (req, res) => {
 });
 
 app.post('/api/groups', authMiddleware('contacts'), (req, res) => {
-  const { name, clientId } = req.body;
+  let { name, clientId } = req.body;
   if (!name) return res.status(400).json({ success: false, error: 'Group name required' });
   
-  const groupId = `grp_${Date.now()}`;
-  const groupData = { id: groupId, name, clientId: clientId || null, createdAt: Date.now() };
+  if (!clientId && req.user) clientId = req.user.id;
+  if (!clientId) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const session = sessionsDb.get(token);
+      if (session) clientId = session.userId;
+    }
+  }
+  
+  const groupId = `grp_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+  const groupData = { id: groupId, name: String(name).trim(), clientId: clientId || null, createdAt: Date.now() };
   groupsDb.set(groupId, groupData);
   saveGroups();
   
@@ -4457,14 +4530,17 @@ app.delete('/api/groups/:id', authMiddleware('contacts'), (req, res) => {
 
 // --- CONTACTS API ---
 app.post('/api/contacts/batch', authMiddleware('contacts'), (req, res) => {
-  const { groupId, contacts } = req.body;
+  let { groupId, contacts, clientId } = req.body;
   if (!groupId || !Array.isArray(contacts)) {
     return res.status(400).json({ success: false, error: 'groupId and contacts array required' });
   }
   
-  if (!groupsDb.has(groupId)) {
+  const group = groupsDb.get(groupId);
+  if (!group) {
     return res.status(404).json({ success: false, error: 'Group not found' });
   }
+
+  const effectiveClientId = group.clientId || clientId || (req.user ? req.user.id : null);
   
   let added = 0;
   contacts.forEach(c => {
@@ -4483,8 +4559,10 @@ app.post('/api/contacts/batch', authMiddleware('contacts'), (req, res) => {
       contactsDb.set(contactId, {
         id: contactId,
         groupId,
+        clientId: effectiveClientId || null,
         phone,
         name,
+        tag: group.name || '',
         createdAt: Date.now()
       });
       added++;
@@ -5045,15 +5123,38 @@ app.post('/api/broadcast', async (req, res) => {
   } else {
     let allContacts = Array.from(contactsDb.values());
     if (clientId && clientId !== 'admin') {
-      allContacts = allContacts.filter(c => c.clientId === clientId);
+      allContacts = allContacts.filter(c => {
+        if (c.clientId === clientId) return true;
+        if (c.groupId) {
+          const grp = groupsDb.get(c.groupId);
+          if (grp && (grp.clientId === clientId || grp.clientId === 'admin')) return true;
+        }
+        return false;
+      });
     }
 
     contacts = allContacts;
     if (targetType && targetType.startsWith('tag_')) {
-      const tagName = targetType.replace('tag_', '').toLowerCase();
-      contacts = allContacts.filter(c => (c.tag || 'Default').toLowerCase() === tagName);
+      const tagName = targetType.replace(/^tag_/i, '').trim().toLowerCase();
+      contacts = allContacts.filter(c => {
+        const cTag = (c.tag || '').trim().toLowerCase();
+        let grpName = '';
+        if (c.groupId) {
+          const grp = groupsDb.get(c.groupId);
+          if (grp && grp.name) grpName = grp.name.trim().toLowerCase();
+        }
+        return cTag === tagName || grpName === tagName || (tagName === 'default' && (!cTag || cTag === 'default'));
+      });
     } else if (targetType && targetType !== 'all') {
-      contacts = allContacts.filter(c => c.groupId === targetType);
+      contacts = allContacts.filter(c => {
+        if (c.groupId === targetType) return true;
+        let grpName = '';
+        if (c.groupId) {
+          const grp = groupsDb.get(c.groupId);
+          if (grp && grp.name) grpName = grp.name.trim().toLowerCase();
+        }
+        return grpName === targetType.trim().toLowerCase() || (c.tag || '').trim().toLowerCase() === targetType.trim().toLowerCase();
+      });
     }
   }
 
