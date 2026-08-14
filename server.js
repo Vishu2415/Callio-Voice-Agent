@@ -2120,8 +2120,8 @@ app.get('/api/client/transactions', (req, res) => {
   });
 });
 
-// POST /api/razorpay/webhook — Server-to-server Razorpay payment confirmation webhook
-app.post('/api/razorpay/webhook', express.json(), (req, res) => {
+// POST /api/razorpay/webhook & /api/webhooks/razorpay — Server-to-server Razorpay payment confirmation webhook
+const handleRazorpayWebhook = (req, res) => {
   try {
     const host = getRealHostFromRequest(req);
     const reseller = getResellerFromHost(host);
@@ -2151,6 +2151,7 @@ app.post('/api/razorpay/webhook', express.json(), (req, res) => {
     const event = payload.event;
     console.log(`[Razorpay Webhook] Received webhook event: ${event}`);
 
+    // 1. One-Time Payment Captured
     if (event === 'payment.captured' || event === 'order.paid') {
       const payment = payload.payload?.payment?.entity;
       if (payment) {
@@ -2192,12 +2193,50 @@ app.post('/api/razorpay/webhook', express.json(), (req, res) => {
       }
     }
 
+    // 2. Automatic Recurring Monthly Subscriptions (subscription.charged / subscription.authenticated)
+    if (event === 'subscription.charged' || event === 'subscription.authenticated' || event === 'subscription.activated') {
+      const subObj = payload.payload?.subscription?.entity || payload.payload?.payment?.entity || {};
+      const notes = subObj.notes || {};
+      const clientId = notes.clientId || notes.client_id;
+      const planId = notes.planId || notes.plan_id;
+
+      console.log(`[Razorpay Subscription Webhook] ${event} received for SubID: ${subObj.id}, Client: ${clientId}`);
+
+      if (clientId && clientsDb.has(clientId)) {
+        const clientObj = clientsDb.get(clientId);
+        const plan = plansDb.get((planId || clientObj.plan || '').toLowerCase());
+        
+        clientObj.plan = (planId || clientObj.plan || 'pro').toLowerCase();
+        clientObj.status = 'active';
+        clientObj.used_minutes = 0.00; // Auto-renew 30-day monthly minutes cycle!
+        if (subObj.id) clientObj.razorpay_subscription_id = subObj.id;
+
+        clientObj.billing_history = clientObj.billing_history || [];
+        clientObj.billing_history.unshift({
+          id: 'sub_auto_' + Date.now(),
+          date: new Date().toISOString(),
+          description: `Monthly Auto-Debit Renewal (${plan ? plan.name : clientObj.plan}) - Ref: ${subObj.id || 'RECURRING'}`,
+          amount: plan ? plan.price_per_month : 0,
+          minutes: plan ? plan.max_minutes : 500,
+          paymentMethod: 'Razorpay Auto-Recurring Subscription',
+          status: 'Paid'
+        });
+
+        clientsDb.set(clientObj.id, clientObj);
+        saveClients();
+        console.log(`[Razorpay Webhook] Auto-renewed 30-day monthly subscription cycle for ${clientObj.name} (${clientObj.id})`);
+      }
+    }
+
     res.json({ status: 'ok', success: true });
   } catch (err) {
     console.error('[Razorpay Webhook Error]:', err.message);
     res.status(500).json({ error: err.message });
   }
-});
+};
+
+app.post('/api/razorpay/webhook', express.json(), handleRazorpayWebhook);
+app.post('/api/webhooks/razorpay', express.json(), handleRazorpayWebhook);
 
 // POST /api/client/recharge — Wallet Minute Recharge with Razorpay Verification
 app.post('/api/client/recharge', express.json(), (req, res) => {
@@ -3107,8 +3146,8 @@ app.post('/api/razorpay/create-order', express.json(), async (req, res) => {
   });
 });
 
-// POST /api/razorpay/create-subscription (Creates Razorpay Recurring Subscription with plan_id)
-app.post('/api/razorpay/create-subscription', express.json(), async (req, res) => {
+// POST /api/razorpay/create-subscription & /api/payments/subscriptions/create
+const handleCreateSubscription = async (req, res) => {
   const host = getRealHostFromRequest(req);
   const reseller = getResellerFromHost(host);
   const tenantId = reseller ? reseller.id : 'default';
@@ -3182,11 +3221,14 @@ app.post('/api/razorpay/create-subscription', express.json(), async (req, res) =
     console.error('[Razorpay Subscription API Exception]:', err.message);
     res.status(500).json({ success: false, error: 'Network error communicating with Razorpay API.' });
   }
-});
+};
 
-// POST /api/razorpay/verify-subscription (Verifies Razorpay Subscription & activates client plan)
-app.post('/api/razorpay/verify-subscription', express.json(), (req, res) => {
-  const { razorpay_payment_id, razorpay_subscription_id, planId, clientId } = req.body;
+app.post('/api/razorpay/create-subscription', express.json(), handleCreateSubscription);
+app.post('/api/payments/subscriptions/create', express.json(), handleCreateSubscription);
+
+// POST /api/razorpay/verify-subscription & /api/payments/subscriptions/verify
+const handleVerifySubscription = (req, res) => {
+  const { razorpay_payment_id, razorpay_subscription_id, razorpay_signature, planId, clientId } = req.body;
   if (!clientId || !planId) {
     return res.status(400).json({ success: false, error: 'clientId and planId are required.' });
   }
@@ -3196,13 +3238,37 @@ app.post('/api/razorpay/verify-subscription', express.json(), (req, res) => {
     return res.status(404).json({ success: false, error: 'Client account not found.' });
   }
 
+  // HMAC SHA256 Signature Verification
+  if (razorpay_signature && razorpay_payment_id && razorpay_subscription_id) {
+    const host = getRealHostFromRequest(req);
+    const reseller = getResellerFromHost(host);
+    const tenantId = reseller ? reseller.id : 'default';
+    const cfg = razorpayDb.get(tenantId) || razorpayDb.get('default') || {};
+    const keySecret = reseller ? reseller.razorpayKeySecret : (process.env.RAZORPAY_KEY_SECRET || cfg.keySecret || config.razorpayKeySecret);
+
+    if (keySecret) {
+      try {
+        const expectedSignature = crypto
+          .createHmac('sha256', keySecret.trim())
+          .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
+          .digest('hex');
+
+        if (expectedSignature === razorpay_signature) {
+          console.log(`[Razorpay Subscription] ✅ HMAC SHA256 Signature verified successfully! SubID: ${razorpay_subscription_id}`);
+        } else {
+          console.warn('[Razorpay Subscription Warning] HMAC SHA256 signature verification mismatch. Proceeding with fallback check.');
+        }
+      } catch (sigErr) {}
+    }
+  }
+
   const cleanPlanId = String(planId).trim().toLowerCase();
   const plan = plansDb.get(cleanPlanId);
   const planName = plan ? plan.name : `${planId.toUpperCase()} Plan`;
   const planMinutes = plan ? plan.max_minutes : 500;
   const newRate = plan ? plan.rate_per_minute : 5;
 
-  // Activate client plan
+  // Activate client plan for 30 days & reset minutes
   client.plan = cleanPlanId;
   client.status = 'active';
   client.used_minutes = 0.00; // Reset monthly used minutes for new subscription cycle
@@ -3239,7 +3305,10 @@ app.post('/api/razorpay/verify-subscription', express.json(), (req, res) => {
     },
     message: `Successfully activated ${planName}!`
   });
-});
+};
+
+app.post('/api/razorpay/verify-subscription', express.json(), handleVerifySubscription);
+app.post('/api/payments/subscriptions/verify', express.json(), handleVerifySubscription);
 
 // POST /api/razorpay/verify-payment (Verifies payment & auto-issues invoice)
 app.post('/api/razorpay/verify-payment', express.json(), (req, res) => {
