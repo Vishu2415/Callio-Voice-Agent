@@ -3997,22 +3997,43 @@ window.addSingleContactFromSidebar = async function() {
 
 // ─── Single Contact Modal V2 Event Handlers & Delegation ─────────────────────
 window.openSingleContactModalV2 = function() {
+  console.log('[Single Contact Modal V2] Opening modal...');
   const modal = document.getElementById('new-single-contact-modal');
-  if (modal) {
-    modal.style.display = 'flex';
-    const n = document.getElementById('v2-contact-name');
-    const p = document.getElementById('v2-contact-phone');
-    const t = document.getElementById('v2-contact-tag');
-    if (n) n.value = '';
-    if (p) p.value = '';
-    if (t) t.value = '';
-    setTimeout(() => { if (n) n.focus(); }, 100);
+  if (!modal) {
+    console.error('[Single Contact Modal V2] Error: Element #new-single-contact-modal not found in DOM!');
+    return;
   }
+  modal.style.setProperty('display', 'flex', 'important');
+  modal.style.setProperty('opacity', '1', 'important');
+  modal.style.setProperty('visibility', 'visible', 'important');
+  modal.style.setProperty('z-index', '99999999', 'important');
+
+  const n = document.getElementById('v2-contact-name');
+  const p = document.getElementById('v2-contact-phone');
+  const t = document.getElementById('v2-contact-tag');
+  if (n) n.value = '';
+  if (p) p.value = '';
+  if (t) t.value = '';
+  setTimeout(() => { if (n) n.focus(); }, 100);
 };
 
 window.closeSingleContactModalV2 = function() {
   const modal = document.getElementById('new-single-contact-modal');
-  if (modal) modal.style.display = 'none';
+  if (modal) {
+    modal.style.setProperty('display', 'none', 'important');
+  }
+};
+
+// Aliases for legacy button callers across app.js
+window.openAddSingleContactModal = function() {
+  window.openSingleContactModalV2();
+};
+window.closeAddSingleContactModal = function() {
+  window.closeSingleContactModalV2();
+};
+window.submitSingleContactFromModal = function() {
+  const form = document.getElementById('form-new-single-contact');
+  if (form) form.requestSubmit();
 };
 
 // Global Event Delegation for V2 Single Contact Button & Modal Triggers
