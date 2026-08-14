@@ -123,7 +123,10 @@ document.querySelectorAll('.glass-navbar .nav-btn').forEach(btn => {
     if (targetId === 'tab-contacts') fetchGroups();
     if (targetId === 'tab-broadcast' || targetId === 'tab-quick-call') {
       fetchAgentsForDropdowns();
-      if (targetId === 'tab-broadcast') fetchGroupsForDropdowns();
+      if (targetId === 'tab-broadcast') {
+        fetchGroupsForDropdowns();
+        if (typeof window.fetchRecentBroadcasts === 'function') window.fetchRecentBroadcasts();
+      }
     }
     if (targetId === 'tab-crm-automation') {
       fetchCrmRulesAndAgents();
@@ -4622,6 +4625,20 @@ window.fetchRecentBroadcasts = async function() {
     console.error("Failed to fetch recent broadcasts", e);
   }
 };
+
+// Auto-load broadcasts immediately & setup 6-second live polling interval
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { window.fetchRecentBroadcasts(); });
+} else {
+  setTimeout(() => { window.fetchRecentBroadcasts(); }, 300);
+}
+
+setInterval(() => {
+  const broadcastPane = document.getElementById('tab-broadcast');
+  if (broadcastPane && (broadcastPane.classList.contains('active') || broadcastPane.style.display !== 'none')) {
+    if (typeof window.fetchRecentBroadcasts === 'function') window.fetchRecentBroadcasts();
+  }
+}, 6000);
 
 window.renderRecentBroadcastsTable = function(broadcasts) {
   const tbody = document.getElementById('recent-broadcasts-table-body');
