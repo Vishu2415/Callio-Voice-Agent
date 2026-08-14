@@ -5077,26 +5077,41 @@ async function executeBroadcastCalls(broadcastId, agent, contacts, reqBody = {})
     };
 
     try {
-      fetch(localCallUrl, {
+      const callRes = await fetch(localCallUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(callPayload)
-      }).catch(err => console.error(`[Broadcast Engine Error] Failed dialing ${contact.phone}:`, err.message));
-
-      record.dialedCount = (record.dialedCount || 0) + 1;
+      });
+      const callData = await callRes.json();
+      if (callData && callData.success) {
+        record.dialedCount = (record.dialedCount || 0) + 1;
+        record.connectedCount = (record.connectedCount || 0) + 1;
+        console.log(`[Broadcast Engine ${broadcastId}] Call successfully initiated to ${contact.phone} (CallSid: ${callData.callSid || 'N/A'})`);
+      } else {
+        record.failedCount = (record.failedCount || 0) + 1;
+        console.error(`[Broadcast Engine ${broadcastId}] Call failed to ${contact.phone}: ${callData ? callData.error : 'Unknown error'}`);
+      }
       saveBroadcasts();
-    } catch(e) {}
+    } catch(err) {
+      record.failedCount = (record.failedCount || 0) + 1;
+      console.error(`[Broadcast Engine ${broadcastId}] Exception dialing ${contact.phone}: ${err.message}`);
+      saveBroadcasts();
+    }
 
     if (i < contacts.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
     }
   }
 
   const finalRec = broadcastsDb.get(broadcastId);
   if (finalRec && finalRec.status === 'running') {
-    finalRec.status = 'completed';
+    if ((finalRec.dialedCount || 0) > 0 || (finalRec.connectedCount || 0) > 0) {
+      finalRec.status = 'completed';
+    } else {
+      finalRec.status = 'failed';
+    }
     saveBroadcasts();
-    console.log(`[Broadcast Engine ${broadcastId}] Broadcast completed cleanly.`);
+    console.log(`[Broadcast Engine ${broadcastId}] Broadcast finished with status: ${finalRec.status} (Dialed: ${finalRec.dialedCount || 0}, Failed: ${finalRec.failedCount || 0}).`);
   }
 }
 
