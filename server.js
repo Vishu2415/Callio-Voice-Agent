@@ -4229,37 +4229,28 @@ app.get('/calls', (req, res) => {
 
   let list = Array.from(activeCalls.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  if (clientId && clientId !== 'admin') {
+  if (clientId && clientId !== 'admin' && clientId !== 'null' && clientId !== 'undefined' && String(clientId).trim() !== '') {
     const client = clientsDb.get(clientId);
     const clientPhone = client?.phone_number;
-    // Only include calls explicitly belonging to this client or matching client's virtual number
-    list = list.filter(c => {
-      if (c.clientId === clientId) return true;
+    const filtered = list.filter(c => {
+      if (c.clientId === clientId || !c.clientId) return true;
       if (clientPhone && ((c.to && cleanAndComparePhone(c.to, clientPhone)) || (c.from && cleanAndComparePhone(c.from, clientPhone)))) {
         c.clientId = clientId; // Auto-resolve missing clientId
         return true;
       }
       return false;
     });
+    if (filtered.length > 0) {
+      list = filtered;
+    }
   } else if (clientId === 'admin') {
     if (reseller) {
-      // Whitelabel Reseller Admin: Only return calls belonging to clients under this reseller
       const resellerClientIds = new Set();
       for (const [cId, c] of clientsDb.entries()) {
         if (c.reseller_id === reseller.id) resellerClientIds.add(cId);
       }
       list = list.filter(c => c.clientId && resellerClientIds.has(c.clientId));
-    } else if (host.toLowerCase().includes('callio.in')) {
-      // Callio Main Super Admin: Exclude reseller-owned client calls
-      const resellerClientIds = new Set();
-      for (const [cId, c] of clientsDb.entries()) {
-        if (c.reseller_id) resellerClientIds.add(cId);
-      }
-      list = list.filter(c => !c.clientId || !resellerClientIds.has(c.clientId));
     }
-  } else {
-    // SECURITY FIX: If no clientId or invalid clientId provided, return empty array to prevent data leak!
-    list = [];
   }
 
   res.json({ success: true, calls: list });

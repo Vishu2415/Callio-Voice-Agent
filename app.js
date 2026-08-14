@@ -2766,8 +2766,10 @@ if (elBtnBackToCalls) {
 
 async function refreshCallsList() {
   try {
-    const clientId = loggedInUser ? loggedInUser.id : '';
-    const res = await fetch(`/calls?clientId=${clientId}`);
+    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) 
+      ? loggedInUser.id 
+      : (window.CurrentClient?.id || (JSON.parse(localStorage.getItem('user_session') || '{}').id || (JSON.parse(localStorage.getItem('callio_user') || '{}').id || '')));
+    const res = await fetch(`/calls?clientId=${encodeURIComponent(clientId || '')}`);
     const data = await res.json();
     const fetchedCalls = Array.isArray(data) ? data : (data && Array.isArray(data.calls) ? data.calls : []);
     callsCache = fetchedCalls;
@@ -6900,8 +6902,10 @@ async function fetchClientDashboardData() {
 // Fetches full call history and updates dashboard boxes (used by whitelabel clients)
 async function refreshCallsListForDashboard() {
   try {
-    const clientId = loggedInUser ? loggedInUser.id : '';
-    const res = await fetch(`/calls?clientId=${clientId}`);
+    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) 
+      ? loggedInUser.id 
+      : (window.CurrentClient?.id || (JSON.parse(localStorage.getItem('user_session') || '{}').id || (JSON.parse(localStorage.getItem('callio_user') || '{}').id || '')));
+    const res = await fetch(`/calls?clientId=${encodeURIComponent(clientId || '')}`);
     const data = await res.json();
     if (data.success) {
       callsCache = data.calls;
