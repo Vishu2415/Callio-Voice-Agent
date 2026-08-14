@@ -3708,6 +3708,35 @@
     </div>
   </div>
 
+  <script>
+    window.openSingleContactModalV2 = function() {
+      var modal = document.getElementById('new-single-contact-modal');
+      if (modal) {
+        modal.style.setProperty('display', 'flex', 'important');
+        modal.style.setProperty('opacity', '1', 'important');
+        modal.style.setProperty('visibility', 'visible', 'important');
+        modal.style.setProperty('z-index', '99999999', 'important');
+        var n = document.getElementById('v2-contact-name');
+        var p = document.getElementById('v2-contact-phone');
+        var t = document.getElementById('v2-contact-tag');
+        if (n) n.value = '';
+        if (p) p.value = '';
+        if (t) t.value = '';
+        setTimeout(function() { if (n) n.focus(); }, 100);
+      }
+    };
+
+    window.closeSingleContactModalV2 = function() {
+      var modal = document.getElementById('new-single-contact-modal');
+      if (modal) {
+        modal.style.setProperty('display', 'none', 'important');
+      }
+    };
+
+    window.openAddSingleContactModal = window.openSingleContactModalV2;
+    window.closeAddSingleContactModal = window.closeSingleContactModalV2;
+  </script>
+
 </body>
 
 </html>
