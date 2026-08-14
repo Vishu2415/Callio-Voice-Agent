@@ -5007,10 +5007,20 @@ app.post('/api/webhooks/crm-trigger-call', express.json(), async (req, res) => {
 // --- BROADCAST API & SCHEDULER ---
 
 app.get('/api/broadcasts', authMiddleware('calls'), (req, res) => {
-  const { clientId } = req.query;
+  let clientId = req.query.clientId || req.query.client_id;
+  if (!clientId && req.user) clientId = req.user.id;
+  if (!clientId) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const session = sessionsDb.get(token);
+      if (session) clientId = session.userId;
+    }
+  }
+
   let list = Array.from(broadcastsDb.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   if (clientId && clientId !== 'admin') {
-    list = list.filter(b => b.clientId === clientId);
+    list = list.filter(b => b.clientId === clientId || !b.clientId);
   }
   res.json({ success: true, broadcasts: list });
 });
@@ -5126,6 +5136,17 @@ app.post('/api/broadcast', async (req, res) => {
   const agent = agentsDb.get(agentId);
   if (!agent) return res.status(404).json({ success: false, error: 'Agent not found' });
 
+  let effectiveClientId = clientId;
+  if (!effectiveClientId && req.user) effectiveClientId = req.user.id;
+  if (!effectiveClientId) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const session = sessionsDb.get(token);
+      if (session) effectiveClientId = session.userId;
+    }
+  }
+
   // Resolve contacts to dial
   let contacts = [];
 
@@ -5134,16 +5155,16 @@ app.post('/api/broadcast', async (req, res) => {
     contacts = customPhones.filter(p => p && String(p).trim().length > 0).map(p => ({
       phone: String(p).trim(),
       name: String(p).trim(),
-      clientId: clientId || null
+      clientId: effectiveClientId || null
     }));
   } else {
     let allContacts = Array.from(contactsDb.values());
-    if (clientId && clientId !== 'admin') {
+    if (effectiveClientId && effectiveClientId !== 'admin') {
       allContacts = allContacts.filter(c => {
-        if (c.clientId === clientId) return true;
+        if (c.clientId === effectiveClientId) return true;
         if (c.groupId) {
           const grp = groupsDb.get(c.groupId);
-          if (grp && (grp.clientId === clientId || grp.clientId === 'admin')) return true;
+          if (grp && (grp.clientId === effectiveClientId || grp.clientId === 'admin')) return true;
         }
         return false;
       });
@@ -5181,7 +5202,7 @@ app.post('/api/broadcast', async (req, res) => {
   const broadcastId = 'bcast_' + Date.now();
   const bcastRecord = {
     id: broadcastId,
-    clientId: clientId || null,
+    clientId: effectiveClientId || null,
     agentId,
     agentName: agent.name,
     targetType: targetType || 'all',
@@ -7609,8 +7630,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               callState.transcript.push({ role: 'user', text: transText });
               callState.status = 'active';
               
-              // Voicemail Detection Logic
-              const isVoicemail = /voicemail|record your message|after the tone|leave a message|person you(?: a|')re trying to reach/i.test(transText);
+              // Voicemail Detection Logic (Strict matching only for actual automated voicemail system prompts)
+              const isVoicemail = /\b(leave a message after the tone|record your message after the tone|please leave your voicemail|at the tone please record your message)\b/i.test(transText);
               
               if (isVoicemail) {
                 console.log(`[Voicemail Detected] Call ${callSid} hit a voicemail machine. Terminating.`);
@@ -8034,6 +8055,16 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 const base64Mulaw = mulawBuffer.toString('base64');
                 
                 const vobizMessage = {
+                  event: 'media',
+                  streamSid: streamSid,
+                  stream_sid: streamSid,
+                  streamId: streamSid,
+                  media: {
+                    payload: base64Mulaw
+                  }
+                };
+                
+                const vobizPlayMessage = {
                   event: 'playAudio',
                   streamId: streamSid,
                   media: {
@@ -8045,6 +8076,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 
                 if (ws.readyState === WebSocket.OPEN) {
                   ws.send(JSON.stringify(vobizMessage));
+                  ws.send(JSON.stringify(vobizPlayMessage));
                 }
               } else {
                 // Transcode: 24kHz PCM -> 8kHz Mu-law (Twilio)
