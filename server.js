@@ -4298,6 +4298,18 @@ app.get('/calls', (req, res) => {
     }
   }
 
+  // Attach clientName & clientEmail to all call objects for clear isolation and display
+  list = list.map(c => {
+    let clientName = c.clientName || '';
+    let clientEmail = c.clientEmail || '';
+    if (c.clientId && clientsDb.has(c.clientId)) {
+      const clientObj = clientsDb.get(c.clientId);
+      clientName = clientObj.name || '';
+      clientEmail = clientObj.email || '';
+    }
+    return { ...c, clientName, clientEmail };
+  });
+
   res.json({ success: true, calls: list });
 });
 

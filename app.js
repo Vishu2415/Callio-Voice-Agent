@@ -7031,7 +7031,10 @@ function populateDashboardBoxes(calls) {
           || (!isDashboardSystemNum(lastCall.to) ? lastCall.to : null)
           || (!isDashboardSystemNum(lastCall.from) ? lastCall.from : null)
           || 'Unknown';
-        const partiesText = isIncoming ? `Incoming ➔ You` : `You ➔ ${customerNum}`;
+        const isAdminUser = typeof loggedInUser !== 'undefined' && loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.id === 'admin');
+        const partiesText = isIncoming 
+          ? (isAdminUser ? `Incoming ➔ ${lastCall.clientName || 'Client'}` : `Incoming ➔ You`) 
+          : (isAdminUser ? `${lastCall.clientName || 'Client'} ➔ ${customerNum}` : `You ➔ ${customerNum}`);
         
         const callDate = new Date(lastCall.createdAt);
         const timeText = isNaN(callDate.getTime()) ? '-' : callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -7248,7 +7251,10 @@ window.renderAISummariesPageTable = function() {
       `<span style="color: var(--color-cyan); font-weight: bold;">⬆ Outgoing</span>`;
 
     const toNum = c.to || 'Unknown';
-    const partiesText = isIncoming ? `Caller ➔ You` : `You ➔ ${toNum}`;
+    const isAdminUser = typeof loggedInUser !== 'undefined' && loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.id === 'admin');
+    const partiesText = isIncoming 
+      ? (isAdminUser ? `Caller ➔ ${c.clientName || 'Client'}` : `Caller ➔ You`) 
+      : (isAdminUser ? `${c.clientName || 'Client'} ➔ ${toNum}` : `You ➔ ${toNum}`);
 
     const callDate = new Date(c.createdAt);
     const timeText = isNaN(callDate.getTime()) ? '' : callDate.toLocaleString([], { weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
