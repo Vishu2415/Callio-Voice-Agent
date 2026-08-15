@@ -122,9 +122,20 @@ function loadBroadcasts() {
     if (fs.existsSync(BROADCASTS_DB_FILE)) {
       const raw = fs.readFileSync(BROADCASTS_DB_FILE, 'utf8');
       const data = JSON.parse(raw);
+      let dirty = false;
       for (const [k, v] of Object.entries(data)) {
+        if (!v.clientId || v.clientId === 'admin') {
+          if (v.agentId && typeof agentsDb !== 'undefined' && agentsDb.has(v.agentId)) {
+            const ag = agentsDb.get(v.agentId);
+            if (ag && ag.clientId) {
+              v.clientId = ag.clientId;
+              dirty = true;
+            }
+          }
+        }
         broadcastsDb.set(k, v);
       }
+      if (dirty) saveBroadcasts();
     }
   } catch (err) {
     console.error('[Startup] Failed to load broadcasts:', err.message);
@@ -705,13 +716,27 @@ function isVirtualNumber(phone) {
 
 function findContactByPhone(phone, clientId = null) {
   if (!phone) return null;
+  // 1st Pass: Match contact explicitly owned by clientId
+  if (clientId && clientId !== 'admin') {
+    for (const contact of contactsDb.values()) {
+      if (cleanAndComparePhone(contact.phone, phone)) {
+        if (contact.clientId === clientId) return contact;
+        if (contact.groupId) {
+          const group = groupsDb.get(contact.groupId);
+          if (group && group.clientId === clientId) return contact;
+        }
+      }
+    }
+  }
+
+  // 2nd Pass: Fallback search across contactsDb ensuring no cross-tenant leakage
   for (const contact of contactsDb.values()) {
     if (cleanAndComparePhone(contact.phone, phone)) {
       if (clientId && clientId !== 'admin') {
-        const group = groupsDb.get(contact.groupId);
-        // Strict isolation: skip contacts owned by a different client
-        if (group && group.clientId && group.clientId !== clientId) {
-          continue;
+        if (contact.clientId && contact.clientId !== clientId) continue;
+        if (contact.groupId) {
+          const group = groupsDb.get(contact.groupId);
+          if (group && group.clientId && group.clientId !== clientId) continue;
         }
       }
       return contact;
@@ -5079,11 +5104,14 @@ app.get('/api/broadcasts', (req, res) => {
   let reqClientId = req.query.clientId || req.query.client_id;
   if (!reqClientId && req.user) reqClientId = req.user.id;
 
-  if (reqClientId && reqClientId !== 'admin' && reqClientId !== 'null' && reqClientId !== 'undefined' && String(reqClientId).trim() !== '') {
-    const filtered = list.filter(b => !b.clientId || b.clientId === reqClientId || b.clientId === 'admin');
-    if (filtered.length > 0) {
-      list = filtered;
-    }
+  const targetCId = (reqClientId || '').trim();
+
+  if (targetCId === 'all' || targetCId === 'admin_all') {
+    // System Overview for Admin: return all broadcasts
+  } else if (targetCId && targetCId !== 'null' && targetCId !== 'undefined') {
+    list = list.filter(b => b.clientId === targetCId);
+  } else {
+    list = [];
   }
 
   res.json({ success: true, broadcasts: list });
@@ -5129,10 +5157,14 @@ async function executeBroadcastCalls(broadcastId, agent, contacts, reqBody = {})
 
     let resolvedName = contact.name || '';
     if (!resolvedName || /^[+\d\s\-\(\)]+$/.test(resolvedName)) {
-      const matched = findContactByPhone(contact.phone, reqBody.clientId);
+      const matched = findContactByPhone(contact.phone, reqBody.clientId || record.clientId);
       if (matched && matched.name && !/^[+\d\s\-\(\)]+$/.test(matched.name)) {
         resolvedName = matched.name;
       }
+    }
+    // Prevent accidental matching where contact name equals or contains agent's business name
+    if (agent && agent.name && resolvedName && resolvedName.toLowerCase().trim() === agent.name.toLowerCase().trim()) {
+      resolvedName = 'Customer';
     }
 
     console.log(`[Broadcast Engine ${broadcastId}] Queuing call to ${contact.phone} (${resolvedName}) (${i+1}/${contacts.length})...`);
@@ -7553,7 +7585,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
       const direction = (callState && callState.direction) || 'incoming';
       const firstName = getFirstName(cleanName);
       if (firstName && firstName.toLowerCase() !== 'saas' && firstName.toLowerCase() !== 'lead') {
-        greetingInstruction = `\n\n[CRITICAL USER IDENTITY & CUSTOMER CONTEXT]: You are currently speaking with customer "${cleanName}" (First Name: "${firstName}"). You KNOW their name is "${firstName}". If they ask "Mera naam kya hai?", "Who am I?", or "Do you know my name?", you MUST answer warmly: "Aapka naam ${firstName} hai!". Greet them by their first name "${firstName}" immediately at the start of the call.`;
+        greetingInstruction = `\n\n[CALL RECIPIENT (CUSTOMER IDENTITY)]: You are currently speaking with customer "${cleanName}" (First Name: "${firstName}"). You KNOW their name is "${firstName}". If they ask "Mera naam kya hai?", "Who am I?", or "Do you know my name?", you MUST answer warmly: "Aapka naam ${firstName} hai!". Greet them by their first name "${firstName}" immediately at the start of the call. [IMPORTANT]: Do NOT confuse your AI agent identity/business name with the customer's name.`;
         if (callState) callState.customerName = cleanName;
       }
     }
