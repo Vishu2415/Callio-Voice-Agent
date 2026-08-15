@@ -7558,8 +7558,12 @@ window.renderTodayCallsPageTable = function() {
     const arrow = isOut ? '⬆ Outgoing' : '⬇ Incoming';
     const arrowColor = isOut ? 'var(--color-cyan)' : 'var(--color-green)';
     const phone = call.to || call.from || call.phone || 'Unknown Number';
-    const duration = call.duration ? `${call.duration}s` : 'N/A';
+    const durSec = call.duration || (call.startedAt && call.endedAt ? Math.round((new Date(call.endedAt) - new Date(call.startedAt))/1000) : 0);
+    const duration = durSec > 0 ? (durSec >= 60 ? `${Math.floor(durSec/60)}m ${durSec%60}s` : `${durSec}s`) : 'N/A';
     const timeText = call.timestamp || call.createdAt ? new Date(call.timestamp || call.createdAt).toLocaleString() : 'Recent';
+    const callSid = call.callSid || call.id || '';
+    const uId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) ? loggedInUser.id : '';
+    const recProxyUrl = callSid ? `/recording-proxy/${callSid}${uId ? '?clientId=' + encodeURIComponent(uId) : ''}` : '';
 
     let statusStyle = 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);';
     if (call.status === 'failed' || call.status === 'no-answer' || call.status === 'busy') {
@@ -7568,25 +7572,56 @@ window.renderTodayCallsPageTable = function() {
       statusStyle = 'background: rgba(6, 182, 212, 0.15); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.3);';
     }
 
+    let recPlayerHtml = '';
+    if (call.recordingStatus === 'ready' || call.recordingUrl) {
+      recPlayerHtml = `
+        <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-color);">
+          <div style="font-size: 0.75rem; color: var(--color-green); font-weight: 700; margin-bottom: 6px;">🎙️ Call Recording Ready</div>
+          <audio controls preload="metadata" src="${recProxyUrl}" style="width: 100%; height: 36px; border-radius: 6px;"></audio>
+        </div>`;
+    } else if (call.recordCall && (call.recordingStatus === 'recording' || call.recordingStatus === 'fetching')) {
+      recPlayerHtml = `<div style="margin-top: 8px; font-size: 0.75rem; color: var(--color-cyan); font-style: italic;">⏳ Processing recording...</div>`;
+    }
+
+    let summaryHtml = '';
+    if (call.summary) {
+      summaryHtml = `<div style="margin-top: 10px; font-size: 0.82rem; color: var(--text-main); background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); white-space: pre-wrap;">${typeof formatMarkdown === 'function' ? formatMarkdown(call.summary) : call.summary}</div>`;
+    }
+
+    let transcriptHtml = '';
+    if (Array.isArray(call.transcript) && call.transcript.length > 0) {
+      transcriptHtml = `
+        <div style="margin-top: 10px; font-size: 0.78rem; max-height: 180px; overflow-y: auto; background: var(--bg-primary); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <strong style="color: var(--text-muted); display: block; margin-bottom: 6px;">💬 Transcript (${call.transcript.length} turns):</strong>
+          ${call.transcript.map(t => `<div style="margin-bottom: 4px;"><strong style="color:${t.role === 'user' ? 'var(--color-cyan)' : '#f59e0b'};">${t.role === 'user' ? 'Caller' : 'AI Agent'}:</strong> ${escapeHtml(t.text)}</div>`).join('')}
+        </div>`;
+    }
+
+    const hasDetails = Boolean(recPlayerHtml || summaryHtml || transcriptHtml);
+
     html += `
-      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; align-items: center; gap: 14px; flex: 1; min-width: 220px;">
-          <div style="font-size: 1.1rem; color: ${arrowColor}; font-weight: 800;">${arrow.startsWith('⬆') ? '⬆' : '⬇'}</div>
-          <div>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <strong style="font-size: 1.05rem; color: var(--text-main); font-family: var(--font-mono);">${phone}</strong>
-              <span style="padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; ${statusStyle}">${call.status || 'completed'}</span>
-            </div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
-              ${timeText} • Duration: <strong>${duration}</strong> • Direction: <span style="color:${arrowColor}; font-weight:700;">${arrow}</span>
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 18px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 14px; flex: 1; min-width: 220px;">
+            <div style="font-size: 1.1rem; color: ${arrowColor}; font-weight: 800;">${arrow.startsWith('⬆') ? '⬆' : '⬇'}</div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <strong style="font-size: 1.05rem; color: var(--text-main); font-family: var(--font-mono);">${phone}</strong>
+                <span style="padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; ${statusStyle}">${call.status || 'completed'}</span>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                ${timeText} • Duration: <strong>${duration}</strong> • Direction: <span style="color:${arrowColor}; font-weight:700;">${arrow}</span>
+              </div>
             </div>
           </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            ${hasDetails ? `<button onclick="const d = document.getElementById('call-details-${callSid}'); if(d) d.style.display = d.style.display==='none'?'block':'none';" class="btn" style="padding: 6px 12px; font-size: 0.78rem; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer; font-weight: 600;">📄 Details & Audio</button>` : ''}
+            <button onclick="window.triggerLeadCall('${phone}')" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); border: none; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              📞 Redial
+            </button>
+          </div>
         </div>
-        <div>
-          <button onclick="window.triggerLeadCall('${phone}')" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: linear-gradient(135deg, var(--color-primary, #ea580c), #ae3115); border: none; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            📞 Redial
-          </button>
-        </div>
+        ${hasDetails ? `<div id="call-details-${callSid}" style="display: none; margin-top: 6px; border-top: 1px dashed var(--border-color); padding-top: 10px;">${recPlayerHtml}${summaryHtml}${transcriptHtml}</div>` : ''}
       </div>
     `;
   });

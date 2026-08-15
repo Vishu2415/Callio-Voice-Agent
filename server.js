@@ -1304,6 +1304,35 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
   if (!callState.mediaEndedAt && callState.mediaStartedAt) {
     callState.mediaEndedAt = callState.endedAt;
   }
+
+  // Calculate & store call duration in seconds
+  let rawDuration = 0;
+  if (callState.providerDuration && !isNaN(callState.providerDuration) && Number(callState.providerDuration) > 0) {
+    rawDuration = Number(callState.providerDuration);
+  } else if (callState.mediaStartedAt && callState.mediaEndedAt) {
+    const mStart = new Date(callState.mediaStartedAt).getTime();
+    const mEnd = new Date(callState.mediaEndedAt).getTime();
+    if (!isNaN(mStart) && !isNaN(mEnd) && mEnd > mStart) {
+      rawDuration = Math.round((mEnd - mStart) / 1000);
+    }
+  } else if (callState.answeredAt) {
+    const aStart = new Date(callState.answeredAt).getTime();
+    const aEnd = new Date(callState.mediaEndedAt || callState.endedAt || Date.now()).getTime();
+    if (!isNaN(aStart) && !isNaN(aEnd) && aEnd > aStart) {
+      rawDuration = Math.round((aEnd - aStart) / 1000);
+    }
+  }
+
+  // Safety cap: Duration CANNOT exceed actual WebSocket stream lifetime + 5 seconds
+  if (callState.mediaStartedAt) {
+    const maxStreamSec = Math.round((new Date(callState.mediaEndedAt || Date.now()).getTime() - new Date(callState.mediaStartedAt).getTime()) / 1000) + 5;
+    if (rawDuration > maxStreamSec && maxStreamSec > 0) {
+      rawDuration = maxStreamSec;
+    }
+  }
+
+  const durationSec = Math.min(Math.max(0, rawDuration), 900);
+  callState.duration = durationSec;
   scheduleSaveCalls();
 
   // SaaS Billing Calculation
@@ -1316,33 +1345,6 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
       const hasSpeechOrTranscript = Boolean((callState.transcript && callState.transcript.length > 0) || callState.userHasSpoken);
       const isUnbilledStatus = ['failed', 'busy', 'no-answer', 'canceled', 'voicemail', 'rejected'].includes(finalStatus) || 
                                ['failed', 'busy', 'no-answer', 'canceled', 'voicemail', 'rejected'].includes(callState.status);
-
-      let rawDuration = 0;
-      if (callState.providerDuration && !isNaN(callState.providerDuration) && Number(callState.providerDuration) > 0) {
-        rawDuration = Number(callState.providerDuration);
-      } else if (callState.mediaStartedAt && callState.mediaEndedAt) {
-        const mStart = new Date(callState.mediaStartedAt).getTime();
-        const mEnd = new Date(callState.mediaEndedAt).getTime();
-        if (!isNaN(mStart) && !isNaN(mEnd) && mEnd > mStart) {
-          rawDuration = Math.round((mEnd - mStart) / 1000);
-        }
-      } else if (callState.answeredAt) {
-        const aStart = new Date(callState.answeredAt).getTime();
-        const aEnd = new Date(callState.mediaEndedAt || callState.endedAt || Date.now()).getTime();
-        if (!isNaN(aStart) && !isNaN(aEnd) && aEnd > aStart) {
-          rawDuration = Math.round((aEnd - aStart) / 1000);
-        }
-      }
-
-      // Safety cap: Duration CANNOT exceed actual WebSocket stream lifetime + 5 seconds
-      if (callState.mediaStartedAt) {
-        const maxStreamSec = Math.round((new Date(callState.mediaEndedAt || Date.now()).getTime() - new Date(callState.mediaStartedAt).getTime()) / 1000) + 5;
-        if (rawDuration > maxStreamSec && maxStreamSec > 0) {
-          rawDuration = maxStreamSec;
-        }
-      }
-
-      const durationSec = Math.min(Math.max(0, rawDuration), 900);
 
       // Disconnected / Early-Cut / Failed Call detection:
       // Calls cut within 10s, unanswered, without speech, or with failed status count towards the 3-disconnect rule
@@ -4232,17 +4234,14 @@ app.get('/calls', (req, res) => {
   if (clientId && clientId !== 'admin' && clientId !== 'null' && clientId !== 'undefined' && String(clientId).trim() !== '') {
     const client = clientsDb.get(clientId);
     const clientPhone = client?.phone_number;
-    const filtered = list.filter(c => {
-      if (c.clientId === clientId || !c.clientId) return true;
+    list = list.filter(c => {
+      if (c.clientId === clientId) return true;
       if (clientPhone && ((c.to && cleanAndComparePhone(c.to, clientPhone)) || (c.from && cleanAndComparePhone(c.from, clientPhone)))) {
         c.clientId = clientId; // Auto-resolve missing clientId
         return true;
       }
       return false;
     });
-    if (filtered.length > 0) {
-      list = filtered;
-    }
   } else if (clientId === 'admin') {
     if (reseller) {
       const resellerClientIds = new Set();
