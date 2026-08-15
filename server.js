@@ -787,19 +787,20 @@ function getOrCreateCallState(callSid, details = {}) {
   }
 
   if (!activeCalls.has(callSid)) {
-    // Smart-linking: check if there is a pending outbound call in 'calling' state created recently
+    // Smart-linking: check if there is a pending outbound call in 'calling' state for the SAME phone number
     let pendingState = null;
     let pendingSid = null;
-    for (const [sid, st] of activeCalls.entries()) {
-      if (st.status === 'calling' && st.direction === 'outgoing' && sid !== callSid) {
-        const isClientMatch = resolvedClientId && st.clientId === resolvedClientId;
-        const isPhoneMatch = initialTo && cleanAndComparePhone(st.to, initialTo);
-        const isRecent = st.createdAt && (Date.now() - new Date(st.createdAt).getTime()) < 120000;
-        // Require explicit phone match OR (client match AND recent) to avoid hijacking calls across clients/numbers
-        if (isPhoneMatch || (isClientMatch && isRecent)) {
-          pendingState = st;
-          pendingSid = sid;
-          break;
+    if (initialTo) {
+      for (const [sid, st] of activeCalls.entries()) {
+        if (st.status === 'calling' && st.direction === 'outgoing' && sid !== callSid) {
+          const isPhoneMatch = cleanAndComparePhone(st.to, initialTo);
+          const isRecent = st.createdAt && (Date.now() - new Date(st.createdAt).getTime()) < 120000;
+          // STRICT REQUIREMENT: Only link if destination phone numbers match!
+          if (isPhoneMatch && isRecent) {
+            pendingState = st;
+            pendingSid = sid;
+            break;
+          }
         }
       }
     }
@@ -3862,9 +3863,9 @@ app.all('/incoming-call-vobiz', (req, res) => {
       const stateTo = state.to || '';
       const matchesTo = toNum && !isVirtualNumber(toNum) && cleanAndComparePhone(stateTo, toNum);
       const matchesFrom = fromNum && !isVirtualNumber(fromNum) && cleanAndComparePhone(stateTo, fromNum);
-      const isPendingOutbound = state.status === 'calling' && state.direction === 'outgoing' && sid !== callSid;
 
-      if (matchesTo || matchesFrom || isPendingOutbound) {
+      // ONLY merge if the actual customer phone number matches!
+      if (matchesTo || matchesFrom) {
         console.log(`[Vobiz Webhook] Smart Dedup: Merging existing active call entry ${sid} (Target: ${stateTo}, status: ${state.status}) into callSid ${callSid}.`);
         const oldState = { ...state, callSid: callSid };
         activeCalls.delete(sid);
