@@ -4295,7 +4295,7 @@ async function fetchAgentsForDropdowns() {
 
         // Load current default from server config
         try {
-          const cfgRes = await fetch('/api/routing-config');
+          const cfgRes = await fetch(`/api/routing-config?client_id=${clientId}`);
           const cfgData = await cfgRes.json();
           if (cfgData.success) {
             routingDefault.value = cfgData.incomingAgentId || '';
