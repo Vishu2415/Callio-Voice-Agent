@@ -375,6 +375,29 @@ function loadCalls() {
         dirty = true;
       }
     }
+    // Auto-resolve missing or admin clientId for calls
+    if (!call.clientId || call.clientId === 'admin') {
+      let resolved = null;
+      for (const [cId, c] of clientsDb.entries()) {
+        if (c.phone_number && (cleanAndComparePhone(c.phone_number, call.to) || cleanAndComparePhone(c.phone_number, call.from))) {
+          resolved = cId;
+          break;
+        }
+      }
+      if (!resolved) {
+        for (const [cId, c] of clientsDb.entries()) {
+          if (c.phone_number && c.phone_number.trim() !== '') {
+            resolved = cId;
+            break;
+          }
+        }
+      }
+      if (resolved) {
+        console.log(`[Startup Sanitization] Assigning missing clientId "${resolved}" to call ${key}`);
+        call.clientId = resolved;
+        dirty = true;
+      }
+    }
   }
   if (dirty) {
     saveCalls();
@@ -715,13 +738,36 @@ function getOrCreateCallState(callSid, details = {}) {
   if (!callSid) return null;
   const initialTo = (details.to && !isVirtualNumber(details.to) && !details.to.includes('-')) ? details.to : (details.from && !isVirtualNumber(details.from) ? details.from : '');
 
+  // Auto-resolve clientId if missing or null
+  let resolvedClientId = details.clientId || null;
+  if (!resolvedClientId) {
+    const candidateNums = [details.to, details.from, initialTo].filter(Boolean);
+    for (const num of candidateNums) {
+      for (const [cId, c] of clientsDb.entries()) {
+        if (c.phone_number && cleanAndComparePhone(c.phone_number, num)) {
+          resolvedClientId = cId;
+          break;
+        }
+      }
+      if (resolvedClientId) break;
+    }
+  }
+  if (!resolvedClientId && typeof clientsDb !== 'undefined') {
+    for (const [cId, c] of clientsDb.entries()) {
+      if (c.phone_number && c.phone_number.trim() !== '') {
+        resolvedClientId = cId;
+        break;
+      }
+    }
+  }
+
   if (!activeCalls.has(callSid)) {
     // Smart-linking: check if there is a pending outbound call in 'calling' state created recently
     let pendingState = null;
     let pendingSid = null;
     for (const [sid, st] of activeCalls.entries()) {
       if (st.status === 'calling' && st.direction === 'outgoing' && sid !== callSid) {
-        const isClientMatch = details.clientId && st.clientId === details.clientId;
+        const isClientMatch = resolvedClientId && st.clientId === resolvedClientId;
         const isPhoneMatch = initialTo && cleanAndComparePhone(st.to, initialTo);
         const isRecent = st.createdAt && (Date.now() - new Date(st.createdAt).getTime()) < 120000;
         // Require explicit phone match OR (client match AND recent) to avoid hijacking calls across clients/numbers
@@ -734,7 +780,7 @@ function getOrCreateCallState(callSid, details = {}) {
     }
 
     if (pendingState && pendingSid) {
-      console.log(`[getOrCreateCallState] Smart-linking pending outbound call ${pendingSid} -> ${callSid} (Target: ${pendingState.to}, Client: ${pendingState.clientId || 'None'})`);
+      console.log(`[getOrCreateCallState] Smart-linking pending outbound call ${pendingSid} -> ${callSid} (Target: ${pendingState.to}, Client: ${pendingState.clientId || resolvedClientId || 'None'})`);
       activeCalls.delete(pendingSid);
       const transferredConfig = callSettingsMap.get(pendingSid);
       if (transferredConfig) {
@@ -747,7 +793,7 @@ function getOrCreateCallState(callSid, details = {}) {
         provider: details.provider || pendingState.provider || 'vobiz',
         status: details.status || 'active',
         startedAt: details.status === 'active' ? (pendingState.startedAt || new Date().toISOString()) : pendingState.startedAt,
-        clientId: details.clientId || pendingState.clientId || null
+        clientId: resolvedClientId || pendingState.clientId || null
       });
     } else {
       activeCalls.set(callSid, {
@@ -765,7 +811,7 @@ function getOrCreateCallState(callSid, details = {}) {
         recordCall: details.recordCall || false,
         createdAt: new Date().toISOString(),
         startedAt: details.status === 'active' ? new Date().toISOString() : null,
-        clientId: details.clientId || null
+        clientId: resolvedClientId
       });
     }
   } else {
