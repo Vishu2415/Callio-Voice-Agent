@@ -4269,26 +4269,18 @@ app.post('/make-call', async (req, res) => {
   }
 });
 
-// GET /calls - Retrieve all active/past calls state list
+// GET /calls - Retrieve all active/past calls state list with strict per-account isolation
 app.get('/calls', (req, res) => {
   const { clientId } = req.query;
   const host = req.headers.host || req.headers['x-forwarded-host'] || '';
   const reseller = getResellerFromHost(host);
 
-  let list = Array.from(activeCalls.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  let list = Array.from(activeCalls.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
-  if (clientId && clientId !== 'admin' && clientId !== 'null' && clientId !== 'undefined' && String(clientId).trim() !== '') {
-    const client = clientsDb.get(clientId);
-    const clientPhone = client?.phone_number;
-    list = list.filter(c => {
-      if (c.clientId === clientId) return true;
-      if (clientPhone && ((c.to && cleanAndComparePhone(c.to, clientPhone)) || (c.from && cleanAndComparePhone(c.from, clientPhone)))) {
-        c.clientId = clientId; // Auto-resolve missing clientId
-        return true;
-      }
-      return false;
-    });
-  } else if (clientId === 'admin') {
+  const targetCId = (clientId || '').trim();
+
+  if (targetCId === 'all' || targetCId === 'admin_all') {
+    // Admin System Overview: Return all calls across all clients (filtered by reseller if applicable)
     if (reseller) {
       const resellerClientIds = new Set();
       for (const [cId, c] of clientsDb.entries()) {
@@ -4296,16 +4288,31 @@ app.get('/calls', (req, res) => {
       }
       list = list.filter(c => c.clientId && resellerClientIds.has(c.clientId));
     }
+  } else if (targetCId && targetCId !== 'null' && targetCId !== 'undefined') {
+    // Exact Account Filtering (works for both Clients AND Admin personal account)
+    const clientObj = clientsDb.get(targetCId);
+    const clientPhone = clientObj?.phone_number;
+    list = list.filter(c => {
+      if (c.clientId === targetCId) return true;
+      if (clientPhone && ((c.to && cleanAndComparePhone(c.to, clientPhone)) || (c.from && cleanAndComparePhone(c.from, clientPhone)))) {
+        c.clientId = targetCId; // Auto-resolve missing clientId
+        return true;
+      }
+      return false;
+    });
+  } else {
+    // No clientId provided: Return empty array to enforce strict isolation
+    list = [];
   }
 
-  // Attach clientName & clientEmail to all call objects for clear isolation and display
+  // Attach clientName & clientEmail to all call objects for clear display
   list = list.map(c => {
     let clientName = c.clientName || '';
     let clientEmail = c.clientEmail || '';
     if (c.clientId && clientsDb.has(c.clientId)) {
-      const clientObj = clientsDb.get(c.clientId);
-      clientName = clientObj.name || '';
-      clientEmail = clientObj.email || '';
+      const cObj = clientsDb.get(c.clientId);
+      clientName = cObj.name || '';
+      clientEmail = cObj.email || '';
     }
     return { ...c, clientName, clientEmail };
   });
