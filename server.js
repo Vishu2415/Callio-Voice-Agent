@@ -1256,7 +1256,7 @@ ${formattedTranscript}`;
   
   try {
     let rawSummaryText = null;
-    const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro'];
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
     for (const model of models) {
       console.log(`[Summary Engine] Attempting summary generation with model: ${model}`);
       rawSummaryText = await callGeminiGenerateContent(model, prompt);
@@ -2729,7 +2729,7 @@ Output JSON format:`;
 
   try {
     let rawText = null;
-    const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
     
     for (const model of models) {
       console.log(`[Trial Summary] Attempting summary generation with model: ${model}`);
