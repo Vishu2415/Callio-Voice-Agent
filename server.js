@@ -370,13 +370,31 @@ function loadCalls() {
   loadDatabase(CALLS_DB_FILE, activeCalls); 
   let dirty = false;
   for (const [key, call] of activeCalls.entries()) {
+    const hasTurns = call.transcript && Array.isArray(call.transcript) && call.transcript.length > 0;
+    const wasConnected = Boolean(call.mediaStartedAt || call.answeredAt || call.userHasSpoken || (call.duration && call.duration > 0));
+
     if (call.status === 'active' || call.status === 'in-progress' || call.status === 'ringing' || call.status === 'calling') {
-      console.log(`[Startup Sanitization] Resetting stuck call ${key} status from ${call.status} to failed.`);
-      call.status = 'failed';
+      const resolvedStatus = (hasTurns || wasConnected) ? 'completed' : 'failed';
+      console.log(`[Startup Sanitization] Resetting stuck call ${key} status from ${call.status} to ${resolvedStatus}.`);
+      call.status = resolvedStatus;
       call.endedAt = call.endedAt || new Date().toISOString();
       call.updatedAt = new Date().toISOString();
       dirty = true;
     }
+
+    // Auto-fix historical calls misclassified as 'failed' when conversation actually occurred
+    if (call.status === 'failed' && (hasTurns || wasConnected)) {
+      console.log(`[Startup Sanitization] Correcting misclassified call ${key} from 'failed' to 'completed' (${hasTurns ? call.transcript.length : 0} turns).`);
+      call.status = 'completed';
+      dirty = true;
+    }
+
+    // Auto-generate missing summary for calls with conversation
+    if (hasTurns && (!call.summary || call.summary.includes('Failed to generate summary') || call.summary.trim() === '')) {
+      call.summary = generateLocalTranscriptSummary(call.transcript);
+      dirty = true;
+    }
+
     // Clean up corrupted calls where target 'to' was recorded as the Virtual Caller ID
     if (call.to && isVirtualNumber(call.to)) {
       if (call.from && !isVirtualNumber(call.from)) {
@@ -1164,37 +1182,37 @@ function generateLocalTranscriptSummary(transcriptTurns) {
   const userMessages = transcriptTurns.filter(t => t && t.role === 'user').map(t => t.text).join(' ');
   const lowerUser = userMessages.toLowerCase();
 
-  let verdict = 'COMPLETED';
-  let intent = 'General Discussion';
-  let action = 'Follow up with lead';
+  let verdict = 'UNDECIDED';
+  let intent = 'Customer ke sath normal baat-cheet hui.';
+  let action = 'Customer ke sath follow-up connect karein.';
 
-  const isBooking = lowerUser.includes('appointment') || lowerUser.includes('book') || lowerUser.includes('slot') || lowerUser.includes('time') || lowerUser.includes('kal') || lowerUser.includes('baje');
-  const isPrice = lowerUser.includes('price') || lowerUser.includes('rate') || lowerUser.includes('cost') || lowerUser.includes('kitna') || lowerUser.includes('charge');
-  const isInterested = lowerUser.includes('interested') || lowerUser.includes('haan') || lowerUser.includes('yes') || isBooking || lowerUser.includes('achha') || lowerUser.includes('thik');
-  const isNotInterested = lowerUser.includes('not interested') || lowerUser.includes('nahi chahiye') || lowerUser.includes('cut the call') || lowerUser.includes('mat karo');
+  const isBooking = lowerUser.includes('appointment') || lowerUser.includes('book') || lowerUser.includes('slot') || lowerUser.includes('time') || lowerUser.includes('kal') || lowerUser.includes('baje') || lowerUser.includes('schedule');
+  const isPrice = lowerUser.includes('price') || lowerUser.includes('rate') || lowerUser.includes('cost') || lowerUser.includes('kitna') || lowerUser.includes('charge') || lowerUser.includes('paisa');
+  const isInterested = lowerUser.includes('interested') || lowerUser.includes('haan') || lowerUser.includes('yes') || isBooking || lowerUser.includes('achha') || lowerUser.includes('thik') || lowerUser.includes('sure') || lowerUser.includes('batao');
+  const isNotInterested = lowerUser.includes('not interested') || lowerUser.includes('nahi chahiye') || lowerUser.includes('cut the call') || lowerUser.includes('mat karo') || lowerUser.includes('no') || lowerUser.includes('nahi');
 
   if (isNotInterested) {
     verdict = 'NOT INTERESTED';
-    intent = 'Customer requested no further contact or declined offer.';
-    action = 'Mark lead as not interested';
+    intent = 'Customer ne aage baat karne se mana kiya ya interest nahi dikhaya.';
+    action = 'Lead ko Not Interested mark karein aur follow-up band karein.';
   } else if (isBooking) {
     verdict = 'INTERESTED';
-    intent = 'Customer inquired about appointment booking & available time slots.';
-    action = 'Confirm appointment booking details';
+    intent = 'Customer ne appointment booking aur available time slots ke baare mein poocha.';
+    action = 'Customer ki appointment details confirm karein.';
   } else if (isPrice) {
     verdict = 'INTERESTED';
-    intent = 'Customer requested pricing and service structure.';
-    action = 'Send pricing details and follow up';
+    intent = 'Customer ne pricing, charges aur plan details ki jaankari maangi.';
+    action = 'Customer ko pricing details share karke follow-up karein.';
   } else if (isInterested) {
     verdict = 'INTERESTED';
-    intent = 'Customer expressed positive interest in the discussion.';
-    action = 'Follow up with lead';
+    intent = 'Customer ne discussion mein positive interest show kiya.';
+    action = 'Lead ke sath jald follow-up karein.';
   }
 
-  const userSentences = userMessages.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 5).slice(0, 3);
+  const userSentences = userMessages.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 3).slice(0, 2);
   let highlights = userSentences.length > 0 
-    ? userSentences.map(s => `- User noted: "${s}"`).join('\n') 
-    : `- Exchanged ${transcriptTurns.length} conversational turns.`;
+    ? userSentences.map(s => `- Customer ne kaha: "${s}"`).join('\n') 
+    : `- Total ${transcriptTurns.length} conversation turns exchange hue.`;
 
   return `**VERDICT:** ${verdict}\n\n**Key Points:**\n- ${intent}\n${highlights}\n\n**Next Action:** ${action}`;
 }
@@ -1218,26 +1236,27 @@ async function generateCallSummaryBackend(callSid) {
 **VERDICT:** [INTERESTED / NOT INTERESTED / UNDECIDED]
 
 **Key Points:**
-- [1-line point]
-- [1-line point]
+- [1-line point in Hinglish]
+- [1-line point in Hinglish]
 
-**Next Action:** [What should the agent do next - 1 sentence]
+**Next Action:** [What should the agent do next in Hinglish - 1 sentence]
 
 2. **CUSTOMER_NAME:** [If the customer explicitly stated, introduced, or confirmed their name in the transcript (e.g. "My name is Vishnu", "I am Rahul Verma", "Mera naam Amit hai", "Haan main Priya bol rahi hoon"), write ONLY the full name of the customer here (e.g. "Vishnu Verma"). If NO name was stated, write "UNKNOWN"]
 
 Rules:
 - Be brutally direct. No fluff.
-- VERDICT must be the very first thing.
+- LANGUAGE REQUIREMENT: Write all Key Points and Next Action strictly in conversational Hinglish (Hindi written using English/Latin alphabet, e.g. "Customer ne event details maangi aur interest dikhaya", "Customer ne baat aage badhane se mana kiya", "Agent ko kal subah 11 baje follow-up call karna chahiye"). Do NOT use Devanagari Hindi script (हिंदी लिपि) and do NOT use pure formal English. Write in natural conversational Hinglish with Roman letters.
+- VERDICT must be the very first thing (must be exactly one of: INTERESTED, NOT INTERESTED, UNDECIDED).
 - If customer stated their name, CUSTOMER_NAME must be written at the bottom.
 
 Transcript:
 ${formattedTranscript}`;
 
-  console.log(`[Summary Engine] Generating summary & name extraction for call ${callSid}...`);
+  console.log(`[Summary Engine] Generating Hinglish summary & name extraction for call ${callSid}...`);
   
   try {
     let rawSummaryText = null;
-    const models = ['gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro'];
+    const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro'];
     for (const model of models) {
       console.log(`[Summary Engine] Attempting summary generation with model: ${model}`);
       rawSummaryText = await callGeminiGenerateContent(model, prompt);
@@ -1353,8 +1372,7 @@ ${formattedTranscript}`;
     scheduleSaveCalls();
   } catch (err) {
     console.error(`[Summary Engine Exception] for call ${callSid}:`, err.message);
-    const turns = callState.transcript ? callState.transcript.length : 0;
-    callState.summary = `**VERDICT:** COMPLETED\n\n**Key Points:**\n- Call completed (${turns} conversational turns).\n- Audio recorded successfully.\n\n**Next Action:** Follow up with customer.`;
+    callState.summary = generateLocalTranscriptSummary(callState.transcript);
     scheduleSaveCalls();
   }
 }
@@ -1369,9 +1387,19 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
   }
   callState._billingProcessed = true;
 
-  console.log(`[Call Lifecycle] Call ${callSid} ended. Setting status to: ${finalStatus}`);
-  callState.status = finalStatus;
-  callState.endedAt = new Date().toISOString();
+  const wasAnswered = Boolean(callState.answeredAt || callState.mediaStartedAt);
+  const hasSpeechOrTranscript = Boolean((callState.transcript && callState.transcript.length > 0) || callState.userHasSpoken);
+
+  let resolvedStatus = finalStatus;
+  // If call had active conversation or was connected/answered, status must NEVER be 'failed'
+  if ((hasSpeechOrTranscript || wasAnswered) && (resolvedStatus === 'failed' || resolvedStatus === 'no-answer' || resolvedStatus === 'busy' || resolvedStatus === 'canceled')) {
+    console.log(`[Call Lifecycle] Call ${callSid} had active conversation (${callState.transcript ? callState.transcript.length : 0} turns) / media stream. Correcting status from '${resolvedStatus}' to 'completed'.`);
+    resolvedStatus = 'completed';
+  }
+
+  console.log(`[Call Lifecycle] Call ${callSid} ended. Setting status to: ${resolvedStatus}`);
+  callState.status = resolvedStatus;
+  callState.endedAt = callState.endedAt || new Date().toISOString();
   callState.updatedAt = new Date().toISOString();
   if (!callState.mediaEndedAt && callState.mediaStartedAt) {
     callState.mediaEndedAt = callState.endedAt;
@@ -3818,10 +3846,13 @@ app.all('/incoming-call-vobiz', (req, res) => {
   if (event === 'Hangup' || event === 'hangup') {
     const callStatus = req.body.CallStatus || req.query.CallStatus || req.body.callStatus || req.query.callStatus || '';
     let finalStatus = 'completed';
-    if (callStatus === 'busy' || callStatus === 'no-answer' || callStatus === 'failed' || callStatus === 'canceled') {
+    const existingCall = activeCalls.get(callSid);
+    const hasConversation = existingCall && ((existingCall.transcript && existingCall.transcript.length > 0) || existingCall.mediaStartedAt || existingCall.answeredAt || existingCall.userHasSpoken);
+
+    if (!hasConversation && (callStatus === 'busy' || callStatus === 'no-answer' || callStatus === 'failed' || callStatus === 'canceled')) {
       finalStatus = 'failed';
     }
-    console.log(`[Vobiz Webhook] Call Hangup event received for CallSid: ${callSid}. Final status: ${finalStatus}`);
+    console.log(`[Vobiz Webhook] Call Hangup event received for CallSid: ${callSid}. Resolved status: ${finalStatus}`);
     handleCallEnd(callSid, finalStatus);
     return res.type('application/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
   }
