@@ -1221,42 +1221,44 @@ async function generateCallSummaryBackend(callSid) {
   const callState = activeCalls.get(callSid);
   if (!callState) return;
 
-  if (callState.transcript.length === 0) {
+  if (!callState.transcript || callState.transcript.length === 0) {
     callState.summary = "No conversation occurred during the call.";
     return;
   }
 
   const formattedTranscript = callState.transcript
-    .map(turn => `${turn.role === 'user' ? 'User' : 'Agent'}: ${turn.text}`)
+    .map(turn => `${turn.role === 'user' ? 'Customer' : 'Agent'}: ${turn.text ? turn.text.trim() : ''}`)
     .join('\n');
 
-  const prompt = `You are an AI sales call analyst. Read this call transcript carefully and extract TWO things:
+  const prompt = `You are an expert sales analyst and CRM specialist. Analyze the following phone call transcript between an AI Calling Agent and a Customer.
 
-1. A direct, crisp summary in this EXACT format:
-**VERDICT:** [INTERESTED / NOT INTERESTED / UNDECIDED]
+Generate a comprehensive, accurate analysis in this EXACT format:
+
+**VERDICT:** [Choose EXACTLY ONE: INTERESTED / NOT INTERESTED / UNDECIDED]
+(Select INTERESTED if customer showed interest, asked for pricing/details, or booked an appointment. Select NOT INTERESTED if customer refused, said no, or hung up. Select UNDECIDED if customer was busy, asked for callback, or conversation was brief/inconclusive).
 
 **Key Points:**
-- [1-line point in Hinglish]
-- [1-line point in Hinglish]
+- [Point 1 in conversational Hinglish summarizing what the customer stated, asked for, or inquired about]
+- [Point 2 in conversational Hinglish summarizing agent's response, product pitched, or key outcome]
 
-**Next Action:** [What should the agent do next in Hinglish - 1 sentence]
+**Next Action:** [Specific, actionable next step for the sales team in 1 sentence in Hinglish - e.g., "Customer ko 2 ghante baad callback karna hai aur marketing plan ki details share karni hai."]
 
-2. **CUSTOMER_NAME:** [If the customer explicitly stated, introduced, or confirmed their name in the transcript (e.g. "My name is Vishnu", "I am Rahul Verma", "Mera naam Amit hai", "Haan main Priya bol rahi hoon"), write ONLY the full name of the customer here (e.g. "Vishnu Verma"). If NO name was stated, write "UNKNOWN"]
+**CUSTOMER_NAME:** [If the customer explicitly stated, introduced, or confirmed their own name in the transcript (e.g. "Mera naam Rahul hai", "Vishnu bol raha hoon", "I am Priya"), extract ONLY their full name here. If no name was stated or confirmed, write "UNKNOWN"]
 
-Rules:
-- Be brutally direct. No fluff.
-- LANGUAGE REQUIREMENT: Write all Key Points and Next Action strictly in conversational Hinglish (Hindi written using English/Latin alphabet, e.g. "Customer ne event details maangi aur interest dikhaya", "Customer ne baat aage badhane se mana kiya", "Agent ko kal subah 11 baje follow-up call karna chahiye"). Do NOT use Devanagari Hindi script (हिंदी लिपि) and do NOT use pure formal English. Write in natural conversational Hinglish with Roman letters.
-- VERDICT must be the very first thing (must be exactly one of: INTERESTED, NOT INTERESTED, UNDECIDED).
-- If customer stated their name, CUSTOMER_NAME must be written at the bottom.
+LANGUAGE & ACCURACY RULES:
+- Write Key Points and Next Action strictly in natural conversational Hinglish using English/Latin alphabet (e.g., "Customer ne collection aur price details maangi", "Agent ko 2 ghante baad follow-up call karna chahiye").
+- Do NOT use Devanagari Hindi script (हिंदी लिपि).
+- Base everything strictly on the actual transcript. Do NOT invent information.
+- VERDICT must be the very first line.
 
 Transcript:
 ${formattedTranscript}`;
 
-  console.log(`[Summary Engine] Generating Hinglish summary & name extraction for call ${callSid}...`);
+  console.log(`[Summary Engine] Generating high-precision Hinglish summary & name extraction for call ${callSid}...`);
   
   try {
     let rawSummaryText = null;
-    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
+    const models = ['gemini-2.5-flash', 'gemini-3.6-flash'];
     for (const model of models) {
       console.log(`[Summary Engine] Attempting summary generation with model: ${model}`);
       rawSummaryText = await callGeminiGenerateContent(model, prompt);
@@ -7655,6 +7657,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               }
             }
           },
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
           systemInstruction: {
             parts: [{ text: finalInstruction }]
           },
@@ -7771,7 +7775,12 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               // If call is already terminating, ignore further input
               if (callState._terminating) return;
 
-              callState.transcript.push({ role: 'user', text: transText });
+              const len = callState.transcript.length;
+              if (len > 0 && callState.transcript[len - 1].role === 'user') {
+                callState.transcript[len - 1].text += ' ' + transText;
+              } else {
+                callState.transcript.push({ role: 'user', text: transText });
+              }
               callState.status = 'active';
               
               // Voicemail Detection Logic (Strict matching only for actual automated voicemail system prompts)
@@ -7820,6 +7829,27 @@ Follow these rules strictly to sound completely human, lively, and emotional:
           }
         }
         
+        // Capture user text from userTurn parts if available
+        if (response.serverContent?.userTurn?.parts) {
+          for (const part of response.serverContent.userTurn.parts) {
+            if (part.text && part.text.trim()) {
+              const uText = part.text.trim();
+              const callState = getOrCreateCallState(callSid);
+              if (callState && !callState._terminating) {
+                const len = callState.transcript.length;
+                if (len > 0 && callState.transcript[len - 1].role === 'user') {
+                  if (!callState.transcript[len - 1].text.includes(uText)) {
+                    callState.transcript[len - 1].text += ' ' + uText;
+                  }
+                } else {
+                  callState.transcript.push({ role: 'user', text: uText });
+                }
+                scheduleSaveCalls();
+              }
+            }
+          }
+        }
+
         // Capture agent output transcription
         if (response.serverContent?.outputTranscription?.text) {
           const transText = response.serverContent.outputTranscription.text.trim();
