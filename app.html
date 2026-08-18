@@ -1139,7 +1139,8 @@
 
       <!-- TAB 4: Broadcast -->
       <div id="tab-broadcast" class="tab-pane">
-        <div class="premium-tab-container">
+        <!-- Sub-View 1: Main Broadcast Campaigns Dashboard -->
+        <div id="broadcast-main-view" class="premium-tab-container">
           <div style="margin-bottom: 20px;">
             <h2 class="tab-title premium-tab-header-title" style="margin: 0;">Broadcast Campaigns</h2>
             <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Launch real-time AI bulk outbound calls across all contacts or tag-filtered audiences.</p>
@@ -1223,7 +1224,7 @@
                         <th>Recipients</th>
                         <th>Created / Scheduled</th>
                         <th>Status</th>
-                        <th style="text-align: right; width: 80px;">Action</th>
+                        <th style="text-align: right; width: 140px;">Action</th>
                       </tr>
                     </thead>
                     <tbody id="recent-broadcasts-table-body">
@@ -1232,6 +1233,140 @@
                   </table>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sub-View 2: Growlio-Style Campaign Analytics & Detail View -->
+        <div id="broadcast-campaign-detail-view" class="premium-tab-container" style="display: none;">
+          <!-- Top Header Navigation Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <button onclick="window.backToBroadcastList()" class="btn" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-size: 1.1rem; width: 40px; height: 40px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Back to Campaigns List">
+                ←
+              </button>
+              <div>
+                <h2 id="bcd-title" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                  Campaign Analytics &amp; Overview
+                </h2>
+                <p id="bcd-subtitle" style="margin: 2px 0 0 0; font-size: 0.82rem; color: var(--text-muted);">
+                  Target: Tag: open test • Created: 18 May 2026, 02:30 pm
+                </p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <button id="bcd-btn-rerun" onclick="window.rerunCurrentBroadcastCampaign()" class="btn" style="background: rgba(6,182,212,0.12); border: 1px solid rgba(6,182,212,0.3); color: var(--color-cyan); font-size: 0.82rem; font-weight: 700; padding: 8px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                🔄 Rerun Campaign
+              </button>
+              <button id="bcd-btn-delete" onclick="window.deleteCurrentBroadcastCampaign()" class="btn" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #ef4444; font-size: 0.82rem; font-weight: 700; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
+                🗑️ Delete
+              </button>
+            </div>
+          </div>
+
+          <!-- Top Funnel Status Metric Bar (Growlio Tab Bar) -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 6px; display: flex; align-items: center; gap: 6px; margin-bottom: 22px; overflow-x: auto;">
+            <button onclick="window.setBroadcastFilterTab('all')" id="bft-all" class="bft-btn active" style="padding: 10px 18px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; background: rgba(6,182,212,0.15); border: 1px solid var(--color-cyan); color: var(--color-cyan); cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;">
+              OVERVIEW
+            </button>
+            <button onclick="window.setBroadcastFilterTab('dialed')" id="bft-dialed" class="bft-btn" style="padding: 10px 16px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; background: transparent; border: 1px solid transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+              ✓ <span id="bcd-count-dialed">0</span> SENT
+            </button>
+            <button onclick="window.setBroadcastFilterTab('answered')" id="bft-answered" class="bft-btn" style="padding: 10px 16px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; background: transparent; border: 1px solid transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+              ✓✓ <span id="bcd-count-answered">0</span> DELIVERED / ANSWERED
+            </button>
+            <button onclick="window.setBroadcastFilterTab('engaged')" id="bft-engaged" class="bft-btn" style="padding: 10px 16px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; background: transparent; border: 1px solid transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+              🎧 <span id="bcd-count-engaged">0</span> ENGAGED
+            </button>
+            <button onclick="window.setBroadcastFilterTab('interested')" id="bft-interested" class="bft-btn" style="padding: 10px 16px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; background: transparent; border: 1px solid transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+              ⭐ <span id="bcd-count-interested">0</span> INTERESTED LEADS
+            </button>
+            <button onclick="window.setBroadcastFilterTab('failed')" id="bft-failed" class="bft-btn" style="padding: 10px 16px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; background: transparent; border: 1px solid transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+              ✕ <span id="bcd-count-failed">0</span> FAILED / BUSY
+            </button>
+          </div>
+
+          <!-- 4-Card KPI Information Grid (Growlio Metrics Layout) -->
+          <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 22px;">
+            <!-- Card 1: Campaign Metadata -->
+            <div class="form-card" style="padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 14px;">
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">CAMPAIGN TYPE</div>
+                <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px;">VOICE BROADCAST</div>
+
+                <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">AI AGENT</div>
+                <div id="bcd-meta-agent" style="font-size: 0.92rem; font-weight: 700; color: var(--color-cyan); margin-bottom: 12px;">Vishal saree shop owner</div>
+
+                <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">TARGET AUDIENCE</div>
+                <div id="bcd-meta-target" style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">Tag: open test</div>
+              </div>
+              <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border-color); font-size: 0.75rem; color: var(--text-muted);">
+                Created At: <strong id="bcd-meta-created" style="color: var(--text-main);">18 May 2026, 02:30 pm</strong>
+              </div>
+            </div>
+
+            <!-- Card 2: Status -->
+            <div class="form-card" style="padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Status</span>
+                <span title="Current execution state" style="cursor: help; color: var(--text-muted); font-size: 0.85rem;">ⓘ</span>
+              </div>
+              <div style="padding: 16px 0;">
+                <div id="bcd-card-status" style="font-size: 1.35rem; font-weight: 900; color: #10b981; letter-spacing: 0.5px;">COMPLETED</div>
+                <div id="bcd-card-status-desc" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">All queued recipient calls processed</div>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 8px;">
+                Mode: <strong id="bcd-meta-mode" style="color: var(--text-main);">Instant Broadcast</strong>
+              </div>
+            </div>
+
+            <!-- Card 3: Audience -->
+            <div class="form-card" style="padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Audience</span>
+                <span title="Total contacts in target group" style="cursor: help; color: var(--text-muted); font-size: 0.85rem;">ⓘ</span>
+              </div>
+              <div style="padding: 16px 0;">
+                <div id="bcd-card-audience" style="font-size: 1.8rem; font-weight: 900; color: var(--text-main); font-family: var(--font-mono);">0</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Total targeted recipients</div>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 8px;">
+                Delivered: <strong id="bcd-meta-delivered-pct" style="color: #10b981;">100%</strong>
+              </div>
+            </div>
+
+            <!-- Card 4: Total Credit Usage -->
+            <div class="form-card" style="padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Total Credit Usage</span>
+                <span title="Total telecommunication & AI minutes credit usage" style="cursor: help; color: var(--text-muted); font-size: 0.85rem;">ⓘ</span>
+              </div>
+              <div style="padding: 16px 0;">
+                <div id="bcd-card-credits" style="font-size: 1.8rem; font-weight: 900; color: var(--color-cyan); font-family: var(--font-mono);">₹0.00</div>
+                <div id="bcd-card-credits-sub" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">0 mins billed</div>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 8px;">
+                Rate: <strong style="color: var(--text-main);">₹1.20 / min</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recipient Call Logs & AI Recordings Analytics Section -->
+          <div class="form-card" style="padding: 22px; border-radius: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Campaign Messages &amp; Recipient Call Logs</h3>
+                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Listen to recordings, check AI sentiment summaries, and view transcripts.</p>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="text" id="bcd-search-input" oninput="window.renderFilteredBroadcastCalls()" placeholder="🔍 Search recipient name or phone..." style="padding: 8px 14px; font-size: 0.82rem; border-radius: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); outline: none; width: 240px;">
+                <button onclick="window.refreshCurrentBroadcastCampaign()" class="btn" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 12px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">🔄 Refresh</button>
+              </div>
+            </div>
+
+            <!-- Dynamic Recipient Calls List Container -->
+            <div id="bcd-calls-container" style="display: flex; flex-direction: column; gap: 14px;">
+              <!-- Populated dynamically with rich call cards -->
             </div>
           </div>
         </div>
