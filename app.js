@@ -4806,10 +4806,26 @@ window.viewBroadcastCallLogs = async function(bId) {
     const interested = campaignCalls.filter(c => (c.summary && c.summary.toUpperCase().includes('INTERESTED') && !c.summary.toUpperCase().includes('NOT INTERESTED'))).length;
     const failed = campaignCalls.filter(c => c.status === 'failed' || c.status === 'busy' || c.status === 'no-answer' || (c.duration === 0 && c.status !== 'completed')).length;
 
-    // Total credit usage calculation
+    // Resolve dynamic Rate Per Minute (Whitelabel / Client Tenant pricing)
+    let ratePerMin = 2.0;
+    if (window.CurrentClient?.pricing?.rate_per_minute !== undefined) {
+      ratePerMin = Number(window.CurrentClient.pricing.rate_per_minute);
+    } else if (window.currentUserPricing?.rate_per_minute !== undefined) {
+      ratePerMin = Number(window.currentUserPricing.rate_per_minute);
+    } else if (window.resellerConfig?.wholesale_rate_per_minute !== undefined) {
+      ratePerMin = Number(window.resellerConfig.wholesale_rate_per_minute);
+    } else {
+      const session = JSON.parse(localStorage.getItem('user_session') || '{}');
+      if (session?.pricing?.rate_per_minute !== undefined) ratePerMin = Number(session.pricing.rate_per_minute);
+      else if (session?.plan === 'pro') ratePerMin = 4.24;
+      else if (session?.plan === 'custom') ratePerMin = 2.0;
+      else if (session?.plan === 'starter' || session?.plan === 'basic') ratePerMin = 5.0;
+    }
+
+    // Total credit usage calculation (per-call 60-second pulse billing for answered calls)
     const totalSec = campaignCalls.reduce((acc, c) => acc + (Number(c.duration) || 0), 0);
-    const billedMins = Math.ceil(totalSec / 60) || (campaignCalls.length > 0 ? campaignCalls.length : 0);
-    const costRupees = (billedMins * 1.20).toFixed(2);
+    const billedMins = campaignCalls.reduce((acc, c) => acc + ((Number(c.duration) > 0) ? Math.ceil(Number(c.duration) / 60) : 0), 0);
+    const costRupees = (billedMins * ratePerMin).toFixed(2);
 
     // Populate Top Header
     const elTitle = document.getElementById('bcd-title');
@@ -4841,6 +4857,7 @@ window.viewBroadcastCallLogs = async function(bId) {
     const elMetaDeliveredPct = document.getElementById('bcd-meta-delivered-pct');
     const elCardCredits = document.getElementById('bcd-card-credits');
     const elCardCreditsSub = document.getElementById('bcd-card-credits-sub');
+    const elRatePerMinText = document.getElementById('bcd-rate-per-min-text');
 
     if (elMetaAgent) elMetaAgent.innerText = bcast.agentName || 'Voice Agent';
     if (elMetaTarget) elMetaTarget.innerText = bcast.targetLabel || 'All Contacts';
@@ -4864,7 +4881,8 @@ window.viewBroadcastCallLogs = async function(bId) {
     }
 
     if (elCardCredits) elCardCredits.innerText = `₹${costRupees}`;
-    if (elCardCreditsSub) elCardCreditsSub.innerText = `${billedMins} mins billed (${totalSec}s total duration)`;
+    if (elCardCreditsSub) elCardCreditsSub.innerText = `${billedMins} mins billed (${totalSec}s across ${answered} connected calls)`;
+    if (elRatePerMinText) elRatePerMinText.innerText = `₹${ratePerMin.toFixed(2)} / min`;
 
     // Render Call Cards with current filter
     window.renderFilteredBroadcastCalls();
@@ -5226,18 +5244,43 @@ window.renderFilteredBroadcastCalls = function() {
           </div>
         ` : (durSec > 0 ? `<div style="font-size: 0.74rem; color: var(--text-muted); font-style: italic;">⏳ Recording processing...</div>` : `<div style="font-size: 0.74rem; color: var(--text-muted); font-style: italic;">🔇 No audio recorded (duration was 0s).</div>`)}
 
-        ${call.summary ? `
-          <div style="font-size: 0.8rem; color: var(--text-main); background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 8px; border-left: 3px solid var(--color-cyan); white-space: pre-wrap; line-height: 1.45;">
-            <strong style="color: var(--color-cyan);">AI Call Summary:</strong>\n${typeof formatMarkdown === 'function' ? formatMarkdown(call.summary) : call.summary}
+        <!-- Side-by-Side 50/50 Card Grid: AI Summary (Left) & Dialogue Transcript (Right) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 4px;">
+          <!-- Left 50% Card: AI Call Summary -->
+          <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; max-height: 280px; overflow-y: auto;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border-color);">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 800; color: #f97316;">
+                <span>💡</span> AI Call Summary
+              </div>
+              ${isCompleted ? `<span style="font-size: 0.68rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.15); color: #10b981;">VERDICT: COMPLETED</span>` : ''}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-main); line-height: 1.5; white-space: pre-wrap;">
+              ${call.summary ? (typeof formatMarkdown === 'function' ? formatMarkdown(call.summary) : escapeHtml(call.summary)) : '<span style="color: var(--text-muted); font-style: italic;">No AI summary recorded.</span>'}
+            </div>
           </div>
-        ` : ''}
 
-        ${Array.isArray(call.transcript) && call.transcript.length > 0 ? `
-          <div style="font-size: 0.78rem; background: var(--bg-primary); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); max-height: 160px; overflow-y: auto;">
-            <div style="font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">💬 Dialogue Transcript (${call.transcript.length} turns):</div>
-            ${call.transcript.map(t => `<div style="margin-bottom: 4px;"><strong style="color:${t.role === 'user' ? 'var(--color-cyan)' : '#f59e0b'};">${t.role === 'user' ? 'Caller' : 'AI Agent'}:</strong> ${escapeHtml(t.text)}</div>`).join('')}
+          <!-- Right 50% Card: Dialogue Transcript -->
+          <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; max-height: 280px; overflow-y: auto;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border-color);">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 800; color: var(--color-cyan);">
+                <span>💬</span> Dialogue Transcript
+              </div>
+              <span style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); background: var(--bg-surface); padding: 2px 6px; border-radius: 4px;">
+                ${Array.isArray(call.transcript) ? call.transcript.length : 0} turns
+              </span>
+            </div>
+            <div style="font-size: 0.78rem; display: flex; flex-direction: column; gap: 6px;">
+              ${Array.isArray(call.transcript) && call.transcript.length > 0 ? call.transcript.map(t => `
+                <div style="padding: 6px 10px; border-radius: 8px; background: ${t.role === 'user' ? 'rgba(6,182,212,0.08)' : 'rgba(245,158,11,0.08)'}; border: 1px solid ${t.role === 'user' ? 'rgba(6,182,212,0.2)' : 'rgba(245,158,11,0.2)'};">
+                  <span style="font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: ${t.role === 'user' ? 'var(--color-cyan)' : '#f59e0b'}; display: block; margin-bottom: 2px;">
+                    ${t.role === 'user' ? '👤 Caller' : '🤖 AI Agent'}:
+                  </span>
+                  <span style="color: var(--text-main); line-height: 1.4;">${escapeHtml(t.text)}</span>
+                </div>
+              `).join('') : '<span style="color: var(--text-muted); font-style: italic;">No transcript captured for this call session.</span>'}
+            </div>
           </div>
-        ` : ''}
+        </div>
       </div>
     `;
   });
