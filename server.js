@@ -5000,6 +5000,19 @@ app.put('/api/tags/rename', express.json(), (req, res) => {
   const nTag = newTag.trim();
   let updatedCount = 0;
 
+  // 1. Also update group names if any group matches oldTag
+  for (const [gId, grp] of groupsDb.entries()) {
+    if (clientId && clientId !== 'admin') {
+      if (grp.clientId && grp.clientId !== clientId) continue;
+    }
+    if (grp.name && grp.name.trim().toLowerCase() === oTag) {
+      grp.name = nTag;
+      groupsDb.set(gId, grp);
+    }
+  }
+  saveGroups();
+
+  // 2. Update all matching contacts in contactsDb
   for (const [id, contact] of contactsDb.entries()) {
     if (clientId && clientId !== 'admin') {
       if (contact.clientId && contact.clientId !== clientId) continue;

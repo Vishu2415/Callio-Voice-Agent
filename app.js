@@ -3739,18 +3739,12 @@ window.fetchAndRenderTagManagement = async function() {
             </span>
           </td>
           <td style="text-align: right;">
-            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap;">
-              <button onclick="window.viewContactsForTag('${escapeHtml(t.name)}')" title="View contacts with this tag" style="background: rgba(6,182,212,0.12); border: 1px solid rgba(6,182,212,0.3); color: var(--color-cyan); padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
-                👁️ Contacts
-              </button>
-              <button onclick="window.broadcastToTagDirect('${escapeHtml(t.name)}')" title="Broadcast to this tag" style="background: rgba(234,88,12,0.12); border: 1px solid rgba(234,88,12,0.3); color: #ea580c; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
-                🚀 Broadcast
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+              <button onclick="window.renameGlobalTag('${escapeHtml(t.name)}')" title="Edit Tag across all contacts" style="background: rgba(6,182,212,0.12); border: 1px solid rgba(6,182,212,0.3); color: var(--color-cyan); padding: 6px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;">
+                ✏️ Edit
               </button>
               ${!isDefault ? `
-                <button onclick="window.renameGlobalTag('${escapeHtml(t.name)}')" title="Rename Tag across all contacts" style="background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
-                  ✏️ Rename
-                </button>
-                <button onclick="window.deleteGlobalTag('${escapeHtml(t.name)}', ${t.count})" title="Delete tag from all contacts" style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+                <button onclick="window.deleteGlobalTag('${escapeHtml(t.name)}', ${t.count})" title="Delete tag from all contacts" style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 6px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;">
                   🗑️ Delete
                 </button>
               ` : ''}
@@ -3809,7 +3803,7 @@ window.createGlobalTag = async function() {
 // Rename a universal tag across all contacts
 window.renameGlobalTag = async function(oldTag) {
   const newTag = prompt(`Enter new name for tag "${oldTag}":`, oldTag);
-  if (!newTag || newTag.trim() === '' || newTag.trim() === oldTag) return;
+  if (!newTag || newTag.trim() === '' || newTag.trim().toLowerCase() === oldTag.toLowerCase()) return;
 
   const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) ? loggedInUser.id : '';
   try {
@@ -3820,20 +3814,26 @@ window.renameGlobalTag = async function(oldTag) {
     });
     const data = await res.json();
     if (data.success) {
-      // Update local contacts cache
+      // Update local contacts and groups cache
       for (const g of (localGroupsCache || [])) {
+        if (g.name && g.name.toLowerCase() === oldTag.toLowerCase()) {
+          g.name = newTag.trim();
+        }
         for (const c of (g.contacts || [])) {
           let tags = window.getContactTagsArray(c);
           if (tags.map(t => t.toLowerCase()).includes(oldTag.toLowerCase())) {
             tags = tags.map(t => t.toLowerCase() === oldTag.toLowerCase() ? newTag.trim() : t);
-            c.tags = tags;
-            c.tag = tags.join(', ');
+            c.tags = Array.from(new Set(tags));
+            c.tag = c.tags.join(', ');
           }
         }
       }
+      if (window.contactsSelectedTag && window.contactsSelectedTag.toLowerCase() === oldTag.toLowerCase()) {
+        window.contactsSelectedTag = newTag.trim();
+      }
       window.fetchAndRenderTagManagement();
       window.renderAllContactsTable();
-      alert(`✅ Renamed tag "${oldTag}" to "${newTag.trim()}" across ${data.updatedCount || 0} contacts.`);
+      alert(`✅ Tag "${oldTag}" updated to "${newTag.trim()}" across ${data.updatedCount || 0} contact(s)!`);
     } else {
       alert('Failed to rename tag: ' + (data.error || 'Unknown error'));
     }
