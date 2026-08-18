@@ -5299,19 +5299,6 @@ window.deleteCurrentBroadcastCampaign = async function() {
   }
 };
 
-  try {
-    const res = await fetch(`/api/broadcasts/${bcast.id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
-      window.backToBroadcastList();
-    } else {
-      alert("Failed to delete broadcast: " + data.error);
-    }
-  } catch (err) {
-    alert("Error deleting broadcast: " + err.message);
-  }
-};
-
 window.deleteBroadcastDirect = async function(id) {
   if (!confirm("Are you sure you want to delete this broadcast campaign record?")) return;
   try {
