@@ -7678,14 +7678,20 @@ window.renderTodayCallsPageTable = function() {
     }
 
     let recPlayerHtml = '';
-    if (call.recordingStatus === 'ready' || call.recordingUrl || (call.status === 'completed' && durSec > 0)) {
+    const hasRecording = Boolean(call.recordingStatus === 'ready' || call.recordingUrl || call.recordingLocalPath);
+    if (hasRecording) {
       recPlayerHtml = `
         <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-color);">
-          <div style="font-size: 0.75rem; color: var(--color-green); font-weight: 700; margin-bottom: 6px;">🎙️ Call Recording Ready</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="font-size: 0.75rem; color: var(--color-green); font-weight: 700;">🎙️ Call Recording Ready</div>
+            <a href="${recProxyUrl}" download="recording-${callSid.substring(0,8)}.mp3" style="font-size: 0.72rem; color: var(--color-cyan); text-decoration: none; font-weight: 700; background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.25); padding: 2px 8px; border-radius: 4px;">⬇ Download MP3</a>
+          </div>
           <audio controls preload="metadata" src="${recProxyUrl}" style="width: 100%; height: 36px; border-radius: 6px;"></audio>
         </div>`;
     } else if (call.status === 'active' || call.recordingStatus === 'recording' || call.recordingStatus === 'fetching') {
       recPlayerHtml = `<div style="margin-top: 8px; font-size: 0.75rem; color: var(--color-cyan); font-style: italic;">⏳ Recording in progress / processing...</div>`;
+    } else if (durSec <= 3 || !call.recordingUrl) {
+      recPlayerHtml = `<div style="margin-top: 6px; font-size: 0.74rem; color: var(--text-muted); font-style: italic;">🔇 No audio recorded (Call duration was under 3s or disconnected instantly).</div>`;
     }
 
     let summaryHtml = '';
