@@ -4106,6 +4106,68 @@
 
     window.openAddSingleContactModal = window.openSingleContactModalV2;
     window.closeAddSingleContactModal = window.closeSingleContactModalV2;
+
+    window.openEditContactModal = function(contactId) {
+      var all = (typeof window.getAllContactsList === 'function') ? window.getAllContactsList() : [];
+      var targetContact = all.find(function(c) { return String(c.id) === String(contactId); });
+      var targetGroupId = targetContact ? (targetContact.groupId || '') : '';
+
+      if (!targetContact && typeof localGroupsCache !== 'undefined') {
+        for (var i = 0; i < (localGroupsCache || []).length; i++) {
+          var g = localGroupsCache[i];
+          var c = (g.contacts || []).find(function(item) { return String(item.id) === String(contactId) || String(item.phone) === String(contactId); });
+          if (c) { targetContact = c; targetGroupId = g.id; break; }
+        }
+      }
+
+      if (!targetContact) {
+        alert('Contact details not found in cache!');
+        return;
+      }
+
+      var modal = document.getElementById('edit-contact-modal-v2');
+      if (!modal) return;
+      if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+      }
+      modal.style.setProperty('display', 'flex', 'important');
+      modal.style.setProperty('opacity', '1', 'important');
+      modal.style.setProperty('visibility', 'visible', 'important');
+      modal.style.setProperty('z-index', '99999999', 'important');
+
+      var elId = document.getElementById('edit-v2-contact-id');
+      var elGId = document.getElementById('edit-v2-group-id');
+      var elName = document.getElementById('edit-v2-contact-name');
+      var elPhone = document.getElementById('edit-v2-contact-phone');
+      var elTags = document.getElementById('edit-v2-contact-tags');
+
+      if (elId) elId.value = targetContact.id || '';
+      if (elGId) elGId.value = targetGroupId || targetContact.groupId || '';
+      if (elName) elName.value = targetContact.name || '';
+      if (elPhone) elPhone.value = targetContact.phone || '';
+      
+      var tags = (typeof window.getContactTagsArray === 'function') ? window.getContactTagsArray(targetContact) : (targetContact.tags || (targetContact.tag ? targetContact.tag.split(',') : []));
+      if (elTags) elTags.value = tags.join(', ');
+
+      var quickContainer = document.getElementById('edit-v2-quick-tags-container');
+      if (quickContainer && all.length > 0) {
+        var uTagsSet = {};
+        all.forEach(function(c) {
+          var cTags = (typeof window.getContactTagsArray === 'function') ? window.getContactTagsArray(c) : (c.tags || []);
+          cTags.forEach(function(t) { if (t) uTagsSet[t] = true; });
+        });
+        var uTags = Object.keys(uTagsSet);
+        quickContainer.innerHTML = uTags.map(function(t) {
+          return '<span onclick="window.appendTagToEditInput(\'' + t.replace(/'/g, "\\'") + '\')" style="background: rgba(6,182,212,0.12); color: var(--color-cyan, #06b6d4); font-size: 0.72rem; padding: 3px 8px; border-radius: 8px; cursor: pointer; border: 1px solid rgba(6,182,212,0.3); font-weight: 700;">+ ' + t + '</span>';
+        }).join('');
+      }
+      setTimeout(function() { if (elName) elName.focus(); }, 100);
+    };
+
+    window.closeEditContactModal = function() {
+      var modal = document.getElementById('edit-contact-modal-v2');
+      if (modal) modal.style.setProperty('display', 'none', 'important');
+    };
   </script>
 
 </body>

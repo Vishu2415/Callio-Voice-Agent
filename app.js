@@ -3900,25 +3900,31 @@ window.broadcastToTagDirect = function(tag) {
 
 // ─── Contact Edit Modal V2 Handlers ──────────────────────────────
 window.openEditContactModal = function(contactId) {
-  let targetContact = null;
-  let targetGroupId = '';
+  const all = (typeof window.getAllContactsList === 'function') ? window.getAllContactsList() : [];
+  let targetContact = all.find(c => String(c.id) === String(contactId));
+  let targetGroupId = targetContact ? (targetContact.groupId || '') : '';
 
-  for (const g of (localGroupsCache || [])) {
-    const c = (g.contacts || []).find(c => c.id === contactId);
-    if (c) { 
-      targetContact = c; 
-      targetGroupId = g.id;
-      break; 
+  if (!targetContact && typeof localGroupsCache !== 'undefined') {
+    for (const g of (localGroupsCache || [])) {
+      const c = (g.contacts || []).find(item => String(item.id) === String(contactId) || String(item.phone) === String(contactId));
+      if (c) { 
+        targetContact = c; 
+        targetGroupId = g.id;
+        break; 
+      }
     }
   }
 
   if (!targetContact) {
-    alert('Contact not found!');
+    alert('Contact details not found in cache!');
     return;
   }
 
   const modal = document.getElementById('edit-contact-modal-v2');
   if (!modal) return;
+  if (modal.parentElement !== document.body) {
+    document.body.appendChild(modal);
+  }
 
   document.getElementById('edit-v2-contact-id').value = targetContact.id || '';
   document.getElementById('edit-v2-group-id').value = targetGroupId || targetContact.groupId || '';
@@ -3929,9 +3935,8 @@ window.openEditContactModal = function(contactId) {
   document.getElementById('edit-v2-contact-tags').value = tags.join(', ');
 
   // Inject quick tag suggestions
-  const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
   const uniqueTagsSet = new Set();
-  allContacts.forEach(c => window.getContactTagsArray(c).forEach(t => uniqueTagsSet.add(t)));
+  all.forEach(c => window.getContactTagsArray(c).forEach(t => uniqueTagsSet.add(t)));
   const uniqueTags = Array.from(uniqueTagsSet).filter(Boolean);
 
   const quickTagsContainer = document.getElementById('edit-v2-quick-tags-container');
@@ -3944,6 +3949,11 @@ window.openEditContactModal = function(contactId) {
   }
 
   modal.style.setProperty('display', 'flex', 'important');
+  modal.style.setProperty('opacity', '1', 'important');
+  modal.style.setProperty('visibility', 'visible', 'important');
+  modal.style.setProperty('z-index', '99999999', 'important');
+  const nameInput = document.getElementById('edit-v2-contact-name');
+  setTimeout(() => { if (nameInput) nameInput.focus(); }, 100);
 };
 
 window.appendTagToEditInput = function(tag) {
