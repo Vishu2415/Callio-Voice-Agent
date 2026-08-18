@@ -1150,68 +1150,56 @@
 
           <!-- SUBVIEW 2: Universal Tag Management Console -->
           <div id="contacts-subview-tags" style="display: none; flex-direction: column; gap: 20px;">
-            <!-- Top Tag Creator & Stats -->
-            <div style="display: grid; grid-template-columns: 1fr 280px; gap: 16px;">
-              <!-- Tag Creator Box -->
-              <div class="vb-card" style="padding: 20px; border-radius: 16px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 1.2rem;">🎨</span>
-                    <h3 style="margin: 0; font-size: 1rem; color: var(--text-main);">Create Custom Tag with Color &amp; Symbol</h3>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 0.74rem; color: var(--text-muted);">Preview:</span>
-                    <span id="tag-management-live-preview" style="background: rgba(6,182,212,0.15); color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.35); padding: 3px 10px; border-radius: 8px; font-weight: 800; font-size: 0.8rem; text-transform: uppercase;">
-                      NEW_TAG
-                    </span>
-                  </div>
+            <!-- Sleek Minimalist Tag Creator & Overview Header -->
+            <div class="vb-card" style="padding: 22px 24px; border-radius: 16px; display: flex; flex-direction: column; gap: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main);">
+                    Universal Tag Management
+                  </h3>
+                  <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: var(--text-muted);">Create and manage reusable audience tags synchronized across all campaigns and API webhooks.</p>
                 </div>
-                <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 14px 0;">Create custom styled tags with customized colors, symbols, and automatic CRM synchronization.</p>
                 
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <input type="text" id="tag-management-create-input" placeholder="Enter tag name (e.g. VIP, Hot Lead, Follow-up)..." oninput="window.updateTagLivePreview()" style="flex: 1; min-width: 220px; padding: 10px 14px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.88rem; outline: none;">
-                    
-                    <select id="tag-management-symbol-select" onchange="window.updateTagLivePreview()" style="padding: 10px 12px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.85rem; outline: none; font-weight: 700;">
-                      <option value="">No Symbol</option>
-                      <option value="●">● Dot</option>
-                      <option value="★">★ Star</option>
-                      <option value="🔥">🔥 Fire</option>
-                      <option value="✓">✓ Check</option>
-                      <option value="💎">💎 Diamond</option>
-                      <option value="⚡">⚡ Lightning</option>
-                    </select>
-
-                    <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-surface); border: 1px solid var(--border-color); padding: 4px 10px; border-radius: 10px;">
-                      <label style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700;">Color:</label>
-                      <input type="color" id="tag-management-color-picker" value="#06b6d4" oninput="window.updateTagLivePreview()" style="width: 28px; height: 28px; border: none; background: transparent; cursor: pointer; border-radius: 6px;">
-                    </div>
-
-                    <button onclick="window.createGlobalTag()" class="btn btn-primary" style="padding: 10px 22px; font-size: 0.85rem; font-weight: 700; border-radius: 10px; background: var(--grad-coral); border: none; color: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                      ➕ Create Tag
-                    </button>
+                <!-- Compact stats pill -->
+                <div style="display: flex; align-items: center; gap: 14px; background: var(--bg-surface); border: 1px solid var(--border-color); padding: 6px 14px; border-radius: 12px;">
+                  <div style="display: flex; align-items: baseline; gap: 6px;">
+                    <span id="tm-total-tags-count" style="font-size: 1.15rem; font-weight: 900; color: var(--color-cyan);">0</span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Tags</span>
                   </div>
-
-                  <!-- Color presets -->
-                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">Color Presets:</span>
-                    <span onclick="window.setTagColorPreset('#06b6d4')" style="width: 18px; height: 18px; border-radius: 50%; background: #06b6d4; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Cyan"></span>
-                    <span onclick="window.setTagColorPreset('#ea580c')" style="width: 18px; height: 18px; border-radius: 50%; background: #ea580c; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Coral Orange"></span>
-                    <span onclick="window.setTagColorPreset('#10b981')" style="width: 18px; height: 18px; border-radius: 50%; background: #10b981; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Emerald Green"></span>
-                    <span onclick="window.setTagColorPreset('#8b5cf6')" style="width: 18px; height: 18px; border-radius: 50%; background: #8b5cf6; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Purple"></span>
-                    <span onclick="window.setTagColorPreset('#f59e0b')" style="width: 18px; height: 18px; border-radius: 50%; background: #f59e0b; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Amber"></span>
-                    <span onclick="window.setTagColorPreset('#ef4444')" style="width: 18px; height: 18px; border-radius: 50%; background: #ef4444; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Red"></span>
-                    <span onclick="window.setTagColorPreset('#ec4899')" style="width: 18px; height: 18px; border-radius: 50%; background: #ec4899; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Pink"></span>
-                    <span onclick="window.setTagColorPreset('#64748b')" style="width: 18px; height: 18px; border-radius: 50%; background: #64748b; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Slate"></span>
+                  <div style="width: 1px; height: 18px; background: var(--border-color);"></div>
+                  <div style="display: flex; align-items: baseline; gap: 6px;">
+                    <span id="tm-total-tagged-contacts" style="font-size: 1.15rem; font-weight: 900; color: var(--text-main);">0</span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Tagged</span>
                   </div>
                 </div>
               </div>
 
-              <!-- Quick Stats Card -->
-              <div class="vb-card" style="padding: 20px; border-radius: 16px; display: flex; flex-direction: column; justify-content: center;">
-                <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Universal Tags</div>
-                <div id="tm-total-tags-count" style="font-size: 1.8rem; font-weight: 800; color: var(--color-cyan); margin: 4px 0;">0</div>
-                <div id="tm-total-tagged-contacts" style="font-size: 0.78rem; color: var(--text-muted);">0 total tagged contacts</div>
+              <!-- Minimalist Single-Line Tag Creation Form -->
+              <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 12px 16px; border-radius: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 220px;">
+                  <input type="text" id="tag-management-create-input" placeholder="Enter tag name (e.g. VIP, Hot Lead, Interested)..." oninput="window.updateTagLivePreview()" style="width: 100%; padding: 9px 14px; border-radius: 10px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.86rem; outline: none; box-sizing: border-box;">
+                </div>
+
+                <!-- Minimalist Color Preset Dots -->
+                <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-primary); border: 1px solid var(--border-color); padding: 5px 10px; border-radius: 10px;">
+                  <span onclick="window.setTagColorPreset('#06b6d4')" style="width: 16px; height: 16px; border-radius: 50%; background: #06b6d4; cursor: pointer; border: 2px solid rgba(255,255,255,0.4);" title="Cyan"></span>
+                  <span onclick="window.setTagColorPreset('#ea580c')" style="width: 16px; height: 16px; border-radius: 50%; background: #ea580c; cursor: pointer; border: 2px solid transparent;" title="Coral"></span>
+                  <span onclick="window.setTagColorPreset('#10b981')" style="width: 16px; height: 16px; border-radius: 50%; background: #10b981; cursor: pointer; border: 2px solid transparent;" title="Green"></span>
+                  <span onclick="window.setTagColorPreset('#8b5cf6')" style="width: 16px; height: 16px; border-radius: 50%; background: #8b5cf6; cursor: pointer; border: 2px solid transparent;" title="Purple"></span>
+                  <span onclick="window.setTagColorPreset('#ef4444')" style="width: 16px; height: 16px; border-radius: 50%; background: #ef4444; cursor: pointer; border: 2px solid transparent;" title="Red"></span>
+                  <input type="color" id="tag-management-color-picker" value="#06b6d4" oninput="window.updateTagLivePreview()" style="width: 20px; height: 20px; border: none; background: transparent; cursor: pointer; padding: 0;" title="Custom Color">
+                </div>
+
+                <!-- Live Preview Pill -->
+                <div style="display: flex; align-items: center; padding: 0 4px;">
+                  <span id="tag-management-live-preview" style="background: rgba(6,182,212,0.15); color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.35); padding: 5px 12px; border-radius: 8px; font-weight: 800; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.4px;">
+                    TAG_PREVIEW
+                  </span>
+                </div>
+
+                <button onclick="window.createGlobalTag()" class="btn btn-primary" style="padding: 9px 18px; font-size: 0.82rem; font-weight: 800; border-radius: 10px; background: var(--grad-coral); border: none; color: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; box-shadow: 0 4px 14px rgba(255,107,74,0.3);">
+                  ➕ Add Tag
+                </button>
               </div>
             </div>
 

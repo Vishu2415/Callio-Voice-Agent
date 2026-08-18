@@ -4062,12 +4062,12 @@ window.inlineEditContactTag = function(contactId, currentTag, triggerEl) {
 
   const popup = document.createElement('div');
   popup.className = 'inline-tag-editor';
-  popup.style.cssText = 'position:fixed; z-index:99999; background:var(--bg-surface,#18181b); border:1px solid var(--border-color,#27272a); border-radius:14px; padding:16px 18px; box-shadow:0 16px 50px rgba(0,0,0,0.6); min-width:280px; max-width:340px;';
+  popup.style.cssText = 'position:fixed; z-index:999999; background:var(--bg-surface, #111827); border:1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius:18px; padding:18px 20px; box-shadow:0 20px 60px rgba(0,0,0,0.65); min-width:300px; max-width:360px; backdrop-filter:blur(12px);';
 
   // Position near trigger element
   const rect = triggerEl ? triggerEl.getBoundingClientRect() : { top: 200, left: 200, bottom: 220 };
-  const top = Math.min(rect.bottom + 6, window.innerHeight - 240);
-  const left = Math.min(rect.left, window.innerWidth - 300);
+  const top = Math.min(rect.bottom + 8, window.innerHeight - 260);
+  const left = Math.min(rect.left, window.innerWidth - 380);
   popup.style.top = top + 'px';
   popup.style.left = left + 'px';
 
@@ -4077,31 +4077,39 @@ window.inlineEditContactTag = function(contactId, currentTag, triggerEl) {
   allContacts.forEach(c => window.getContactTagsArray(c).forEach(t => uniqueTagsSet.add(t)));
   const uniqueTags = Array.from(uniqueTagsSet).filter(Boolean);
 
+  const currentSelectedTags = (currentTag || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+
   popup.innerHTML = `
-    <div style="font-size:0.82rem; font-weight:800; color:var(--text-main,#fff); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
-      <span>🏷️ Manage Contact Tags</span>
-      <span style="font-size:0.7rem; color:var(--text-muted); font-weight:500;">Comma-separated</span>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <div>
+        <h4 style="margin:0; font-size:0.92rem; font-weight:800; color:var(--text-main,#fff);">Edit Tags</h4>
+        <span style="font-size:0.72rem; color:var(--text-muted,#9ca3af);">Assign or toggle audience tags</span>
+      </div>
+      <button onclick="document.querySelector('.inline-tag-editor').remove()" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color, rgba(255,255,255,0.1)); color:var(--text-muted,#9ca3af); border-radius:50%; width:24px; height:24px; cursor:pointer; font-size:0.8rem; display:flex; align-items:center; justify-content:center;">✕</button>
     </div>
-    <p style="font-size:0.74rem; color:var(--text-muted); margin:0 0 10px 0;">Add multiple tags (e.g. VIP, Hot Lead, Test)</p>
-    <input type="text" id="inline-tag-input" value="${escapeHtml(currentTag)}" placeholder="e.g. new, hot_lead, interested..." 
-      style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--color-cyan,#06b6d4); color:var(--text-main,#fff); border-radius:8px; padding:8px 10px; font-size:0.85rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
+
+    <input type="text" id="inline-tag-input" value="${escapeHtml(currentTag)}" placeholder="e.g. VIP, Interested, Follow-up..." 
+      style="width:100%; background:var(--bg-primary, #0B0F19); border:1px solid var(--border-color, rgba(255,255,255,0.15)); color:var(--text-main,#fff); border-radius:10px; padding:9px 12px; font-size:0.86rem; box-sizing:border-box; outline:none; margin-bottom:12px; transition:border-color 0.2s;">
     
-    <div style="font-size:0.72rem; color:var(--text-muted); font-weight:700; margin-bottom:5px;">Quick Add / Toggle Tag:</div>
-    <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:12px; max-height:90px; overflow-y:auto;">
-      ${uniqueTags.map(t => `<span onclick="window.toggleTagInInput('${escapeHtml(t)}')" style="background:rgba(6,182,212,0.12); color:var(--color-cyan,#06b6d4); font-size:0.7rem; padding:3px 8px; border-radius:8px; cursor:pointer; border:1px solid rgba(6,182,212,0.3); font-weight:700;">+ ${escapeHtml(t)}</span>`).join('')}
-      <span onclick="window.toggleTagInInput('Interested')" style="background:rgba(16,185,129,0.12); color:#10b981; font-size:0.7rem; padding:3px 8px; border-radius:8px; cursor:pointer; border:1px solid rgba(16,185,129,0.3); font-weight:700;">+ ✅ Interested</span>
-      <span onclick="window.toggleTagInInput('Not Interested')" style="background:rgba(239,68,68,0.12); color:#ef4444; font-size:0.7rem; padding:3px 8px; border-radius:8px; cursor:pointer; border:1px solid rgba(239,68,68,0.3); font-weight:700;">+ ❌ Not Interested</span>
-      <span onclick="window.toggleTagInInput('Hot Lead')" style="background:rgba(234,88,12,0.12); color:#ea580c; font-size:0.7rem; padding:3px 8px; border-radius:8px; cursor:pointer; border:1px solid rgba(234,88,12,0.3); font-weight:700;">+ 🔥 Hot Lead</span>
+    <div style="font-size:0.72rem; color:var(--text-muted,#9ca3af); font-weight:700; margin-bottom:6px;">Available Tags:</div>
+    <div id="inline-tag-pills-container" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; max-height:100px; overflow-y:auto;">
+      ${uniqueTags.length > 0 ? uniqueTags.map(t => {
+        const isSel = currentSelectedTags.includes(t.toLowerCase());
+        return `<span onclick="window.toggleTagInInput('${escapeHtml(t)}')" style="background:${isSel ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.05)'}; color:${isSel ? 'var(--color-cyan,#06b6d4)' : 'var(--text-muted,#9ca3af)'}; font-size:0.72rem; padding:4px 9px; border-radius:8px; cursor:pointer; border:1px solid ${isSel ? 'rgba(6,182,212,0.4)' : 'var(--border-color, rgba(255,255,255,0.1))'}; font-weight:700; transition:all 0.15s;">
+          ${isSel ? '✓ ' : '+ '}${escapeHtml(t)}
+        </span>`;
+      }).join('') : '<span style="font-size:0.74rem; color:var(--text-muted);">No tags created yet. Type above to add.</span>'}
     </div>
 
     <div style="display:flex; gap:8px;">
-      <button onclick="document.querySelector('.inline-tag-editor').remove()" style="flex:1; padding:8px; border-radius:8px; background:rgba(255,255,255,0.06); border:1px solid var(--border-color,#27272a); color:var(--text-muted,#a1a1aa); font-weight:700; cursor:pointer; font-size:0.8rem;">Cancel</button>
-      <button id="inline-tag-save-btn" style="flex:2; padding:8px; border-radius:8px; background:var(--grad-coral, linear-gradient(135deg, #FF6B4A, #ae3115)); border:none; color:#fff; font-weight:800; cursor:pointer; font-size:0.8rem;">Save Tags</button>
+      <button onclick="document.querySelector('.inline-tag-editor').remove()" style="flex:1; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); border:1px solid var(--border-color, rgba(255,255,255,0.1)); color:var(--text-main,#fff); font-weight:600; cursor:pointer; font-size:0.78rem;">Cancel</button>
+      <button id="inline-tag-save-btn" style="flex:1.6; height:36px; border-radius:10px; background:var(--grad-coral, linear-gradient(135deg, #FF6B4A, #ea580c)); border:none; color:#fff; font-weight:800; cursor:pointer; font-size:0.8rem; box-shadow:0 4px 14px rgba(255,107,74,0.35);">Save Tags</button>
     </div>
   `;
 
   document.body.appendChild(popup);
-  document.getElementById('inline-tag-input').focus();
+  const tagInput = document.getElementById('inline-tag-input');
+  if (tagInput) tagInput.focus();
 
   // Close on outside click
   setTimeout(() => {
@@ -4130,7 +4138,7 @@ window.inlineEditContactTag = function(contactId, currentTag, triggerEl) {
         popup.remove();
         // Update local cache and re-render
         for (const g of (localGroupsCache || [])) {
-          const c = (g.contacts || []).find(c => c.id === contactId);
+          const c = (g.contacts || []).find(c => String(c.id) === String(contactId));
           if (c) { 
             c.tags = tagsArr;
             c.tag = tagStr; 
@@ -4156,12 +4164,29 @@ window.inlineEditContactTag = function(contactId, currentTag, triggerEl) {
 window.toggleTagInInput = function(tag) {
   const input = document.getElementById('inline-tag-input');
   if (!input) return;
-  const current = input.value.split(',').map(t => t.trim()).filter(Boolean);
+  let current = input.value.split(',').map(t => t.trim()).filter(Boolean);
   if (current.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
-    input.value = current.filter(t => t.toLowerCase() !== tag.toLowerCase()).join(', ');
+    current = current.filter(t => t.toLowerCase() !== tag.toLowerCase());
   } else {
     current.push(tag);
-    input.value = current.join(', ');
+  }
+  input.value = current.join(', ');
+
+  // Update visual state of pills inside popup
+  const container = document.getElementById('inline-tag-pills-container');
+  if (container) {
+    const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
+    const uniqueTagsSet = new Set();
+    allContacts.forEach(c => window.getContactTagsArray(c).forEach(t => uniqueTagsSet.add(t)));
+    const uniqueTags = Array.from(uniqueTagsSet).filter(Boolean);
+    const selectedLower = current.map(t => t.toLowerCase());
+
+    container.innerHTML = uniqueTags.map(t => {
+      const isSel = selectedLower.includes(t.toLowerCase());
+      return `<span onclick="window.toggleTagInInput('${escapeHtml(t)}')" style="background:${isSel ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.05)'}; color:${isSel ? 'var(--color-cyan,#06b6d4)' : 'var(--text-muted,#9ca3af)'}; font-size:0.72rem; padding:4px 9px; border-radius:8px; cursor:pointer; border:1px solid ${isSel ? 'rgba(6,182,212,0.4)' : 'var(--border-color, rgba(255,255,255,0.1))'}; font-weight:700; transition:all 0.15s;">
+        ${isSel ? '✓ ' : '+ '}${escapeHtml(t)}
+      </span>`;
+    }).join('');
   }
 };
 
