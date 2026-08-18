@@ -5655,14 +5655,32 @@ window.instantAssignBulkTag = async function(tag) {
     });
     const data = await res.json();
     if (data.success) {
+      const selectedCount = ctx.phones.length;
       window.closeBulkTagModal();
       window._selectedBroadcastPhones.clear();
       window.updateSelectedBroadcastCount();
-      if (typeof window.fetchAllContacts === 'function') window.fetchAllContacts();
-      if (window._currentBroadcastCampaign && window._currentBroadcastCampaign.id) {
-        window.viewBroadcastCallLogs(window._currentBroadcastCampaign.id);
+
+      // Update local contacts cache immediately
+      const targetPhoneNorms = new Set(ctx.phones.map(x => String(typeof x === 'object' ? (x.phone || x.to) : x).replace(/\D/g, '')));
+      for (const g of (localGroupsCache || [])) {
+        for (const c of (g.contacts || [])) {
+          const cNorm = String(c.phone || '').replace(/\D/g, '');
+          if (targetPhoneNorms.has(cNorm)) {
+            let tags = window.getContactTagsArray(c);
+            if (!tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
+              tags.push(tag);
+            }
+            c.tags = tags;
+            c.tag = tags.join(', ');
+          }
+        }
       }
-      alert(`✅ Tag "${tag}" successfully assigned to ${data.updatedCount} contact(s)!`);
+
+      if (typeof window.fetchAllContacts === 'function') window.fetchAllContacts();
+      if (window.renderAllContactsTable) window.renderAllContactsTable();
+      if (window.renderFilteredBroadcastCalls) window.renderFilteredBroadcastCalls();
+
+      alert(`✅ Tag "${tag}" successfully assigned to ${selectedCount} contact(s)!`);
     } else {
       alert("❌ Failed to assign tag: " + (data.error || 'Unknown error'));
     }
@@ -5813,6 +5831,7 @@ window.renderFilteredBroadcastCalls = function() {
   }
 
   const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) ? loggedInUser.id : '';
+  const allContacts = (typeof window.getAllContactsList === 'function') ? window.getAllContactsList() : [];
 
   let html = '';
   filtered.forEach((call, index) => {
@@ -5824,12 +5843,16 @@ window.renderFilteredBroadcastCalls = function() {
     const phoneNum = call.to || call.customerNumber || call.phone || '';
     let contactTag = '';
 
-    const matched = (window.allContactsList || []).find(c => c && c.phone && typeof cleanAndComparePhone === 'function' && cleanAndComparePhone(c.phone, phoneNum));
+    const phoneNorm = String(phoneNum).replace(/\D/g, '');
+    const matched = allContacts.find(c => c && c.phone && (
+      typeof cleanAndComparePhone === 'function' ? cleanAndComparePhone(c.phone, phoneNum) : String(c.phone).replace(/\D/g, '') === phoneNorm
+    ));
     if (matched) {
-      if (matched.name && !/^[+\d\s\-\(\)]+$/.test(matched.name) && (!displayName || displayName.toLowerCase() === 'customer')) {
+      if (matched.name && !/^[+\d\s\-\(\)]+$/.test(matched.name) && (!displayName || displayName.toLowerCase() === 'customer' || displayName.startsWith('Recipient') || displayName.startsWith('Contact #'))) {
         displayName = matched.name;
       }
-      if (matched.tag) contactTag = matched.tag;
+      const mTags = window.getContactTagsArray(matched).filter(t => t && t.toLowerCase() !== 'default');
+      if (mTags.length > 0) contactTag = mTags.join(', ');
     }
 
     if (!displayName || /^[+\d\s\-\(\)]+$/.test(displayName) || displayName.toLowerCase() === 'customer') {

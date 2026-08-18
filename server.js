@@ -4898,7 +4898,12 @@ app.post('/api/contacts/bulk-tag', express.json(), (req, res) => {
     const cPhone = String(contact.phone || '').replace(/\D/g, '');
     if (normPhoneMap.has(cPhone)) {
       if (clientId && clientId !== 'admin' && contact.clientId && contact.clientId !== clientId) continue;
-      contact.tag = cleanTag;
+      let curTags = parseTags(contact.tags || contact.tag);
+      if (!curTags.map(t => t.toLowerCase()).includes(cleanTag.toLowerCase())) {
+        curTags.push(cleanTag);
+      }
+      contact.tags = curTags;
+      contact.tag = curTags.join(', ');
       contactsDb.set(id, contact);
       matchedNorms.add(cPhone);
       updatedCount++;
@@ -4914,10 +4919,12 @@ app.post('/api/contacts/bulk-tag', express.json(), (req, res) => {
         phone: info.originalPhone,
         name: info.name || info.originalPhone,
         tag: cleanTag,
+        tags: [cleanTag],
         clientId: clientId || null,
         createdAt: Date.now()
       };
       contactsDb.set(newId, newContact);
+      matchedNorms.add(normPhone);
       updatedCount++;
     }
   }
