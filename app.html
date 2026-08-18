@@ -1356,11 +1356,32 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
               <div>
                 <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Campaign Messages &amp; Recipient Call Logs</h3>
-                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Listen to recordings, check AI sentiment summaries, and view transcripts.</p>
+                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Listen to recordings, check AI sentiment summaries, assign tags, or re-broadcast.</p>
               </div>
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <input type="text" id="bcd-search-input" oninput="window.renderFilteredBroadcastCalls()" placeholder="🔍 Search recipient name or phone..." style="padding: 8px 14px; font-size: 0.82rem; border-radius: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); outline: none; width: 240px;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <button id="bcd-btn-broadcast-filtered" onclick="window.broadcastToFilteredContacts()" class="btn btn-primary" style="padding: 8px 14px; font-size: 0.8rem; font-weight: 700; border-radius: 8px; background: linear-gradient(135deg, #06b6d4, #8b5cf6); color: #fff; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  ⚡ Broadcast to Filtered (<span id="bcd-filtered-action-count">0</span>)
+                </button>
+                <input type="text" id="bcd-search-input" oninput="window.renderFilteredBroadcastCalls()" placeholder="🔍 Search recipient name or phone..." style="padding: 8px 14px; font-size: 0.82rem; border-radius: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); outline: none; width: 220px;">
                 <button onclick="window.refreshCurrentBroadcastCampaign()" class="btn" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 12px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">🔄 Refresh</button>
+              </div>
+            </div>
+
+            <!-- Bulk Selection & Quick Tag Action Toolbar -->
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--text-main); user-select: none;">
+                  <input type="checkbox" id="bcd-select-all-checkbox" onchange="window.toggleSelectAllBroadcastCalls(this.checked)" style="cursor: pointer; width: 16px; height: 16px; accent-color: var(--color-cyan);">
+                  Select All (<span id="bcd-selected-count">0</span> selected)
+                </label>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <button onclick="window.openBulkTagModal()" id="bcd-btn-bulk-tag" style="background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.35); color: #a78bfa; padding: 6px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  🏷️ Assign Tag (<span class="bcd-sel-num">0</span>)
+                </button>
+                <button onclick="window.broadcastToSelectedContacts()" id="bcd-btn-broadcast-selected" style="background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.35); color: var(--color-cyan); padding: 6px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  🚀 Broadcast Selected (<span class="bcd-sel-num">0</span>)
+                </button>
               </div>
             </div>
 
@@ -1371,27 +1392,55 @@
           </div>
         </div>
 
-        <!-- Broadcast Call Logs & Recordings Modal -->
-        <div id="broadcast-logs-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 999999; align-items: center; justify-content: center; padding: 20px;">
-          <div style="background: var(--bg-card, #ffffff); color: var(--text-main, #111827); border: 1px solid var(--border-color, rgba(0,0,0,0.12)); border-radius: 18px; width: 100%; max-width: 850px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35); overflow: hidden; animation: modalFadeIn 0.25s ease-out;">
-            <!-- Modal Header -->
-            <div style="padding: 20px 24px; border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.08)); display: flex; align-items: center; justify-content: space-between; background: var(--bg-surface, rgba(0,0,0,0.02));">
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: #10b981;">
-                  🎙️
-                </div>
+        <!-- Broadcast Quick / Bulk Tag Assignment Modal -->
+        <div id="broadcast-tag-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 999999; align-items: center; justify-content: center; padding: 20px;">
+          <div style="background: var(--bg-card, #1e293b); color: var(--text-main, #ffffff); border: 1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius: 16px; width: 100%; max-width: 480px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); overflow: hidden; animation: modalFadeIn 0.2s ease-out;">
+            <div style="padding: 18px 22px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-surface);">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.3rem;">🏷️</span>
                 <div>
-                  <h3 id="broadcast-modal-title" style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main, #111827);">Broadcast Campaign Call Logs &amp; Recordings</h3>
-                  <p id="broadcast-modal-subtitle" style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted, #6b7280);">Listen to recordings &amp; view AI analysis for this campaign</p>
+                  <h3 id="btm-modal-title" style="margin: 0; font-size: 1rem; font-weight: 800;">Assign Tag to Contacts</h3>
+                  <p id="btm-modal-subtitle" style="margin: 2px 0 0 0; font-size: 0.76rem; color: var(--text-muted);">Assign a tag for grouping &amp; targeted broadcast follow-ups</p>
                 </div>
               </div>
-              <button onclick="window.closeBroadcastLogsModal()" style="background: var(--bg-surface, rgba(0,0,0,0.05)); border: 1px solid var(--border-color, rgba(0,0,0,0.1)); color: var(--text-main, #111827); font-size: 1.2rem; cursor: pointer; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">✕</button>
+              <button onclick="window.closeBulkTagModal()" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
             </div>
-            
-            <!-- Modal Body -->
-            <div id="broadcast-modal-body" style="padding: 20px 24px; overflow-y: auto; flex: 1; min-height: 200px;">
-              <!-- Dynamically populated list of call recordings -->
+
+            <div style="padding: 20px 22px;">
+              <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">Targeting</label>
+                <div id="btm-target-desc" style="font-size: 0.85rem; font-weight: 700; color: var(--color-cyan); background: rgba(6,182,212,0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(6,182,212,0.25);">
+                  17 contacts selected
+                </div>
+              </div>
+
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">Select or Type Tag Name</label>
+                <input type="text" id="btm-tag-input" list="btm-tag-suggestions" placeholder="e.g. failed_followup, hot_lead, callback" style="width: 100%; padding: 10px 14px; font-size: 0.9rem; border-radius: 10px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
+                <datalist id="btm-tag-suggestions">
+                  <option value="failed_followup"></option>
+                  <option value="hot_lead"></option>
+                  <option value="interested"></option>
+                  <option value="engaged"></option>
+                  <option value="callback_requested"></option>
+                  <option value="not_interested"></option>
+                </datalist>
+              </div>
+
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px;">
+                <button type="button" onclick="document.getElementById('btm-tag-input').value = 'failed_followup'" style="font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; cursor: pointer; font-weight: 600;">+ failed_followup</button>
+                <button type="button" onclick="document.getElementById('btm-tag-input').value = 'hot_lead'" style="font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; background: rgba(234,179,8,0.15); border: 1px solid rgba(234,179,8,0.3); color: #eab308; cursor: pointer; font-weight: 600;">+ hot_lead</button>
+                <button type="button" onclick="document.getElementById('btm-tag-input').value = 'engaged'" style="font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #10b981; cursor: pointer; font-weight: 600;">+ engaged</button>
+                <button type="button" onclick="document.getElementById('btm-tag-input').value = 'callback_requested'" style="font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.3); color: var(--color-cyan); cursor: pointer; font-weight: 600;">+ callback_requested</button>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" onclick="window.closeBulkTagModal()" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">Cancel</button>
+                <button type="button" onclick="window.saveBulkTagAssignment()" class="btn btn-primary" style="background: linear-gradient(135deg, #8b5cf6, #06b6d4); color: #fff; border: none; padding: 8px 20px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; cursor: pointer;">💾 Save &amp; Assign Tag</button>
+              </div>
             </div>
+          </div>
+        </div>
             
             <!-- Modal Footer -->
             <div style="padding: 14px 24px; border-top: 1px solid var(--border-color, rgba(0,0,0,0.08)); display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface, rgba(0,0,0,0.02));">

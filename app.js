@@ -4880,6 +4880,223 @@ window.viewBroadcastCallLogs = async function(bId) {
   }
 };
 
+window._selectedBroadcastPhones = new Map(); // phone -> { phone, name }
+window._lastFilteredCalls = [];
+window._tagTargetContext = null; // { mode: 'bulk' | 'single', phones: [] }
+
+window.toggleSelectAllBroadcastCalls = function(isChecked) {
+  const checkboxes = document.querySelectorAll('.bcd-call-checkbox');
+  checkboxes.forEach(cb => {
+    cb.checked = isChecked;
+    const phone = cb.getAttribute('data-phone');
+    const name = cb.getAttribute('data-name');
+    if (phone) {
+      if (isChecked) {
+        window._selectedBroadcastPhones.set(phone, { phone, name });
+      } else {
+        window._selectedBroadcastPhones.delete(phone);
+      }
+    }
+  });
+  window.updateSelectedBroadcastCount();
+};
+
+window.toggleSelectBroadcastCall = function(phone, name, isChecked) {
+  if (isChecked) {
+    window._selectedBroadcastPhones.set(phone, { phone, name });
+  } else {
+    window._selectedBroadcastPhones.delete(phone);
+  }
+  const selectAllCb = document.getElementById('bcd-select-all-checkbox');
+  if (selectAllCb && window._lastFilteredCalls.length > 0) {
+    selectAllCb.checked = window._selectedBroadcastPhones.size === window._lastFilteredCalls.length;
+  }
+  window.updateSelectedBroadcastCount();
+};
+
+window.updateSelectedBroadcastCount = function() {
+  const count = window._selectedBroadcastPhones.size;
+  const countEl = document.getElementById('bcd-selected-count');
+  if (countEl) countEl.innerText = count;
+  document.querySelectorAll('.bcd-sel-num').forEach(el => {
+    el.innerText = count;
+  });
+};
+
+window.openBulkTagModal = function(singlePhone, singleName) {
+  const modal = document.getElementById('broadcast-tag-modal');
+  const title = document.getElementById('btm-modal-title');
+  const desc = document.getElementById('btm-target-desc');
+  const input = document.getElementById('btm-tag-input');
+  if (!modal) return;
+
+  if (singlePhone) {
+    window._tagTargetContext = { mode: 'single', phones: [{ phone: singlePhone, name: singleName || '' }] };
+    if (title) title.innerText = `🏷️ Assign Tag to ${singleName || singlePhone}`;
+    if (desc) desc.innerText = `Target: ${singlePhone} (${singleName || 'Contact'})`;
+  } else {
+    let phonesToTag = Array.from(window._selectedBroadcastPhones.values());
+    if (phonesToTag.length === 0) {
+      // If nothing checked, default to all filtered calls
+      phonesToTag = window._lastFilteredCalls.map(c => ({
+        phone: c.to || c.customerNumber || c.phone || '',
+        name: c.name || c.customerName || ''
+      })).filter(x => x.phone);
+    }
+
+    if (phonesToTag.length === 0) {
+      alert("No contacts available to tag.");
+      return;
+    }
+
+    window._tagTargetContext = { mode: 'bulk', phones: phonesToTag };
+    const tabName = (window._currentBroadcastFilterTab || 'all').toUpperCase();
+    if (title) title.innerText = `🏷️ Assign Tag to ${phonesToTag.length} Contacts`;
+    if (desc) desc.innerText = `${phonesToTag.length} contacts selected (Filter: ${tabName})`;
+  }
+
+  if (input) input.value = '';
+  modal.style.display = 'flex';
+};
+
+window.closeBulkTagModal = function() {
+  const modal = document.getElementById('broadcast-tag-modal');
+  if (modal) modal.style.display = 'none';
+  window._tagTargetContext = null;
+};
+
+window.saveBulkTagAssignment = async function() {
+  const input = document.getElementById('btm-tag-input');
+  const tag = input ? input.value.trim() : '';
+  if (!tag) {
+    alert("Please enter or select a tag name.");
+    return;
+  }
+
+  const ctx = window._tagTargetContext;
+  if (!ctx || !Array.isArray(ctx.phones) || ctx.phones.length === 0) {
+    alert("No target contacts found.");
+    return;
+  }
+
+  try {
+    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) ? loggedInUser.id : '';
+    const res = await fetch('/api/contacts/bulk-tag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phones: ctx.phones,
+        tag: tag,
+        clientId: clientId
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`✅ Tag "${tag}" successfully assigned to ${data.updatedCount} contact(s)!`);
+      window.closeBulkTagModal();
+      window._selectedBroadcastPhones.clear();
+      window.updateSelectedBroadcastCount();
+      // Reload contacts in background if available
+      if (typeof window.fetchAllContacts === 'function') window.fetchAllContacts();
+      // Refresh current view
+      if (window._currentBroadcastCampaign && window._currentBroadcastCampaign.id) {
+        window.viewBroadcastCallLogs(window._currentBroadcastCampaign.id);
+      }
+    } else {
+      alert("❌ Failed to assign tag: " + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert("Network error while assigning tag: " + err.message);
+  }
+};
+
+window.broadcastToFilteredContacts = async function() {
+  const bcast = window._currentBroadcastCampaign;
+  if (!bcast) return;
+
+  const calls = window._lastFilteredCalls || [];
+  const phones = Array.from(new Set(calls.map(c => c.to || c.customerNumber || c.phone || '').filter(p => p && p.length > 5)));
+
+  if (phones.length === 0) {
+    alert("No valid recipient phone numbers found in the current filter.");
+    return;
+  }
+
+  const filterName = (window._currentBroadcastFilterTab || 'all').toUpperCase();
+  if (!confirm(`🚀 Launch a new Voice Broadcast to all ${phones.length} contacts matching filter "${filterName}" using agent "${bcast.agentName || 'Voice Agent'}"?`)) {
+    return;
+  }
+
+  try {
+    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) ? loggedInUser.id : '';
+    const res = await fetch('/api/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agentId: bcast.agentId,
+        customPhones: phones,
+        targetType: `filtered_${filterName.toLowerCase()}`,
+        targetLabel: `${bcast.agentName || 'Agent'} - ${filterName} Followup (${phones.length} contacts)`,
+        mode: 'now',
+        clientId: clientId
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`✅ Broadcast initiated successfully to ${phones.length} contacts!`);
+      window.viewBroadcastCallLogs(data.broadcastId);
+    } else {
+      alert("❌ Failed to launch broadcast: " + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert("Network error: " + err.message);
+  }
+};
+
+window.broadcastToSelectedContacts = async function() {
+  const bcast = window._currentBroadcastCampaign;
+  if (!bcast) return;
+
+  const selectedList = Array.from(window._selectedBroadcastPhones.values());
+  const phones = Array.from(new Set(selectedList.map(x => x.phone).filter(p => p && p.length > 5)));
+
+  if (phones.length === 0) {
+    alert("Please select at least 1 contact using the checkboxes below to broadcast.");
+    return;
+  }
+
+  if (!confirm(`🚀 Launch a new Voice Broadcast to ${phones.length} selected contacts using agent "${bcast.agentName || 'Voice Agent'}"?`)) {
+    return;
+  }
+
+  try {
+    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) ? loggedInUser.id : '';
+    const res = await fetch('/api/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agentId: bcast.agentId,
+        customPhones: phones,
+        targetType: 'custom_selection',
+        targetLabel: `Selected Contacts (${phones.length} contacts)`,
+        mode: 'now',
+        clientId: clientId
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`✅ Broadcast initiated successfully to ${phones.length} selected contacts!`);
+      window._selectedBroadcastPhones.clear();
+      window.updateSelectedBroadcastCount();
+      window.viewBroadcastCallLogs(data.broadcastId);
+    } else {
+      alert("❌ Failed to launch broadcast: " + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert("Network error: " + err.message);
+  }
+};
+
 window.renderFilteredBroadcastCalls = function() {
   const container = document.getElementById('bcd-calls-container');
   if (!container) return;
@@ -4911,6 +5128,18 @@ window.renderFilteredBroadcastCalls = function() {
     });
   }
 
+  window._lastFilteredCalls = filtered;
+
+  // Update action counts
+  const filteredActionCount = document.getElementById('bcd-filtered-action-count');
+  if (filteredActionCount) filteredActionCount.innerText = filtered.length;
+
+  const selectAllCb = document.getElementById('bcd-select-all-checkbox');
+  if (selectAllCb) {
+    selectAllCb.checked = filtered.length > 0 && window._selectedBroadcastPhones.size === filtered.length;
+  }
+  window.updateSelectedBroadcastCount();
+
   if (filtered.length === 0) {
     container.innerHTML = `
       <div style="text-align: center; padding: 40px; color: var(--text-muted);">
@@ -4932,33 +5161,42 @@ window.renderFilteredBroadcastCalls = function() {
 
     let displayName = call.name || call.customerName || '';
     const phoneNum = call.to || call.customerNumber || call.phone || '';
+    let contactTag = '';
+
+    const matched = (window.allContactsList || []).find(c => c && c.phone && typeof cleanAndComparePhone === 'function' && cleanAndComparePhone(c.phone, phoneNum));
+    if (matched) {
+      if (matched.name && !/^[+\d\s\-\(\)]+$/.test(matched.name) && (!displayName || displayName.toLowerCase() === 'customer')) {
+        displayName = matched.name;
+      }
+      if (matched.tag) contactTag = matched.tag;
+    }
 
     if (!displayName || /^[+\d\s\-\(\)]+$/.test(displayName) || displayName.toLowerCase() === 'customer') {
-      const matched = (window.allContactsList || []).find(c => c && c.phone && typeof cleanAndComparePhone === 'function' && cleanAndComparePhone(c.phone, phoneNum));
-      if (matched && matched.name && !/^[+\d\s\-\(\)]+$/.test(matched.name)) {
-        displayName = matched.name;
-      } else {
-        displayName = phoneNum ? `Recipient` : `Contact #${index + 1}`;
-      }
+      displayName = phoneNum ? `Recipient` : `Contact #${index + 1}`;
     }
 
     const isInterested = call.summary && call.summary.toUpperCase().includes('INTERESTED') && !call.summary.toUpperCase().includes('NOT INTERESTED');
     const isCompleted = call.status === 'completed' || durSec > 0;
     const statusColor = isCompleted ? '#10b981' : '#ef4444';
+    const isChecked = window._selectedBroadcastPhones.has(phoneNum);
 
     let hasAudio = Boolean(call.recordingStatus === 'ready' || call.recordingUrl || (isCompleted && durSec > 3));
 
     html += `
-      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; transition: border-color 0.2s;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div style="display: flex; align-items: center; gap: 12px;">
-            <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, rgba(6,182,212,0.15), rgba(139,92,246,0.15)); border: 1px solid rgba(6,182,212,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+            <input type="checkbox" class="bcd-call-checkbox" data-phone="${escapeHtml(phoneNum)}" data-name="${escapeHtml(displayName)}" ${isChecked ? 'checked' : ''} onchange="window.toggleSelectBroadcastCall('${escapeHtml(phoneNum)}', '${escapeHtml(displayName)}', this.checked)" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--color-cyan);">
+            <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, rgba(6,182,212,0.15), rgba(139,92,246,0.15)); border: 1px solid rgba(6,182,212,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
               👤
             </div>
             <div>
-              <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <span style="font-weight: 800; color: var(--text-main); font-size: 0.95rem;">${escapeHtml(displayName)}</span>
                 ${phoneNum ? `<span style="font-size: 0.82rem; color: var(--color-cyan); font-weight: 700; font-family: var(--font-mono);">(${escapeHtml(phoneNum)})</span>` : ''}
+                <button onclick="window.openBulkTagModal('${escapeHtml(phoneNum)}', '${escapeHtml(displayName)}')" title="Click to assign or change tag" style="background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 3px;">
+                  🏷️ ${contactTag ? escapeHtml(contactTag) : '+ Tag'}
+                </button>
               </div>
               <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">
                 Call ID: <span style="font-family: var(--font-mono);">${(call.callSid || '').substring(0, 16)}...</span>
@@ -4966,7 +5204,7 @@ window.renderFilteredBroadcastCalls = function() {
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <span style="font-size: 0.75rem; background: var(--bg-primary); padding: 4px 10px; border-radius: 6px; color: var(--text-muted); font-weight: 600;">⏱️ ${durationText}</span>
             <span style="font-size: 0.72rem; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${(call.status || 'COMPLETED').toUpperCase()}</span>
             ${isInterested ? `<span style="font-size: 0.72rem; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: rgba(234,179,8,0.15); color: #eab308; border: 1px solid rgba(234,179,8,0.3);">⭐ INTERESTED</span>` : ''}
@@ -5047,6 +5285,19 @@ window.deleteCurrentBroadcastCampaign = async function() {
   const bcast = window._currentBroadcastCampaign;
   if (!bcast || !bcast.id) return;
   if (!confirm("Are you sure you want to delete this broadcast campaign record?")) return;
+
+  try {
+    const res = await fetch(`/api/broadcasts/${bcast.id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      window.backToBroadcastList();
+    } else {
+      alert("Failed to delete broadcast: " + data.error);
+    }
+  } catch (err) {
+    alert("Error deleting broadcast: " + err.message);
+  }
+};
 
   try {
     const res = await fetch(`/api/broadcasts/${bcast.id}`, { method: 'DELETE' });

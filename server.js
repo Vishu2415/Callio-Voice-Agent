@@ -4842,7 +4842,7 @@ app.put('/api/contacts/:id', express.json(), authMiddleware('contacts'), (req, r
 
 // PATCH tag by phone number (used from call logs where only phone is known)
 app.patch('/api/contacts/by-phone', express.json(), (req, res) => {
-  const { phone, tag } = req.body;
+  const { phone, tag, name, clientId } = req.body;
   if (!phone) return res.status(400).json({ success: false, error: 'phone is required' });
   const normPhone = String(phone).replace(/\D/g, '');
   let updated = null;
@@ -4850,18 +4850,81 @@ app.patch('/api/contacts/by-phone', express.json(), (req, res) => {
     const cPhone = String(contact.phone || '').replace(/\D/g, '');
     if (cPhone === normPhone) {
       contact.tag = tag || '';
+      if (name && !contact.name) contact.name = name;
       contactsDb.set(id, contact);
       updated = contact;
       break;
     }
   }
-  saveContacts();
-  if (updated) {
-    res.json({ success: true, contact: updated });
-  } else {
-    // Contact not found — create a minimal one so tag is persisted
-    res.json({ success: true, message: 'Contact not found in DB but noted', contact: null });
+  if (!updated) {
+    // If not found in contactsDb, auto-create contact entry with tag
+    const newId = `cont_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newContact = {
+      id: newId,
+      phone: String(phone).trim(),
+      name: name || phone,
+      tag: tag || '',
+      clientId: clientId || null,
+      createdAt: Date.now()
+    };
+    contactsDb.set(newId, newContact);
+    updated = newContact;
   }
+  saveContacts();
+  res.json({ success: true, contact: updated });
+});
+
+// POST /api/contacts/bulk-tag - Assign a tag to multiple phone numbers at once
+app.post('/api/contacts/bulk-tag', express.json(), (req, res) => {
+  const { phones, tag, clientId } = req.body;
+  if (!Array.isArray(phones) || phones.length === 0 || !tag) {
+    return res.status(400).json({ success: false, error: 'phones array and tag are required' });
+  }
+
+  let updatedCount = 0;
+  const cleanTag = tag.trim();
+  const normPhoneMap = new Map();
+  phones.forEach(item => {
+    const p = typeof item === 'object' ? (item.phone || item.to) : item;
+    const name = typeof item === 'object' ? (item.name || '') : '';
+    if (p) {
+      normPhoneMap.set(String(p).replace(/\D/g, ''), { originalPhone: String(p).trim(), name });
+    }
+  });
+
+  const matchedNorms = new Set();
+
+  for (const [id, contact] of contactsDb.entries()) {
+    const cPhone = String(contact.phone || '').replace(/\D/g, '');
+    if (normPhoneMap.has(cPhone)) {
+      if (clientId && clientId !== 'admin' && contact.clientId && contact.clientId !== clientId) continue;
+      contact.tag = cleanTag;
+      contactsDb.set(id, contact);
+      matchedNorms.add(cPhone);
+      updatedCount++;
+    }
+  }
+
+  // Auto-create any contacts that weren't in contactsDb yet
+  for (const [normPhone, info] of normPhoneMap.entries()) {
+    if (!matchedNorms.has(normPhone) && normPhone.length > 5) {
+      const newId = `cont_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const newContact = {
+        id: newId,
+        phone: info.originalPhone,
+        name: info.name || info.originalPhone,
+        tag: cleanTag,
+        clientId: clientId || null,
+        createdAt: Date.now()
+      };
+      contactsDb.set(newId, newContact);
+      updatedCount++;
+    }
+  }
+
+  saveContacts();
+  console.log(`[Bulk Tagging] Tag "${cleanTag}" assigned to ${updatedCount} contacts.`);
+  res.json({ success: true, updatedCount, tag: cleanTag });
 });
 
 app.delete('/api/contacts/:id', authMiddleware('contacts'), (req, res) => {
