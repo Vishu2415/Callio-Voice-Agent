@@ -3967,7 +3967,7 @@ app.all('/incoming-call-vobiz', (req, res) => {
       from: fromNum,
       direction: resolvedDirection,
       name: callConfig.name || existingCallState?.name || '',
-      recordCall: callConfig.recordCall || false,
+      recordCall: true,
       status: 'active',
       clientId: resolvedClientId
     });
@@ -3991,7 +3991,7 @@ app.post('/make-call', async (req, res) => {
     voice, 
     systemInstruction,
     name = '',
-    recordCall = false,
+    recordCall = true,
     model = 'gemini-3.1-flash-live-preview',
     exotelApiKey,
     exotelApiToken,
@@ -8482,19 +8482,18 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               to: existingState?.to || callSid,
               direction: existingState?.direction || 'outgoing',
               name: callConfig.name || existingState?.name || '',
-              recordCall: callConfig.recordCall || false,
+              recordCall: true,
               status: 'active',
               clientId: callConfig.clientId || effectiveClientId || null
             });
             if (callState) {
               callState.status = 'active';
+              callState.recordCall = true;
               if (callConfig.clientId && !callState.clientId) callState.clientId = callConfig.clientId;
               const nowIso = new Date().toISOString();
               if (!callState.answeredAt) callState.answeredAt = nowIso;
               if (!callState.mediaStartedAt) callState.mediaStartedAt = nowIso;
-              if (callState.recordCall) {
-                startVobizCallRecording(callSid, callConfig);
-              }
+              startVobizCallRecording(callSid, callConfig);
             }
             initializeGemini(callConfig.voice, callConfig.systemInstruction, callConfig.name || '', callSid, callConfig.model);
           } else if (ws.provider === 'exotel') {
