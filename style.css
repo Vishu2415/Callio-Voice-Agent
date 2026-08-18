@@ -200,6 +200,112 @@ html[data-theme="light"] .action-lead-card .btn-done:hover {
 html[data-theme="light"] .glass-navbar .logo-area h1 {
   color: #0f172a !important;
 }
+
+/* --- Broadcast Campaign Analytics Modern Cards & Split Grid --- */
+.bcd-call-card {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 14px !important;
+  padding: 18px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+}
+html[data-theme="light"] .bcd-call-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+.bcd-audio-box {
+  padding: 12px 16px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  flex-wrap: wrap !important;
+}
+html[data-theme="light"] .bcd-audio-box {
+  background: #f8fafc !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.bcd-summary-card {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(249, 115, 22, 0.25) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 280px !important;
+  overflow-y: auto !important;
+}
+html[data-theme="light"] .bcd-summary-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(249, 115, 22, 0.3) !important;
+  box-shadow: 0 2px 10px rgba(249, 115, 22, 0.04) !important;
+}
+
+.bcd-transcript-card {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(6, 182, 212, 0.25) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 280px !important;
+  overflow-y: auto !important;
+}
+html[data-theme="light"] .bcd-transcript-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(6, 182, 212, 0.3) !important;
+  box-shadow: 0 2px 10px rgba(6, 182, 212, 0.04) !important;
+}
+
+.bcd-bubble-caller {
+  padding: 8px 12px !important;
+  border-radius: 10px !important;
+  background: rgba(6, 182, 212, 0.08) !important;
+  border: 1px solid rgba(6, 182, 212, 0.25) !important;
+  color: var(--text-main) !important;
+}
+html[data-theme="light"] .bcd-bubble-caller {
+  background: #f0fdfa !important;
+  border: 1px solid #99f6e4 !important;
+  color: #0f172a !important;
+}
+
+.bcd-bubble-agent {
+  padding: 8px 12px !important;
+  border-radius: 10px !important;
+  background: rgba(245, 158, 11, 0.08) !important;
+  border: 1px solid rgba(245, 158, 11, 0.25) !important;
+  color: var(--text-main) !important;
+}
+html[data-theme="light"] .bcd-bubble-agent {
+  background: #fffbeb !important;
+  border: 1px solid #fde68a !important;
+  color: #0f172a !important;
+}
+
+.bcd-verdict-pill {
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #10b981 !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+}
+html[data-theme="light"] .bcd-verdict-pill {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+}
 html[data-theme="light"] .vb-metric-val {
   color: #0f172a !important;
 }

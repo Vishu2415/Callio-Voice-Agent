@@ -5201,7 +5201,7 @@ window.renderFilteredBroadcastCalls = function() {
     let hasAudio = Boolean(call.recordingStatus === 'ready' || call.recordingUrl || (isCompleted && durSec > 3));
 
     html += `
-      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; transition: border-color 0.2s;">
+      <div class="bcd-call-card">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div style="display: flex; align-items: center; gap: 12px;">
             <input type="checkbox" class="bcd-call-checkbox" data-phone="${escapeHtml(phoneNum)}" data-name="${escapeHtml(displayName)}" ${isChecked ? 'checked' : ''} onchange="window.toggleSelectBroadcastCall('${escapeHtml(phoneNum)}', '${escapeHtml(displayName)}', this.checked)" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--color-cyan);">
@@ -5233,7 +5233,7 @@ window.renderFilteredBroadcastCalls = function() {
         </div>
 
         ${hasAudio ? `
-          <div style="padding: 10px 14px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 10px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <div class="bcd-audio-box">
             <div style="flex: 1; min-width: 240px;">
               <div style="font-size: 0.72rem; color: #10b981; font-weight: 700; margin-bottom: 4px;">🎙️ Audio Recording Ready</div>
               <audio controls preload="metadata" src="${recProxyUrl}" style="width: 100%; height: 36px; border-radius: 6px; outline: none;"></audio>
@@ -5247,12 +5247,12 @@ window.renderFilteredBroadcastCalls = function() {
         <!-- Side-by-Side 50/50 Card Grid: AI Summary (Left) & Dialogue Transcript (Right) -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 4px;">
           <!-- Left 50% Card: AI Call Summary -->
-          <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; max-height: 280px; overflow-y: auto;">
+          <div class="bcd-summary-card">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border-color);">
-              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 800; color: #f97316;">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 800; color: #ea580c;">
                 <span>💡</span> AI Call Summary
               </div>
-              ${isCompleted ? `<span style="font-size: 0.68rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.15); color: #10b981;">VERDICT: COMPLETED</span>` : ''}
+              ${isCompleted ? `<span class="bcd-verdict-pill">VERDICT: COMPLETED</span>` : ''}
             </div>
             <div style="font-size: 0.78rem; color: var(--text-main); line-height: 1.5; white-space: pre-wrap;">
               ${call.summary ? (typeof formatMarkdown === 'function' ? formatMarkdown(call.summary) : escapeHtml(call.summary)) : '<span style="color: var(--text-muted); font-style: italic;">No AI summary recorded.</span>'}
@@ -5260,22 +5260,22 @@ window.renderFilteredBroadcastCalls = function() {
           </div>
 
           <!-- Right 50% Card: Dialogue Transcript -->
-          <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; max-height: 280px; overflow-y: auto;">
+          <div class="bcd-transcript-card">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border-color);">
               <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 800; color: var(--color-cyan);">
                 <span>💬</span> Dialogue Transcript
               </div>
-              <span style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); background: var(--bg-surface); padding: 2px 6px; border-radius: 4px;">
+              <span style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); background: var(--bg-primary); padding: 2px 6px; border-radius: 4px;">
                 ${Array.isArray(call.transcript) ? call.transcript.length : 0} turns
               </span>
             </div>
             <div style="font-size: 0.78rem; display: flex; flex-direction: column; gap: 6px;">
               ${Array.isArray(call.transcript) && call.transcript.length > 0 ? call.transcript.map(t => `
-                <div style="padding: 6px 10px; border-radius: 8px; background: ${t.role === 'user' ? 'rgba(6,182,212,0.08)' : 'rgba(245,158,11,0.08)'}; border: 1px solid ${t.role === 'user' ? 'rgba(6,182,212,0.2)' : 'rgba(245,158,11,0.2)'};">
-                  <span style="font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: ${t.role === 'user' ? 'var(--color-cyan)' : '#f59e0b'}; display: block; margin-bottom: 2px;">
+                <div class="${t.role === 'user' ? 'bcd-bubble-caller' : 'bcd-bubble-agent'}">
+                  <span style="font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: ${t.role === 'user' ? 'var(--color-cyan)' : '#d97706'}; display: block; margin-bottom: 2px;">
                     ${t.role === 'user' ? '👤 Caller' : '🤖 AI Agent'}:
                   </span>
-                  <span style="color: var(--text-main); line-height: 1.4;">${escapeHtml(t.text)}</span>
+                  <span style="line-height: 1.4;">${escapeHtml(t.text)}</span>
                 </div>
               `).join('') : '<span style="color: var(--text-muted); font-style: italic;">No transcript captured for this call session.</span>'}
             </div>
