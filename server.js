@@ -4960,15 +4960,13 @@ app.get('/api/tags', (req, res) => {
       if (contact.clientId && contact.clientId !== targetCId) continue;
     }
     const tags = parseTags(contact.tags || contact.tag);
-    if (tags.length === 0) {
-      const c = tagCounts.get('Default') || 0;
-      tagCounts.set('Default', c + 1);
-    } else {
-      tags.forEach(t => {
-        const c = tagCounts.get(t) || 0;
-        tagCounts.set(t, c + 1);
-      });
-    }
+    tags.forEach(t => {
+      const cleanT = (t || '').trim();
+      if (cleanT && cleanT.toLowerCase() !== 'default') {
+        const c = tagCounts.get(cleanT) || 0;
+        tagCounts.set(cleanT, c + 1);
+      }
+    });
   }
 
   const tagsList = Array.from(tagCounts.entries()).map(([name, count]) => ({

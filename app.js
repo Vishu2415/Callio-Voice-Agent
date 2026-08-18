@@ -3521,13 +3521,12 @@ window.renderAllContactsTable = function() {
     const allTagsMap = new Map();
     allContacts.forEach(c => {
       const tags = window.getContactTagsArray(c);
-      if (tags.length === 0) {
-        allTagsMap.set('Default', (allTagsMap.get('Default') || 0) + 1);
-      } else {
-        tags.forEach(t => {
-          allTagsMap.set(t, (allTagsMap.get(t) || 0) + 1);
-        });
-      }
+      tags.forEach(t => {
+        const cleanT = (t || '').trim();
+        if (cleanT && cleanT.toLowerCase() !== 'default') {
+          allTagsMap.set(cleanT, (allTagsMap.get(cleanT) || 0) + 1);
+        }
+      });
     });
 
     let tagHtml = `
@@ -3570,7 +3569,7 @@ window.renderAllContactsTable = function() {
   let html = '';
   list.forEach(c => {
     const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }) : '—';
-    const tags = window.getContactTagsArray(c);
+    const tags = window.getContactTagsArray(c).filter(t => t && t.toLowerCase() !== 'default');
 
     // Multi-tag pills HTML (clean without emoji)
     let tagsPillsHtml = '';
@@ -3592,7 +3591,7 @@ window.renderAllContactsTable = function() {
         <td style="max-width: 320px;">
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px;">
             ${tagsPillsHtml}
-            <button onclick="window.inlineEditContactTag('${c.id}', '${escapeHtml(c.tag || '')}', this)" title="Add or edit tags" style="background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 2px;">
+            <button onclick="window.inlineEditContactTag('${c.id}', '${escapeHtml(tags.join(', '))}', this)" title="Add or edit tags" style="background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 2px;">
               + Tag
             </button>
           </div>
@@ -3697,7 +3696,7 @@ window.fetchAndRenderTagManagement = async function() {
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to load tags');
 
-    const tags = data.tags || [];
+    const tags = (data.tags || []).filter(t => t.name && t.name.toLowerCase() !== 'default');
     const totalTagsEl = document.getElementById('tm-total-tags-count');
     const totalTaggedContactsEl = document.getElementById('tm-total-tagged-contacts');
 
@@ -3719,7 +3718,6 @@ window.fetchAndRenderTagManagement = async function() {
 
     let html = '';
     tags.forEach(t => {
-      const isDefault = t.name.toLowerCase() === 'default';
       const color = t.color || '#06b6d4';
       html += `
         <tr>
@@ -3743,11 +3741,9 @@ window.fetchAndRenderTagManagement = async function() {
               <button onclick="window.renameGlobalTag('${escapeHtml(t.name)}')" title="Edit Tag across all contacts" style="background: rgba(6,182,212,0.12); border: 1px solid rgba(6,182,212,0.3); color: var(--color-cyan); padding: 6px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;">
                 ✏️ Edit
               </button>
-              ${!isDefault ? `
-                <button onclick="window.deleteGlobalTag('${escapeHtml(t.name)}', ${t.count})" title="Delete tag from all contacts" style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 6px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;">
-                  🗑️ Delete
-                </button>
-              ` : ''}
+              <button onclick="window.deleteGlobalTag('${escapeHtml(t.name)}', ${t.count})" title="Delete tag from all contacts" style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 6px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;">
+                🗑️ Delete
+              </button>
             </div>
           </td>
         </tr>
