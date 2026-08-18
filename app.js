@@ -4062,54 +4062,65 @@ window.inlineEditContactTag = function(contactId, currentTag, triggerEl) {
 
   const popup = document.createElement('div');
   popup.className = 'inline-tag-editor';
-  popup.style.cssText = 'position:fixed; z-index:999999; background:var(--bg-surface, #111827); border:1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius:18px; padding:18px 20px; box-shadow:0 20px 60px rgba(0,0,0,0.65); min-width:300px; max-width:360px; backdrop-filter:blur(12px);';
+  popup.style.cssText = 'position:fixed; z-index:999999; background:var(--bg-surface, #111827); border:1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius:14px; padding:12px 14px; box-shadow:0 16px 40px rgba(0,0,0,0.6); min-width:220px; max-width:280px; backdrop-filter:blur(12px);';
 
   // Position near trigger element
   const rect = triggerEl ? triggerEl.getBoundingClientRect() : { top: 200, left: 200, bottom: 220 };
-  const top = Math.min(rect.bottom + 8, window.innerHeight - 260);
-  const left = Math.min(rect.left, window.innerWidth - 380);
+  const top = Math.min(rect.bottom + 6, window.innerHeight - 240);
+  const left = Math.min(rect.left, window.innerWidth - 300);
   popup.style.top = top + 'px';
   popup.style.left = left + 'px';
 
-  // Fetch available tags from current contacts
+  // Fetch available tags from current contacts & groups
   const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
   const uniqueTagsSet = new Set();
   allContacts.forEach(c => window.getContactTagsArray(c).forEach(t => uniqueTagsSet.add(t)));
   const uniqueTags = Array.from(uniqueTagsSet).filter(Boolean);
 
-  const currentSelectedTags = (currentTag || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+  // Find target contact
+  let targetContact = allContacts.find(c => String(c.id) === String(contactId));
+  if (!targetContact && typeof localGroupsCache !== 'undefined') {
+    for (const g of localGroupsCache) {
+      const c = (g.contacts || []).find(item => String(item.id) === String(contactId));
+      if (c) { targetContact = c; break; }
+    }
+  }
+
+  const contactTags = targetContact ? window.getContactTagsArray(targetContact).map(t => t.toLowerCase()) : (currentTag || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+
+  let itemsHtml = '';
+  if (uniqueTags.length === 0) {
+    itemsHtml = `
+      <div style="font-size:0.78rem; color:var(--text-muted); padding:8px 0; text-align:center;">
+        No tags created yet.<br>
+        <a href="javascript:void(0)" onclick="document.querySelector('.inline-tag-editor').remove(); window.switchContactsSubtab('tags');" style="color:var(--color-cyan); font-weight:700; text-decoration:none; display:inline-block; margin-top:4px;">
+          + Create in Tag Management
+        </a>
+      </div>
+    `;
+  } else {
+    itemsHtml = uniqueTags.map(t => {
+      const isSelected = contactTags.includes(t.toLowerCase());
+      return `
+        <div onclick="window.instantToggleContactTag('${contactId}', '${escapeHtml(t)}', this)" style="display:flex; align-items:center; justify-content:space-between; padding:7px 10px; border-radius:8px; cursor:pointer; background:${isSelected ? 'rgba(6,182,212,0.15)' : 'transparent'}; border:1px solid ${isSelected ? 'rgba(6,182,212,0.35)' : 'transparent'}; color:${isSelected ? 'var(--color-cyan, #06b6d4)' : 'var(--text-main, #e4e4e7)'}; font-size:0.82rem; font-weight:${isSelected ? '700' : '600'}; margin-bottom:4px; transition:all 0.15s;" onmouseover="if(!this.dataset.selected) this.style.background='rgba(255,255,255,0.05)'" onmouseout="if(!this.dataset.selected) this.style.background='transparent'" data-selected="${isSelected ? 'true' : ''}">
+          <span>${escapeHtml(t)}</span>
+          <span style="font-size:0.85rem; font-weight:800; color:${isSelected ? 'var(--color-cyan, #06b6d4)' : 'var(--text-muted, #71717a)'};">${isSelected ? '✓' : '+'}</span>
+        </div>
+      `;
+    }).join('');
+  }
 
   popup.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <div>
-        <h4 style="margin:0; font-size:0.92rem; font-weight:800; color:var(--text-main,#fff);">Edit Tags</h4>
-        <span style="font-size:0.72rem; color:var(--text-muted,#9ca3af);">Assign or toggle audience tags</span>
-      </div>
-      <button onclick="document.querySelector('.inline-tag-editor').remove()" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color, rgba(255,255,255,0.1)); color:var(--text-muted,#9ca3af); border-radius:50%; width:24px; height:24px; cursor:pointer; font-size:0.8rem; display:flex; align-items:center; justify-content:center;">✕</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.08));">
+      <span style="font-size:0.75rem; font-weight:800; color:var(--text-muted,#9ca3af); text-transform:uppercase; letter-spacing:0.5px;">Assign Tags</span>
+      <button onclick="document.querySelector('.inline-tag-editor').remove()" style="background:none; border:none; color:var(--text-muted,#9ca3af); cursor:pointer; font-size:0.85rem; padding:0 2px;">✕</button>
     </div>
-
-    <input type="text" id="inline-tag-input" value="${escapeHtml(currentTag)}" placeholder="e.g. VIP, Interested, Follow-up..." 
-      style="width:100%; background:var(--bg-primary, #0B0F19); border:1px solid var(--border-color, rgba(255,255,255,0.15)); color:var(--text-main,#fff); border-radius:10px; padding:9px 12px; font-size:0.86rem; box-sizing:border-box; outline:none; margin-bottom:12px; transition:border-color 0.2s;">
-    
-    <div style="font-size:0.72rem; color:var(--text-muted,#9ca3af); font-weight:700; margin-bottom:6px;">Available Tags:</div>
-    <div id="inline-tag-pills-container" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; max-height:100px; overflow-y:auto;">
-      ${uniqueTags.length > 0 ? uniqueTags.map(t => {
-        const isSel = currentSelectedTags.includes(t.toLowerCase());
-        return `<span onclick="window.toggleTagInInput('${escapeHtml(t)}')" style="background:${isSel ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.05)'}; color:${isSel ? 'var(--color-cyan,#06b6d4)' : 'var(--text-muted,#9ca3af)'}; font-size:0.72rem; padding:4px 9px; border-radius:8px; cursor:pointer; border:1px solid ${isSel ? 'rgba(6,182,212,0.4)' : 'var(--border-color, rgba(255,255,255,0.1))'}; font-weight:700; transition:all 0.15s;">
-          ${isSel ? '✓ ' : '+ '}${escapeHtml(t)}
-        </span>`;
-      }).join('') : '<span style="font-size:0.74rem; color:var(--text-muted);">No tags created yet. Type above to add.</span>'}
-    </div>
-
-    <div style="display:flex; gap:8px;">
-      <button onclick="document.querySelector('.inline-tag-editor').remove()" style="flex:1; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); border:1px solid var(--border-color, rgba(255,255,255,0.1)); color:var(--text-main,#fff); font-weight:600; cursor:pointer; font-size:0.78rem;">Cancel</button>
-      <button id="inline-tag-save-btn" style="flex:1.6; height:36px; border-radius:10px; background:var(--grad-coral, linear-gradient(135deg, #FF6B4A, #ea580c)); border:none; color:#fff; font-weight:800; cursor:pointer; font-size:0.8rem; box-shadow:0 4px 14px rgba(255,107,74,0.35);">Save Tags</button>
+    <div style="max-height:180px; overflow-y:auto; padding-right:2px;">
+      ${itemsHtml}
     </div>
   `;
 
   document.body.appendChild(popup);
-  const tagInput = document.getElementById('inline-tag-input');
-  if (tagInput) tagInput.focus();
 
   // Close on outside click
   setTimeout(() => {
@@ -4120,73 +4131,72 @@ window.inlineEditContactTag = function(contactId, currentTag, triggerEl) {
       }
     });
   }, 50);
-
-  // Save handler
-  document.getElementById('inline-tag-save-btn').onclick = async function() {
-    const rawVal = document.getElementById('inline-tag-input').value.trim();
-    const tagsArr = Array.from(new Set(rawVal.split(',').map(t => t.trim()).filter(Boolean)));
-    const tagStr = tagsArr.join(', ');
-
-    try {
-      const res = await fetch(`/api/contacts/${contactId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag: tagStr, tags: tagsArr })
-      });
-      const data = await res.json();
-      if (data.success) {
-        popup.remove();
-        // Update local cache and re-render
-        for (const g of (localGroupsCache || [])) {
-          const c = (g.contacts || []).find(c => String(c.id) === String(contactId));
-          if (c) { 
-            c.tags = tagsArr;
-            c.tag = tagStr; 
-            break; 
-          }
-        }
-        window.renderAllContactsTable();
-      } else {
-        alert('Failed to update tags: ' + (data.error || 'Unknown'));
-      }
-    } catch(e) {
-      alert('Network error: ' + e.message);
-    }
-  };
-
-  // Also save on Enter key
-  document.getElementById('inline-tag-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') document.getElementById('inline-tag-save-btn').click();
-  });
 };
 
-// Helper to append/toggle tag in input
-window.toggleTagInInput = function(tag) {
-  const input = document.getElementById('inline-tag-input');
-  if (!input) return;
-  let current = input.value.split(',').map(t => t.trim()).filter(Boolean);
-  if (current.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
-    current = current.filter(t => t.toLowerCase() !== tag.toLowerCase());
-  } else {
-    current.push(tag);
+// Instant Auto-Save Tag Toggle
+window.instantToggleContactTag = async function(contactId, tag, itemEl) {
+  const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
+  let targetContact = allContacts.find(c => String(c.id) === String(contactId));
+
+  if (!targetContact && typeof localGroupsCache !== 'undefined') {
+    for (const g of localGroupsCache) {
+      const c = (g.contacts || []).find(item => String(item.id) === String(contactId));
+      if (c) { targetContact = c; break; }
+    }
   }
-  input.value = current.join(', ');
 
-  // Update visual state of pills inside popup
-  const container = document.getElementById('inline-tag-pills-container');
-  if (container) {
-    const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
-    const uniqueTagsSet = new Set();
-    allContacts.forEach(c => window.getContactTagsArray(c).forEach(t => uniqueTagsSet.add(t)));
-    const uniqueTags = Array.from(uniqueTagsSet).filter(Boolean);
-    const selectedLower = current.map(t => t.toLowerCase());
+  if (!targetContact) return;
 
-    container.innerHTML = uniqueTags.map(t => {
-      const isSel = selectedLower.includes(t.toLowerCase());
-      return `<span onclick="window.toggleTagInInput('${escapeHtml(t)}')" style="background:${isSel ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.05)'}; color:${isSel ? 'var(--color-cyan,#06b6d4)' : 'var(--text-muted,#9ca3af)'}; font-size:0.72rem; padding:4px 9px; border-radius:8px; cursor:pointer; border:1px solid ${isSel ? 'rgba(6,182,212,0.4)' : 'var(--border-color, rgba(255,255,255,0.1))'}; font-weight:700; transition:all 0.15s;">
-        ${isSel ? '✓ ' : '+ '}${escapeHtml(t)}
-      </span>`;
-    }).join('');
+  let tags = window.getContactTagsArray(targetContact);
+  const exists = tags.map(t => t.toLowerCase()).includes(tag.toLowerCase());
+
+  if (exists) {
+    tags = tags.filter(t => t.toLowerCase() !== tag.toLowerCase());
+  } else {
+    tags.push(tag);
+  }
+
+  const tagStr = tags.join(', ');
+
+  // Update UI element immediately for instant feedback
+  if (itemEl) {
+    const isNowSelected = !exists;
+    itemEl.style.background = isNowSelected ? 'rgba(6,182,212,0.15)' : 'transparent';
+    itemEl.style.borderColor = isNowSelected ? 'rgba(6,182,212,0.35)' : 'transparent';
+    itemEl.style.color = isNowSelected ? 'var(--color-cyan, #06b6d4)' : 'var(--text-main, #e4e4e7)';
+    itemEl.style.fontWeight = isNowSelected ? '700' : '600';
+    itemEl.dataset.selected = isNowSelected ? 'true' : '';
+    const iconSpan = itemEl.querySelector('span:last-child');
+    if (iconSpan) {
+      iconSpan.innerText = isNowSelected ? '✓' : '+';
+      iconSpan.style.color = isNowSelected ? 'var(--color-cyan, #06b6d4)' : 'var(--text-muted, #71717a)';
+    }
+  }
+
+  // Update local cache
+  targetContact.tags = tags;
+  targetContact.tag = tagStr;
+  for (const g of (localGroupsCache || [])) {
+    const c = (g.contacts || []).find(item => String(item.id) === String(contactId));
+    if (c) {
+      c.tags = tags;
+      c.tag = tagStr;
+      break;
+    }
+  }
+
+  // Live re-render row tags
+  window.renderAllContactsTable();
+
+  // Save to backend
+  try {
+    await fetch(`/api/contacts/${contactId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag: tagStr, tags: tags })
+    });
+  } catch (err) {
+    console.error('Failed to auto-save tag toggle:', err);
   }
 };
 
