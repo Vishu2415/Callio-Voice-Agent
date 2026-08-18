@@ -5502,18 +5502,43 @@ window.openBulkTagModal = function(singlePhone, singleName) {
   const modal = document.getElementById('broadcast-tag-modal');
   const title = document.getElementById('btm-modal-title');
   const desc = document.getElementById('btm-target-desc');
-  const input = document.getElementById('btm-tag-input');
+  const listContainer = document.getElementById('btm-tags-list-container');
   if (!modal) return;
+
+  // Fetch all registered tags
+  const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
+  const uniqueTagsSet = new Set();
+  allContacts.forEach(c => window.getContactTagsArray(c).forEach(t => uniqueTagsSet.add(t)));
+  const uniqueTags = Array.from(uniqueTagsSet).filter(Boolean);
 
   if (singlePhone) {
     window._tagTargetContext = { mode: 'single', phones: [{ phone: singlePhone, name: singleName || '' }] };
-    if (title) title.innerText = `🏷️ Assign Tag to ${singleName || singlePhone}`;
+    if (title) title.innerText = `Assign Tags to ${singleName || singlePhone}`;
     if (desc) desc.innerText = `Target: ${singlePhone} (${singleName || 'Contact'})`;
+
+    // Find contact's existing tags
+    const targetContact = allContacts.find(c => String(c.phone).replace(/\D/g,'') === String(singlePhone).replace(/\D/g,''));
+    const contactTags = targetContact ? window.getContactTagsArray(targetContact).map(t => t.toLowerCase()) : [];
+
+    if (listContainer) {
+      if (uniqueTags.length === 0) {
+        listContainer.innerHTML = `<div style="text-align:center; padding:12px 0; color:var(--text-muted); font-size:0.8rem;">No tags created yet. Create tags in Tag Management first.</div>`;
+      } else {
+        listContainer.innerHTML = uniqueTags.map(t => {
+          const isSelected = contactTags.includes(t.toLowerCase());
+          return `
+            <div onclick="window.instantToggleBroadcastTag('${escapeHtml(singlePhone)}', '${escapeHtml(singleName || '')}', '${escapeHtml(t)}', this)" style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:10px; cursor:pointer; background:${isSelected ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.03)'}; border:1px solid ${isSelected ? 'rgba(6,182,212,0.35)' : 'var(--border-color, rgba(255,255,255,0.08))'}; color:${isSelected ? 'var(--color-cyan, #06b6d4)' : 'var(--text-main, #e4e4e7)'}; font-size:0.84rem; font-weight:${isSelected ? '700' : '600'}; transition:all 0.15s;" data-selected="${isSelected ? 'true' : ''}">
+              <span>${escapeHtml(t)}</span>
+              <span style="font-size:0.88rem; font-weight:800; color:${isSelected ? 'var(--color-cyan, #06b6d4)' : 'var(--text-muted, #71717a)'};">${isSelected ? '✓' : '+'}</span>
+            </div>
+          `;
+        }).join('');
+      }
+    }
   } else {
     let phonesToTag = Array.from(window._selectedBroadcastPhones.values());
     if (phonesToTag.length === 0) {
-      // If nothing checked, default to all filtered calls
-      phonesToTag = window._lastFilteredCalls.map(c => ({
+      phonesToTag = (window._lastFilteredCalls || []).map(c => ({
         phone: c.to || c.customerNumber || c.phone || '',
         name: c.name || c.customerName || ''
       })).filter(x => x.phone);
@@ -5526,11 +5551,25 @@ window.openBulkTagModal = function(singlePhone, singleName) {
 
     window._tagTargetContext = { mode: 'bulk', phones: phonesToTag };
     const tabName = (window._currentBroadcastFilterTab || 'all').toUpperCase();
-    if (title) title.innerText = `🏷️ Assign Tag to ${phonesToTag.length} Contacts`;
+    if (title) title.innerText = `Assign Tag to ${phonesToTag.length} Contacts`;
     if (desc) desc.innerText = `${phonesToTag.length} contacts selected (Filter: ${tabName})`;
+
+    if (listContainer) {
+      if (uniqueTags.length === 0) {
+        listContainer.innerHTML = `<div style="text-align:center; padding:12px 0; color:var(--text-muted); font-size:0.8rem;">No tags created yet. Create tags in Tag Management first.</div>`;
+      } else {
+        listContainer.innerHTML = uniqueTags.map(t => {
+          return `
+            <div onclick="window.instantAssignBulkTag('${escapeHtml(t)}')" style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:10px; cursor:pointer; background:rgba(255,255,255,0.03); border:1px solid var(--border-color, rgba(255,255,255,0.08)); color:var(--text-main, #e4e4e7); font-size:0.84rem; font-weight:600; transition:all 0.15s;" onmouseover="this.style.background='rgba(6,182,212,0.1)'; this.style.borderColor='rgba(6,182,212,0.3)';" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='var(--border-color, rgba(255,255,255,0.08))';">
+              <span>${escapeHtml(t)}</span>
+              <span style="font-size:0.82rem; font-weight:700; color:var(--color-cyan, #06b6d4);">Apply Tag →</span>
+            </div>
+          `;
+        }).join('');
+      }
+    }
   }
 
-  if (input) input.value = '';
   modal.style.display = 'flex';
 };
 
@@ -5540,19 +5579,72 @@ window.closeBulkTagModal = function() {
   window._tagTargetContext = null;
 };
 
-window.saveBulkTagAssignment = async function() {
-  const input = document.getElementById('btm-tag-input');
-  const tag = input ? input.value.trim() : '';
-  if (!tag) {
-    alert("Please enter or select a tag name.");
-    return;
+// Instant Single Tag Toggle for Broadcast Recipient Card
+window.instantToggleBroadcastTag = async function(phone, name, tag, itemEl) {
+  const allContacts = window.getAllContactsList ? window.getAllContactsList() : [];
+  let targetContact = allContacts.find(c => String(c.phone).replace(/\D/g,'') === String(phone).replace(/\D/g,''));
+
+  let tags = targetContact ? window.getContactTagsArray(targetContact) : [];
+  const exists = tags.map(t => t.toLowerCase()).includes(tag.toLowerCase());
+
+  if (exists) {
+    tags = tags.filter(t => t.toLowerCase() !== tag.toLowerCase());
+  } else {
+    tags.push(tag);
   }
 
-  const ctx = window._tagTargetContext;
-  if (!ctx || !Array.isArray(ctx.phones) || ctx.phones.length === 0) {
-    alert("No target contacts found.");
-    return;
+  const tagStr = tags.join(', ');
+
+  // Update UI item
+  if (itemEl) {
+    const isNowSelected = !exists;
+    itemEl.style.background = isNowSelected ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.03)';
+    itemEl.style.borderColor = isNowSelected ? 'rgba(6,182,212,0.35)' : 'var(--border-color, rgba(255,255,255,0.08))';
+    itemEl.style.color = isNowSelected ? 'var(--color-cyan, #06b6d4)' : 'var(--text-main, #e4e4e7)';
+    itemEl.style.fontWeight = isNowSelected ? '700' : '600';
+    itemEl.dataset.selected = isNowSelected ? 'true' : '';
+    const iconSpan = itemEl.querySelector('span:last-child');
+    if (iconSpan) {
+      iconSpan.innerText = isNowSelected ? '✓' : '+';
+      iconSpan.style.color = isNowSelected ? 'var(--color-cyan, #06b6d4)' : 'var(--text-muted, #71717a)';
+    }
   }
+
+  // Update local cache
+  if (targetContact) {
+    targetContact.tags = tags;
+    targetContact.tag = tagStr;
+  }
+  for (const g of (localGroupsCache || [])) {
+    const c = (g.contacts || []).find(item => String(item.phone).replace(/\D/g,'') === String(phone).replace(/\D/g,''));
+    if (c) {
+      c.tags = tags;
+      c.tag = tagStr;
+    }
+  }
+
+  // Live update the broadcast recipient card badge
+  if (window._currentBroadcastCampaign && window._currentBroadcastCampaign.id) {
+    window.viewBroadcastCallLogs(window._currentBroadcastCampaign.id);
+  }
+
+  // Save to backend
+  try {
+    const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) ? loggedInUser.id : '';
+    await fetch('/api/contacts/by-phone', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, tag: tagStr, clientId })
+    });
+  } catch (err) {
+    console.error('Failed to auto-save broadcast tag toggle:', err);
+  }
+};
+
+// Instant Bulk Tag Assignment
+window.instantAssignBulkTag = async function(tag) {
+  const ctx = window._tagTargetContext;
+  if (!ctx || !Array.isArray(ctx.phones) || ctx.phones.length === 0) return;
 
   try {
     const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) ? loggedInUser.id : '';
@@ -5567,21 +5659,19 @@ window.saveBulkTagAssignment = async function() {
     });
     const data = await res.json();
     if (data.success) {
-      alert(`✅ Tag "${tag}" successfully assigned to ${data.updatedCount} contact(s)!`);
       window.closeBulkTagModal();
       window._selectedBroadcastPhones.clear();
       window.updateSelectedBroadcastCount();
-      // Reload contacts in background if available
       if (typeof window.fetchAllContacts === 'function') window.fetchAllContacts();
-      // Refresh current view
       if (window._currentBroadcastCampaign && window._currentBroadcastCampaign.id) {
         window.viewBroadcastCallLogs(window._currentBroadcastCampaign.id);
       }
+      alert(`✅ Tag "${tag}" successfully assigned to ${data.updatedCount} contact(s)!`);
     } else {
       alert("❌ Failed to assign tag: " + (data.error || 'Unknown error'));
     }
   } catch (err) {
-    alert("Network error while assigning tag: " + err.message);
+    alert("Network error: " + err.message);
   }
 };
 
