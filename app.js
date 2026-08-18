@@ -4899,7 +4899,7 @@ document.getElementById('btn-dial-phone')?.addEventListener('click', async () =>
     publicUrl: publicUrl,
     voice: agentConfig.voice,
     systemInstruction: finalInstruction,
-    recordCall: elRecordCall.checked,
+    recordCall: true,
     
     exotelApiKey: elExotelApiKey.value,
     exotelApiToken: elExotelApiToken.value,
@@ -4921,9 +4921,8 @@ document.getElementById('btn-dial-phone')?.addEventListener('click', async () =>
     });
     const data = await response.json();
     if (data.success) {
-      alert("Call initiated successfully!");
-      // Switch to dashboard tab
-      document.querySelector('.glass-navbar .nav-btn[data-tab="tab-recordings"]').click();
+      // Start live transcription monitor in the right side card
+      window.startLiveCallSessionMonitor(data.callSid, number, agentConfig.name);
     } else {
       alert("Failed to initiate call: " + data.error);
     }
@@ -4931,6 +4930,102 @@ document.getElementById('btn-dial-phone')?.addEventListener('click', async () =>
     alert("Network error: " + error.message);
   }
 });
+
+// Live Call Session Monitor in Telephony Console
+window.startLiveCallSessionMonitor = function(callSid, phone, agentName) {
+  const container = document.getElementById('call-session-info-container');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 12px; padding: 4px 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 12px; padding: 12px 16px;">
+        <div>
+          <div id="monitor-status-badge" style="font-size: 0.75rem; color: var(--color-cyan); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #06b6d4; animation: pulse 1.5s infinite;"></span>
+            <span id="monitor-status-text">Dialing &amp; Connecting...</span>
+          </div>
+          <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono); margin-top: 4px;">
+            📞 ${escapeHtml(phone)}
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+            AI Agent: <strong style="color: var(--text-main);">${escapeHtml(agentName || 'Voice Agent')}</strong>
+          </div>
+        </div>
+        <div>
+          <button onclick="window.endActiveCall && window.endActiveCall('${callSid}')" class="btn" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #ef4444; font-weight: 700; padding: 6px 14px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">
+            🔴 Hang Up
+          </button>
+        </div>
+      </div>
+
+      <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.76rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">⚡ Real-time Live Transcription</span>
+          <span id="monitor-turn-count" style="font-size: 0.72rem; color: var(--color-cyan); font-weight: 700;">0 turns</span>
+        </div>
+        <div id="monitor-live-transcript-box" style="height: 200px; overflow-y: auto; font-size: 0.82rem; line-height: 1.5; color: var(--text-main); padding: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
+          <div id="monitor-waiting-msg" style="color: var(--text-muted); font-style: italic; text-align: center; padding: 40px 0;">Waiting for call to connect and speaker turns to begin...</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (window._liveMonitorInterval) clearInterval(window._liveMonitorInterval);
+  window._liveMonitorInterval = setInterval(async () => {
+    try {
+      const clientId = (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id) ? loggedInUser.id : '';
+      const res = await fetch(`/calls?clientId=${encodeURIComponent(clientId)}`);
+      const data = await res.json();
+      const calls = data.calls || [];
+      const currentCall = calls.find(c => c.callSid === callSid || c.id === callSid);
+
+      if (!currentCall) return;
+
+      const transcriptBox = document.getElementById('monitor-live-transcript-box');
+      const statusText = document.getElementById('monitor-status-text');
+      const turnCount = document.getElementById('monitor-turn-count');
+
+      if (statusText) {
+        if (currentCall.status === 'completed') {
+          statusText.innerText = `Call Completed (Duration: ${currentCall.duration ? currentCall.duration + 's' : 'Finished'})`;
+          statusText.parentElement.style.color = '#10b981';
+          if (window._liveMonitorInterval) { clearInterval(window._liveMonitorInterval); window._liveMonitorInterval = null; }
+        } else if (currentCall.status === 'failed' || currentCall.status === 'no-answer' || currentCall.status === 'busy') {
+          statusText.innerText = `Call Failed: ${currentCall.failureReason || 'Unanswered / Line Busy'}`;
+          statusText.parentElement.style.color = '#ef4444';
+          if (window._liveMonitorInterval) { clearInterval(window._liveMonitorInterval); window._liveMonitorInterval = null; }
+        } else {
+          statusText.innerText = `Call Connected & Active`;
+        }
+      }
+
+      if (Array.isArray(currentCall.transcript) && currentCall.transcript.length > 0) {
+        if (turnCount) turnCount.innerText = `${currentCall.transcript.length} turns`;
+        if (transcriptBox) {
+          transcriptBox.innerHTML = currentCall.transcript.map(t => `
+            <div style="margin-bottom: 8px;">
+              <strong style="color: ${t.role === 'user' ? 'var(--color-cyan)' : '#f59e0b'}; font-size: 0.78rem;">${t.role === 'user' ? 'Caller' : 'AI Agent'}:</strong>
+              <span style="color: var(--text-main); margin-left: 4px;">${escapeHtml(t.text)}</span>
+            </div>
+          `).join('');
+          transcriptBox.scrollTop = transcriptBox.scrollHeight;
+        }
+      }
+    } catch(e) {}
+  }, 1500);
+};
+
+window.endActiveCall = async function(callSid) {
+  try {
+    await fetch('/api/calls/hangup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callSid })
+    });
+    const statusText = document.getElementById('monitor-status-text');
+    if (statusText) statusText.innerText = 'Call Terminated';
+  } catch(e) {}
+};
 
 
 // ================================================================
@@ -7570,21 +7665,27 @@ window.renderTodayCallsPageTable = function() {
     const recProxyUrl = callSid ? `/recording-proxy/${callSid}${uId ? '?clientId=' + encodeURIComponent(uId) : ''}` : '';
 
     let statusStyle = 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);';
+    let statusLabel = call.status || 'completed';
+    let failureBadge = '';
+
     if (call.status === 'failed' || call.status === 'no-answer' || call.status === 'busy') {
       statusStyle = 'background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);';
+      const reason = call.failureReason || (call.status === 'busy' ? 'User Busy' : (call.status === 'no-answer' ? 'No Answer' : 'Call Unanswered / Line Busy'));
+      failureBadge = `<span style="font-size: 0.72rem; color: #ef4444; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 8px; border-radius: 6px; font-weight: 600; margin-left: 6px;">⚠️ ${escapeHtml(reason)}</span>`;
     } else if (call.status === 'active' || call.status === 'in-progress' || call.status === 'calling') {
       statusStyle = 'background: rgba(6, 182, 212, 0.15); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.3);';
+      statusLabel = '⚡ LIVE ACTIVE';
     }
 
     let recPlayerHtml = '';
-    if (call.recordingStatus === 'ready' || call.recordingUrl) {
+    if (call.recordingStatus === 'ready' || call.recordingUrl || (call.status === 'completed' && durSec > 0)) {
       recPlayerHtml = `
         <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-color);">
           <div style="font-size: 0.75rem; color: var(--color-green); font-weight: 700; margin-bottom: 6px;">🎙️ Call Recording Ready</div>
           <audio controls preload="metadata" src="${recProxyUrl}" style="width: 100%; height: 36px; border-radius: 6px;"></audio>
         </div>`;
-    } else if (call.recordCall && (call.recordingStatus === 'recording' || call.recordingStatus === 'fetching')) {
-      recPlayerHtml = `<div style="margin-top: 8px; font-size: 0.75rem; color: var(--color-cyan); font-style: italic;">⏳ Processing recording...</div>`;
+    } else if (call.status === 'active' || call.recordingStatus === 'recording' || call.recordingStatus === 'fetching') {
+      recPlayerHtml = `<div style="margin-top: 8px; font-size: 0.75rem; color: var(--color-cyan); font-style: italic;">⏳ Recording in progress / processing...</div>`;
     }
 
     let summaryHtml = '';
@@ -7595,13 +7696,18 @@ window.renderTodayCallsPageTable = function() {
     let transcriptHtml = '';
     if (Array.isArray(call.transcript) && call.transcript.length > 0) {
       transcriptHtml = `
-        <div style="margin-top: 10px; font-size: 0.78rem; max-height: 180px; overflow-y: auto; background: var(--bg-primary); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+        <div style="margin-top: 10px; font-size: 0.78rem; max-height: 200px; overflow-y: auto; background: var(--bg-primary); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
           <strong style="color: var(--text-muted); display: block; margin-bottom: 6px;">💬 Transcript (${call.transcript.length} turns):</strong>
           ${call.transcript.map(t => `<div style="margin-bottom: 4px;"><strong style="color:${t.role === 'user' ? 'var(--color-cyan)' : '#f59e0b'};">${t.role === 'user' ? 'Caller' : 'AI Agent'}:</strong> ${escapeHtml(t.text)}</div>`).join('')}
         </div>`;
+    } else if (call.status === 'active' || call.status === 'calling') {
+      transcriptHtml = `
+        <div style="margin-top: 10px; font-size: 0.78rem; background: var(--bg-primary); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); color: var(--color-cyan);">
+          ⚡ Live call in progress — listening for turns in real-time...
+        </div>`;
     }
 
-    const hasDetails = Boolean(recPlayerHtml || summaryHtml || transcriptHtml);
+    const hasDetails = Boolean(recPlayerHtml || summaryHtml || transcriptHtml || failureBadge);
 
     html += `
       <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 18px; display: flex; flex-direction: column; gap: 8px;">
@@ -7609,9 +7715,10 @@ window.renderTodayCallsPageTable = function() {
           <div style="display: flex; align-items: center; gap: 14px; flex: 1; min-width: 220px;">
             <div style="font-size: 1.1rem; color: ${arrowColor}; font-weight: 800;">${arrow.startsWith('⬆') ? '⬆' : '⬇'}</div>
             <div>
-              <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <strong style="font-size: 1.05rem; color: var(--text-main); font-family: var(--font-mono);">${phone}</strong>
-                <span style="padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; ${statusStyle}">${call.status || 'completed'}</span>
+                <span style="padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; ${statusStyle}">${statusLabel}</span>
+                ${failureBadge}
               </div>
               <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
                 ${timeText} • Duration: <strong>${duration}</strong> • Direction: <span style="color:${arrowColor}; font-weight:700;">${arrow}</span>

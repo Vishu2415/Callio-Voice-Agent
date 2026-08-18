@@ -1635,10 +1635,15 @@ function getIncomingCallConfig(query = {}, fromNum = '', clientId = '', toNum = 
       console.log(`[Incoming Routing] Caller ${fromNum} has tag: "${contactTag}" — searching for matching agent…`);
 
       let taggedAgent = null;
-      const matchedRule = tagRules.find(r => r.tag && r.tag.toLowerCase() === contactTag);
+      // 1. Direct tag match
+      let matchedRule = tagRules.find(r => r.tag && r.tag.toLowerCase().trim() === contactTag);
+      // 2. Wildcard / Universal tag match (*, all, universal)
+      if (!matchedRule) {
+        matchedRule = tagRules.find(r => r.tag && (r.tag.trim() === '*' || r.tag.toLowerCase().trim() === 'all' || r.tag.toLowerCase().trim() === 'universal'));
+      }
       if (matchedRule && matchedRule.agentId) {
         taggedAgent = agentsDb.get(matchedRule.agentId) || null;
-        if (taggedAgent) console.log(`[Incoming Routing] Matched via tagRules config: agentId ${matchedRule.agentId}`);
+        if (taggedAgent) console.log(`[Incoming Routing] Matched via tagRules config (${matchedRule.tag}): agentId ${matchedRule.agentId}`);
       }
 
       if (!taggedAgent) {
@@ -3847,14 +3852,27 @@ app.all('/incoming-call-vobiz', (req, res) => {
   const event = req.body.Event || req.query.Event || req.body.event || req.query.event || '';
   if (event === 'Hangup' || event === 'hangup') {
     const callStatus = req.body.CallStatus || req.query.CallStatus || req.body.callStatus || req.query.callStatus || '';
+    const rawCause = req.body.HangupCause || req.query.HangupCause || req.body.hangup_cause || req.query.hangup_cause || req.body.Reason || req.query.Reason || '';
     let finalStatus = 'completed';
     const existingCall = activeCalls.get(callSid);
     const hasConversation = existingCall && ((existingCall.transcript && existingCall.transcript.length > 0) || existingCall.mediaStartedAt || existingCall.answeredAt || existingCall.userHasSpoken);
 
-    if (!hasConversation && (callStatus === 'busy' || callStatus === 'no-answer' || callStatus === 'failed' || callStatus === 'canceled')) {
+    if (!hasConversation && (callStatus === 'busy' || callStatus === 'no-answer' || callStatus === 'failed' || callStatus === 'canceled' || rawCause)) {
       finalStatus = 'failed';
+      if (existingCall) {
+        let cleanReason = 'Unanswered / Line Busy';
+        const upperCause = String(rawCause || callStatus).toUpperCase();
+        if (upperCause.includes('BUSY')) cleanReason = 'User Busy';
+        else if (upperCause.includes('NO_ANSWER') || upperCause.includes('NOANSWER')) cleanReason = 'No Answer / Unanswered';
+        else if (upperCause.includes('REJECT')) cleanReason = 'Call Rejected';
+        else if (upperCause.includes('CANCEL')) cleanReason = 'Canceled';
+        else if (upperCause.includes('UNALLOCATED') || upperCause.includes('INVALID')) cleanReason = 'Invalid Number';
+        else if (upperCause.includes('BALANCE') || upperCause.includes('FUNDS')) cleanReason = 'Insufficient Balance';
+        else if (rawCause) cleanReason = rawCause.replace(/_/g, ' ');
+        existingCall.failureReason = cleanReason;
+      }
     }
-    console.log(`[Vobiz Webhook] Call Hangup event received for CallSid: ${callSid}. Resolved status: ${finalStatus}`);
+    console.log(`[Vobiz Webhook] Call Hangup event received for CallSid: ${callSid}. Resolved status: ${finalStatus}, Reason: ${existingCall?.failureReason || 'N/A'}`);
     handleCallEnd(callSid, finalStatus);
     return res.type('application/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
   }
@@ -4326,6 +4344,28 @@ app.post('/make-call', async (req, res) => {
       return res.status(500).json({ success: false, error: err.message });
     }
   }
+});
+
+// POST /api/calls/hangup - Hang up an active voice session
+app.post('/api/calls/hangup', async (req, res) => {
+  const { callSid } = req.body;
+  if (!callSid) return res.status(400).json({ error: 'callSid is required' });
+  const callState = activeCalls.get(callSid);
+  if (!callState) return res.json({ success: true, message: 'Call not active' });
+
+  try {
+    if (callState.provider === 'vobiz' && callState.vobizAuthId && callState.vobizAuthToken) {
+      await fetch(`https://api.vobiz.ai/api/v1/Account/${callState.vobizAuthId}/Call/${callSid}/`, {
+        method: 'DELETE',
+        headers: {
+          'X-Auth-ID': callState.vobizAuthId,
+          'X-Auth-Token': callState.vobizAuthToken
+        }
+      }).catch(() => {});
+    }
+  } catch (err) {}
+  handleCallEnd(callSid, 'completed');
+  return res.json({ success: true, message: 'Call terminated' });
 });
 
 // GET /calls - Retrieve all active/past calls state list with strict per-account isolation
