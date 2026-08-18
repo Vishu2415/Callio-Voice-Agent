@@ -1154,16 +1154,56 @@
             <div style="display: grid; grid-template-columns: 1fr 280px; gap: 16px;">
               <!-- Tag Creator Box -->
               <div class="vb-card" style="padding: 20px; border-radius: 16px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                  <span style="font-size: 1.2rem;">🏷️</span>
-                  <h3 style="margin: 0; font-size: 1rem; color: var(--text-main);">Create New Universal Tag</h3>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.2rem;">🎨</span>
+                    <h3 style="margin: 0; font-size: 1rem; color: var(--text-main);">Create Custom Tag with Color &amp; Symbol</h3>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 0.74rem; color: var(--text-muted);">Preview:</span>
+                    <span id="tag-management-live-preview" style="background: rgba(6,182,212,0.15); color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.35); padding: 3px 10px; border-radius: 8px; font-weight: 800; font-size: 0.8rem; text-transform: uppercase;">
+                      NEW_TAG
+                    </span>
+                  </div>
                 </div>
-                <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 14px 0;">Create reusable tags for audience segmentation, campaign triggers, and CRM sync.</p>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                  <input type="text" id="tag-management-create-input" placeholder="e.g. vip, hot_lead, interested, follow_up..." style="flex: 1; min-width: 220px; padding: 10px 14px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.88rem; outline: none;">
-                  <button onclick="window.createGlobalTag()" class="btn btn-primary" style="padding: 10px 22px; font-size: 0.85rem; font-weight: 700; border-radius: 10px; background: var(--grad-coral); border: none; color: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                    ➕ Create Tag
-                  </button>
+                <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 14px 0;">Create custom styled tags with customized colors, symbols, and automatic CRM synchronization.</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <input type="text" id="tag-management-create-input" placeholder="Enter tag name (e.g. VIP, Hot Lead, Follow-up)..." oninput="window.updateTagLivePreview()" style="flex: 1; min-width: 220px; padding: 10px 14px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.88rem; outline: none;">
+                    
+                    <select id="tag-management-symbol-select" onchange="window.updateTagLivePreview()" style="padding: 10px 12px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.85rem; outline: none; font-weight: 700;">
+                      <option value="">No Symbol</option>
+                      <option value="●">● Dot</option>
+                      <option value="★">★ Star</option>
+                      <option value="🔥">🔥 Fire</option>
+                      <option value="✓">✓ Check</option>
+                      <option value="💎">💎 Diamond</option>
+                      <option value="⚡">⚡ Lightning</option>
+                    </select>
+
+                    <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-surface); border: 1px solid var(--border-color); padding: 4px 10px; border-radius: 10px;">
+                      <label style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700;">Color:</label>
+                      <input type="color" id="tag-management-color-picker" value="#06b6d4" oninput="window.updateTagLivePreview()" style="width: 28px; height: 28px; border: none; background: transparent; cursor: pointer; border-radius: 6px;">
+                    </div>
+
+                    <button onclick="window.createGlobalTag()" class="btn btn-primary" style="padding: 10px 22px; font-size: 0.85rem; font-weight: 700; border-radius: 10px; background: var(--grad-coral); border: none; color: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                      ➕ Create Tag
+                    </button>
+                  </div>
+
+                  <!-- Color presets -->
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">Color Presets:</span>
+                    <span onclick="window.setTagColorPreset('#06b6d4')" style="width: 18px; height: 18px; border-radius: 50%; background: #06b6d4; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Cyan"></span>
+                    <span onclick="window.setTagColorPreset('#ea580c')" style="width: 18px; height: 18px; border-radius: 50%; background: #ea580c; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Coral Orange"></span>
+                    <span onclick="window.setTagColorPreset('#10b981')" style="width: 18px; height: 18px; border-radius: 50%; background: #10b981; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Emerald Green"></span>
+                    <span onclick="window.setTagColorPreset('#8b5cf6')" style="width: 18px; height: 18px; border-radius: 50%; background: #8b5cf6; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Purple"></span>
+                    <span onclick="window.setTagColorPreset('#f59e0b')" style="width: 18px; height: 18px; border-radius: 50%; background: #f59e0b; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Amber"></span>
+                    <span onclick="window.setTagColorPreset('#ef4444')" style="width: 18px; height: 18px; border-radius: 50%; background: #ef4444; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Red"></span>
+                    <span onclick="window.setTagColorPreset('#ec4899')" style="width: 18px; height: 18px; border-radius: 50%; background: #ec4899; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Pink"></span>
+                    <span onclick="window.setTagColorPreset('#64748b')" style="width: 18px; height: 18px; border-radius: 50%; background: #64748b; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Slate"></span>
+                  </div>
                 </div>
               </div>
 
@@ -3983,6 +4023,53 @@
         <div style="display: flex; gap: 12px; margin-top: 8px;">
           <button type="button" id="btn-cancel-single-contact-v2" class="btn" style="flex: 1; height: 46px; border-radius: 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main, #fff); font-weight: 700; cursor: pointer;">Cancel</button>
           <button type="submit" id="btn-save-single-contact-v2" class="btn" style="flex: 2; height: 46px; border-radius: 14px; background: linear-gradient(135deg, #FF6B4A, #ea580c); border: none; color: #fff; font-weight: 800; font-size: 0.92rem; cursor: pointer; box-shadow: 0 8px 24px rgba(234, 88, 12, 0.4);">💾 Save Contact</button>
+        </div>
+      </form>
+
+  <!-- Modal: Edit Single Contact V2 -->
+  <div id="edit-contact-modal-v2" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 100000; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;">
+    <div style="max-width: 500px; width: 100%; background: var(--bg-surface, #0B0F19); border: 1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius: 24px; padding: 28px 24px; box-shadow: 0 25px 60px rgba(0,0,0,0.8); color: var(--text-main, #fff); position: relative; box-sizing: border-box;">
+      
+      <button onclick="window.closeEditContactModal()" style="position: absolute; top: 18px; right: 18px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted, #9CA3AF); border-radius: 50%; width: 32px; height: 32px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>
+
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+        <div style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(59,130,246,0.15)); border: 1px solid rgba(6,182,212,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">✏️</div>
+        <div>
+          <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--text-main, #fff);">Edit Contact Details</h3>
+          <span style="font-size: 0.78rem; color: var(--text-muted, #9ca3af);">Update contact name, phone number, and tags</span>
+        </div>
+      </div>
+
+      <form id="form-edit-single-contact" onsubmit="window.submitEditedContact(event)" style="display: flex; flex-direction: column; gap: 16px;">
+        <input type="hidden" id="edit-v2-contact-id">
+        <input type="hidden" id="edit-v2-group-id">
+
+        <div>
+          <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-main, #fff); margin-bottom: 6px;">Contact Name</label>
+          <input type="text" id="edit-v2-contact-name" placeholder="e.g. Rahul Sharma" style="width: 100%; height: 44px; padding: 0 14px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-main, #fff); margin-bottom: 6px;">Phone Number *</label>
+          <input type="text" id="edit-v2-contact-phone" required placeholder="e.g. 9876543210" style="width: 100%; height: 44px; padding: 0 14px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: #06b6d4; font-weight: 700; font-family: var(--font-mono); font-size: 0.9rem; outline: none; box-sizing: border-box;">
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-main, #fff); margin-bottom: 6px;">Tags / Categories (Comma-separated)</label>
+          <input type="text" id="edit-v2-contact-tags" placeholder="e.g. VIP, Hot Leads, Followup" style="width: 100%; height: 44px; padding: 0 14px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+          <div id="edit-v2-quick-tags-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+            <!-- Quick tag suggestions injected dynamically -->
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 10px;">
+          <button type="button" onclick="window.deleteContactFromEditModal()" style="padding: 10px 16px; border-radius: 12px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; font-weight: 700; cursor: pointer; font-size: 0.82rem;">
+            🗑️ Delete
+          </button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" onclick="window.closeEditContactModal()" class="btn" style="height: 44px; padding: 0 16px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main, #fff); font-weight: 700; cursor: pointer;">Cancel</button>
+            <button type="submit" class="btn" style="height: 44px; padding: 0 20px; border-radius: 12px; background: linear-gradient(135deg, #FF6B4A, #ea580c); border: none; color: #fff; font-weight: 800; font-size: 0.9rem; cursor: pointer; box-shadow: 0 8px 24px rgba(234, 88, 12, 0.4);">💾 Save Changes</button>
+          </div>
         </div>
       </form>
 
