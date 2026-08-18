@@ -4927,6 +4927,17 @@ app.post('/api/contacts/bulk-tag', express.json(), (req, res) => {
   res.json({ success: true, updatedCount, tag: cleanTag });
 });
 
+function parseTags(tagOrTags) {
+  if (!tagOrTags) return [];
+  if (Array.isArray(tagOrTags)) {
+    return Array.from(new Set(tagOrTags.map(t => String(t || '').trim()).filter(Boolean)));
+  }
+  if (typeof tagOrTags === 'string') {
+    return Array.from(new Set(tagOrTags.split(',').map(t => t.trim()).filter(Boolean)));
+  }
+  return [];
+}
+
 app.delete('/api/contacts/:id', authMiddleware('contacts'), (req, res) => {
   const { id } = req.params;
   if (contactsDb.has(id)) {
@@ -4936,6 +4947,111 @@ app.delete('/api/contacts/:id', authMiddleware('contacts'), (req, res) => {
   } else {
     res.status(404).json({ success: false, error: 'Contact not found' });
   }
+});
+
+// --- UNIVERSAL TAG MANAGEMENT API ---
+// GET /api/tags - Get all tags with contact counts
+app.get('/api/tags', (req, res) => {
+  const targetCId = req.query.clientId || req.query.client_id || (req.user ? req.user.id : null);
+  const tagCounts = new Map(); // tagName -> count
+
+  for (const contact of contactsDb.values()) {
+    if (targetCId && targetCId !== 'admin') {
+      if (contact.clientId && contact.clientId !== targetCId) continue;
+    }
+    const tags = parseTags(contact.tags || contact.tag);
+    if (tags.length === 0) {
+      const c = tagCounts.get('Default') || 0;
+      tagCounts.set('Default', c + 1);
+    } else {
+      tags.forEach(t => {
+        const c = tagCounts.get(t) || 0;
+        tagCounts.set(t, c + 1);
+      });
+    }
+  }
+
+  const tagsList = Array.from(tagCounts.entries()).map(([name, count]) => ({
+    name,
+    count,
+    color: name.toLowerCase().includes('hot') ? '#ea580c' : (name.toLowerCase().includes('lead') ? '#eab308' : (name.toLowerCase().includes('test') ? '#06b6d4' : '#10b981'))
+  }));
+
+  res.json({ success: true, tags: tagsList });
+});
+
+// POST /api/tags - Create a new tag (or ensure it exists)
+app.post('/api/tags', express.json(), (req, res) => {
+  const { name, color, clientId } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ success: false, error: 'Tag name is required' });
+  }
+  const cleanName = name.trim();
+  res.json({ success: true, tag: { name: cleanName, color: color || '#06b6d4', count: 0 } });
+});
+
+// PUT /api/tags/rename - Rename a tag across all contacts
+app.put('/api/tags/rename', express.json(), (req, res) => {
+  const { oldTag, newTag, clientId } = req.body;
+  if (!oldTag || !newTag || !newTag.trim()) {
+    return res.status(400).json({ success: false, error: 'oldTag and newTag are required' });
+  }
+  const oTag = oldTag.trim().toLowerCase();
+  const nTag = newTag.trim();
+  let updatedCount = 0;
+
+  for (const [id, contact] of contactsDb.entries()) {
+    if (clientId && clientId !== 'admin') {
+      if (contact.clientId && contact.clientId !== clientId) continue;
+    }
+    let tags = parseTags(contact.tags || contact.tag);
+    let matched = false;
+    tags = tags.map(t => {
+      if (t.toLowerCase() === oTag) {
+        matched = true;
+        return nTag;
+      }
+      return t;
+    });
+    if (matched) {
+      contact.tags = Array.from(new Set(tags));
+      contact.tag = contact.tags.join(', ');
+      contactsDb.set(id, contact);
+      updatedCount++;
+    }
+  }
+  saveContacts();
+  console.log(`[Tag Management] Renamed tag "${oldTag}" ➔ "${newTag}" for ${updatedCount} contacts.`);
+  res.json({ success: true, updatedCount, oldTag, newTag: nTag });
+});
+
+// DELETE /api/tags/:tagName - Remove a tag from all contacts
+app.delete('/api/tags/:tagName', (req, res) => {
+  const tagName = decodeURIComponent(req.params.tagName || '').trim();
+  const clientId = req.query.clientId || req.query.client_id;
+  if (!tagName) {
+    return res.status(400).json({ success: false, error: 'tagName is required' });
+  }
+  const tLower = tagName.toLowerCase();
+  let removedCount = 0;
+
+  for (const [id, contact] of contactsDb.entries()) {
+    if (clientId && clientId !== 'admin') {
+      if (contact.clientId && contact.clientId !== clientId) continue;
+    }
+    let tags = parseTags(contact.tags || contact.tag);
+    const initialLen = tags.length;
+    tags = tags.filter(t => t.toLowerCase() !== tLower);
+    if (tags.length !== initialLen) {
+      contact.tags = tags;
+      contact.tag = tags.join(', ');
+      contactsDb.set(id, contact);
+      removedCount++;
+    }
+  }
+  saveContacts();
+  console.log(`[Tag Management] Deleted tag "${tagName}" from ${removedCount} contacts.`);
+  res.json({ success: true, removedCount, deletedTag: tagName });
 });
 
 
