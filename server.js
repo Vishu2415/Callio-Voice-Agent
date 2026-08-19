@@ -4012,8 +4012,12 @@ app.post('/make-call', async (req, res) => {
   if (req.body.callerId) vobizCallerId = req.body.callerId;
   if (req.body.virtualNumber) vobizCallerId = req.body.virtualNumber;
   
-  if (!to || !publicUrl) {
-    return res.status(400).json({ success: false, error: 'Missing destination (to) or publicUrl parameters.' });
+  if (!publicUrl) {
+    publicUrl = (defaultCallConfig && defaultCallConfig.publicUrl) || process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
+  }
+  
+  if (!to) {
+    return res.status(400).json({ success: false, error: 'Missing destination (to) parameter.' });
   }
 
   // Wallet Low-Balance Blocking
