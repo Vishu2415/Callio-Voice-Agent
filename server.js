@@ -2776,6 +2776,118 @@ app.post('/api/routing-config', express.json(), (req, res) => {
   }
 });
 
+// ─── CRM Dynamic Inbound Agent Sync API ──────────────────────────────────────
+// GET /api/inbound-agent: Fetch current default incoming agent
+app.get('/api/inbound-agent', (req, res) => {
+  // Resolve client from Bearer Auth or headers/query
+  const rawAuth = req.headers.authorization || '';
+  const token = (rawAuth ? rawAuth.replace(/^Bearer\s+/i, '') : '') || req.headers['x-api-key'] || req.headers['api-key'] || req.query.api_key || req.query.client_id || '';
+  
+  let targetClient = null;
+  let targetClientId = '';
+  if (token) {
+    for (const [cId, client] of clientsDb.entries()) {
+      if (client.api_key === token || client.vobiz_sub_auth_token === token || cId === token) {
+        targetClient = client;
+        targetClientId = cId;
+        break;
+      }
+    }
+    if (!targetClient) {
+      for (const [rId, reseller] of resellersDb.entries()) {
+        if (reseller.api_key === token || reseller.vobiz_sub_auth_token === token || rId === token) {
+          targetClient = reseller;
+          targetClientId = rId;
+          break;
+        }
+      }
+    }
+  }
+
+  const currentAgentId = targetClient?.agent_config?.incomingAgentId || targetClient?.incomingAgentId || targetClient?.defaultAgentId || defaultCallConfig.incomingAgentId || '';
+  const agent = currentAgentId ? agentsDb.get(currentAgentId) : null;
+
+  return res.json({
+    success: true,
+    agentId: currentAgentId || (agent ? agent.id : ''),
+    agentName: agent ? agent.name : (currentAgentId ? 'Unknown Agent' : 'None (Default System)'),
+    voice: agent?.voice || targetClient?.agent_config?.voice || defaultCallConfig.voice || 'Aoede',
+    model: agent?.model || defaultCallConfig.model || 'gemini-3.1-flash-live-preview'
+  });
+});
+
+// POST /api/inbound-agent: Update default incoming agent
+app.post('/api/inbound-agent', express.json(), (req, res) => {
+  const { agentId } = req.body;
+  if (agentId === undefined || agentId === null) {
+    return res.status(400).json({ success: false, error: 'Missing required field: agentId' });
+  }
+
+  // Resolve client from Bearer Auth or headers/query/body
+  const rawAuth = req.headers.authorization || '';
+  const token = (rawAuth ? rawAuth.replace(/^Bearer\s+/i, '') : '') || req.headers['x-api-key'] || req.headers['api-key'] || req.query.api_key || req.body.apiKey || req.query.client_id || '';
+  
+  let targetClient = null;
+  let targetClientId = '';
+  if (token) {
+    for (const [cId, client] of clientsDb.entries()) {
+      if (client.api_key === token || client.vobiz_sub_auth_token === token || cId === token) {
+        targetClient = client;
+        targetClientId = cId;
+        break;
+      }
+    }
+    if (!targetClient) {
+      for (const [rId, reseller] of resellersDb.entries()) {
+        if (reseller.api_key === token || reseller.vobiz_sub_auth_token === token || rId === token) {
+          targetClient = reseller;
+          targetClientId = rId;
+          break;
+        }
+      }
+    }
+  }
+
+  const cleanAgentId = String(agentId).trim();
+  const matchedAgent = cleanAgentId ? agentsDb.get(cleanAgentId) : null;
+
+  if (cleanAgentId && !matchedAgent) {
+    return res.status(404).json({ success: false, error: `Agent with ID "${cleanAgentId}" not found in Callio.` });
+  }
+
+  // If client identified, persist to client's record
+  if (targetClientId && clientsDb.has(targetClientId)) {
+    const client = clientsDb.get(targetClientId);
+    if (!client.agent_config) client.agent_config = {};
+    client.agent_config.incomingAgentId = cleanAgentId;
+    client.incomingAgentId = cleanAgentId;
+    client.defaultAgentId = cleanAgentId;
+    if (matchedAgent) {
+      if (matchedAgent.voice) client.agent_config.voice = matchedAgent.voice;
+      if (matchedAgent.systemInstruction) client.agent_config.system_prompt = matchedAgent.systemInstruction;
+    }
+    clientsDb.set(targetClientId, client);
+    saveClients();
+    console.log(`[Inbound Agent API] Updated incoming agent for Client "${client.name}" (${targetClientId}) -> Agent: "${matchedAgent ? matchedAgent.name : 'Cleared'}" (ID: ${cleanAgentId})`);
+  }
+
+  // Also sync to global defaultCallConfig
+  defaultCallConfig.incomingAgentId = cleanAgentId;
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultCallConfig, null, 2), 'utf-8');
+    console.log(`[Inbound Agent API] Global default incoming agent saved -> ID: ${cleanAgentId}`);
+    return res.json({
+      success: true,
+      message: 'Default incoming agent updated successfully.',
+      agentId: cleanAgentId,
+      agentName: matchedAgent ? matchedAgent.name : (cleanAgentId ? 'Unknown' : 'None (Default System)')
+    });
+  } catch (err) {
+    console.error('[Inbound Agent API Error] Failed to save config:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to persist incoming agent setting.' });
+  }
+});
+
 // Helper to call Gemini API with fallback retry support
 async function callGeminiGenerateContent(modelName, promptText) {
   try {
