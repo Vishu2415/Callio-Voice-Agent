@@ -12725,7 +12725,7 @@ window.openInvoiceModal = function(txnId) {
 
   const brand = window.BrandingContext || {};
   const appName = brand.appName || 'Callio AI Voice Agent';
-  const logoUrl = brand.logoUrl || '/logo_new.png';
+  const logoUrl = brand.logoUrl || '/callio_logo.svg';
   const supportEmail = brand.supportEmail || 'support@callio.ai';
   const user = window.loggedInUser || { name: 'Valued Customer', email: 'customer@client.com' };
 
@@ -12931,7 +12931,7 @@ window.initiateUserRecharge = async function() {
         payment_capture: 1, // Auto-capture payment immediately upon completion
         name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
         description: `Wallet Recharge: ${amount} Minutes (@ ₹${rate.toFixed(2)}/min)`,
-        image: window.BrandingContext?.logoUrl || '/logo_new.png',
+        image: window.BrandingContext?.logoUrl || '/callio_logo.svg',
         notes: {
           clientId: targetClientId,
           minutes: amount,
@@ -13282,7 +13282,7 @@ window.subscribePlan = async function(planName, price) {
         subscription_id: data.subscriptionId,
         name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
         description: `${data.plan?.name || planName.toUpperCase()} - Monthly Recurring Subscription (₹${price}/mo)`,
-        image: window.BrandingContext?.logoUrl || '/logo_new.png',
+        image: window.BrandingContext?.logoUrl || '/callio_logo.svg',
         handler: async function (response) {
           try {
             const vRes = await fetch('/api/razorpay/verify-subscription', {
@@ -13916,7 +13916,7 @@ window.proceedToRazorpayCheckout = async function(planId, planName, basePrice, t
         subscription_id: subData.subscriptionId,
         name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
         description: `${planName} Subscription (₹${basePrice} + 18% GST)`,
-        image: window.BrandingContext?.logoUrl || '/logo_new.png',
+        image: window.BrandingContext?.logoUrl || '/callio_logo.svg',
         handler: async function (response) {
           try {
             const verifyRes = await fetch('/api/payments/subscriptions/verify', {
@@ -13968,7 +13968,7 @@ window.proceedToRazorpayCheckout = async function(planId, planName, basePrice, t
         currency: 'INR',
         name: window.BrandingContext?.appName || 'Callio AI Voice Agent',
         description: `Subscription for ${planName} (Incl. 18% GST)`,
-        image: window.BrandingContext?.logoUrl || '/logo_new.png',
+        image: window.BrandingContext?.logoUrl || '/callio_logo.svg',
         handler: async function (response) {
           try {
             await fetch('/api/payments/subscriptions/verify', {
