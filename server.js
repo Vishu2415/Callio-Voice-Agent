@@ -1379,6 +1379,117 @@ ${formattedTranscript}`;
   }
 }
 
+async function dispatchPostCallWebhook(callSid) {
+  try {
+    const callState = activeCalls.get(callSid);
+    if (!callState) return;
+
+    // 1. Resolve true customer phone number (ignore virtual numbers)
+    const systemNumbers = ['917971442441', '7971442441', '971442441'];
+    function isSysNum(ph) {
+      if (!ph) return true;
+      const c = String(ph).replace(/\D/g, '');
+      return !c || c.length < 8 || systemNumbers.some(n => c === n || c.endsWith(n) || n.endsWith(c));
+    }
+
+    let customerPhone = [callState.customerNumber, callState.phone, callState.to, callState.from]
+      .find(p => p && !isSysNum(p)) || callState.to || callState.from || '';
+
+    let cleanDigits = String(customerPhone).replace(/\D/g, '');
+    let formattedPhone = customerPhone;
+    if (cleanDigits.length === 10) {
+      formattedPhone = `+91${cleanDigits}`;
+    } else if (cleanDigits.length === 12 && cleanDigits.startsWith('91')) {
+      formattedPhone = `+${cleanDigits}`;
+    } else if (cleanDigits.length > 5) {
+      formattedPhone = customerPhone.startsWith('+') ? customerPhone : `+${cleanDigits}`;
+    }
+
+    const summary = callState.summary || 'No conversation occurred during the call.';
+
+    // 2. Determine Interest Rating (HIGH, MEDIUM, LOW, NOT_INTERESTED)
+    let interest = 'MEDIUM';
+    const upperSummary = summary.toUpperCase();
+    if (upperSummary.includes('NOT INTERESTED') || upperSummary.includes('NOT_INTERESTED') || callState.status === 'failed' || callState.status === 'voicemail') {
+      interest = 'NOT_INTERESTED';
+    } else if (upperSummary.includes('INTERESTED') || upperSummary.includes('HIGH') || upperSummary.includes('DEMO') || upperSummary.includes('BUY') || upperSummary.includes('PRICING') || upperSummary.includes('PURCHASE')) {
+      interest = 'HIGH';
+    } else if (upperSummary.includes('UNDECIDED') || upperSummary.includes('CALLBACK') || upperSummary.includes('BUSY')) {
+      interest = 'MEDIUM';
+    } else if (callState.duration && callState.duration > 20) {
+      interest = 'HIGH';
+    }
+
+    // 3. Extract concise Verdict text
+    let verdict = 'Call Completed';
+    const verdictMatch = summary.match(/\*\*(?:VERDICT|Verdict):\*\*\s*([^\n]+)/i);
+    if (verdictMatch) {
+      verdict = verdictMatch[1].trim().replace(/[\*\_\"]/g, '');
+    } else {
+      if (interest === 'HIGH') verdict = 'Interested in product demo';
+      else if (interest === 'NOT_INTERESTED') verdict = 'Not Interested / Declined';
+      else verdict = 'General inquiry / Followup needed';
+    }
+
+    // Exact JSON payload expected by Growlio CRM & Developers
+    const payload = {
+      phone: formattedPhone,
+      status: callState.status || 'completed',
+      summary: summary,
+      interest: interest,
+      verdict: verdict,
+      duration: callState.duration || 0,
+      callSid: callSid,
+      direction: callState.direction || 'outbound',
+      leadId: callState.leadId || null,
+      customerName: callState.customerName || callState.name || null,
+      createdAt: callState.createdAt || new Date().toISOString()
+    };
+
+    // 4. Resolve Webhook URLs
+    const webhookUrls = [];
+    const configuredCrmUrl = process.env.CRM_CALLBACK_URL || (defaultCallConfig && defaultCallConfig.crmCallbackUrl) || 'https://growlio.in/api/crm/calling-agent/callback';
+    if (configuredCrmUrl && !webhookUrls.includes(configuredCrmUrl)) {
+      webhookUrls.push(configuredCrmUrl);
+    }
+
+    // Custom per-call SaaS callback if specified
+    const settings = callSettingsMap.get(callSid);
+    if (settings && settings.saasApiUrl) {
+      const customUrl = `${settings.saasApiUrl.replace(/\/$/, '')}/crm/calling-agent/callback`;
+      if (!webhookUrls.includes(customUrl)) webhookUrls.push(customUrl);
+    }
+
+    if (callState.clientId && clientsDb.has(callState.clientId)) {
+      const client = clientsDb.get(callState.clientId);
+      if (client.webhook_url && !webhookUrls.includes(client.webhook_url)) {
+        webhookUrls.push(client.webhook_url);
+      }
+    }
+
+    // 5. Fire POST Webhook requests
+    for (const url of webhookUrls) {
+      try {
+        console.log(`[CRM Webhook Dispatch] 📡 Sending call end webhook to: ${url} for Phone: ${formattedPhone}`);
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          console.log(`[CRM Webhook Dispatch] ✅ Successfully delivered webhook to ${url} (HTTP ${res.status})`);
+        } else {
+          console.warn(`[CRM Webhook Dispatch] ⚠️ Webhook to ${url} returned HTTP ${res.status}`);
+        }
+      } catch (err) {
+        console.error(`[CRM Webhook Dispatch Error] Failed to deliver webhook to ${url}:`, err.message);
+      }
+    }
+  } catch (outerErr) {
+    console.error(`[CRM Webhook Exception]:`, outerErr.message);
+  }
+}
+
 function handleCallEnd(callSid, finalStatus = 'completed') {
   if (!callSid) return;
   const callState = activeCalls.get(callSid);
@@ -1449,7 +1560,6 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
                                ['failed', 'busy', 'no-answer', 'canceled', 'voicemail', 'rejected'].includes(callState.status);
 
       // Disconnected / Early-Cut / Failed Call detection:
-      // Calls cut within 10s, unanswered, without speech, or with failed status count towards the 3-disconnect rule
       const isDisconnectedCall = !wasAnswered || !hasSpeechOrTranscript || isUnbilledStatus || durationSec < 10;
 
       if (isDisconnectedCall) {
@@ -1530,34 +1640,7 @@ function handleCallEnd(callSid, finalStatus = 'completed') {
 
   (async () => {
     await generateCallSummaryBackend(callSid);
-    
-    // CRM note and activity sync callback
-    const settings = callSettingsMap.get(callSid);
-    if (settings && settings.leadId && settings.saasApiUrl) {
-      const { leadId, saasApiUrl } = settings;
-      console.log(`[CRM Callback] Dispatching call end data to SaaS: ${saasApiUrl}/crm/calling-agent/callback for Lead: ${leadId}`);
-      try {
-        const callbackResponse = await fetch(`${saasApiUrl}/crm/calling-agent/callback`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            leadId: leadId,
-            status: finalStatus,
-            summary: callState.summary,
-            transcript: callState.transcript
-          })
-        });
-        if (callbackResponse.ok) {
-          console.log(`[CRM Callback] Callback successfully delivered to SaaS platform.`);
-        } else {
-          console.error(`[CRM Callback Error] SaaS platform returned status ${callbackResponse.status}`);
-        }
-      } catch (callbackErr) {
-        console.error(`[CRM Callback Exception] Failed to send callback to SaaS:`, callbackErr.message);
-      }
-    }
+    await dispatchPostCallWebhook(callSid);
 
     if (callState.recordCall) {
       if (callState.provider === 'twilio') {

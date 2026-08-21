@@ -18,5 +18,6 @@
   "shareContacts": true,
   "shareCalls": true,
   "incomingAgentId": "agent_1781958457888",
+  "crmCallbackUrl": "https://growlio.in/api/crm/calling-agent/callback",
   "tagRules": []
 }
