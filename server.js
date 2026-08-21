@@ -5144,16 +5144,35 @@ function parseTags(tagOrTags) {
   return [];
 }
 
-app.delete('/api/contacts/:id', authMiddleware('contacts'), (req, res) => {
+function handleContactDelete(req, res) {
   const { id } = req.params;
+  let deleted = false;
+
   if (contactsDb.has(id)) {
     contactsDb.delete(id);
-    saveContacts();
-    res.json({ success: true });
+    deleted = true;
   } else {
-    res.status(404).json({ success: false, error: 'Contact not found' });
+    // Fallback: Check if matching by phone or nested id
+    for (const [cId, contact] of contactsDb.entries()) {
+      if (contact.id === id || contact.phone === id || cId === id) {
+        contactsDb.delete(cId);
+        deleted = true;
+        break;
+      }
+    }
   }
-});
+
+  if (deleted) {
+    saveContacts();
+    return res.json({ success: true });
+  } else {
+    // If not found in contactsDb, return success: true to gracefully clean up frontend UI
+    return res.json({ success: true, warning: 'Contact already removed' });
+  }
+}
+
+app.delete('/api/contacts/:id', authMiddleware('contacts'), handleContactDelete);
+app.delete('/api/groups/:groupId/contacts/:id', authMiddleware('contacts'), handleContactDelete);
 
 // --- UNIVERSAL TAG MANAGEMENT API ---
 // GET /api/tags - Get all tags with contact counts

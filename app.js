@@ -4271,12 +4271,25 @@ window.deleteSingleContactDirect = async function(contactId, groupId) {
   if (!confirm("Are you sure you want to delete this contact?")) return;
   try {
     const clientId = loggedInUser ? loggedInUser.id : '';
-    const res = await fetch(`/api/groups/${groupId}/contacts/${contactId}?clientId=${clientId}`, {
+    const res = await fetch(`/api/contacts/${contactId}?clientId=${clientId}`, {
       method: 'DELETE'
     });
     const data = await res.json();
     if (data.success) {
-      fetchGroups();
+      // Remove immediately from local caches
+      if (Array.isArray(localGroupsCache)) {
+        localGroupsCache.forEach(g => {
+          if (Array.isArray(g.contacts)) {
+            g.contacts = g.contacts.filter(c => c.id !== contactId && c.phone !== contactId);
+          }
+        });
+      }
+      if (typeof renderAllContactsTable === 'function') {
+        renderAllContactsTable();
+      }
+      if (typeof fetchGroups === 'function') {
+        fetchGroups();
+      }
     } else {
       alert("Failed to delete contact: " + (data.error || 'Unknown error'));
     }
