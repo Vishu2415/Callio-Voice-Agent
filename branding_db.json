@@ -1,17 +1,19 @@
 {
   "default": {
-    "id": "default",
-    "customDomain": "localhost",
-    "subdomain": "default.localhost",
+    "id": "callio.in",
+    "customDomain": "",
+    "subdomain": "",
     "appName": "Callio",
-    "logoUrl": "callio_logo.svg",
-    "authHeroUrl": "calling_mockup_3d.png",
+    "logoUrl": "/uploads/1785577557940_C logon.png",
+    "logoHeight": 32,
     "faviconUrl": "favicon.ico",
+    "authHeroUrl": "/uploads/1785749430050_389687_original_4320x7680.jpg",
     "primaryColor": "#FF6B4A",
     "secondaryColor": "#ae3115",
-    "supportEmail": "support@callio.com",
-    "supportPhone": "+91",
-    "copyrightText": "© 2026 Callio. All rights reserved."
+    "supportEmail": "",
+    "supportPhone": "",
+    "copyrightText": "© 2026 Callio. All rights reserved.",
+    "demoSystemPrompt": "your word is to collect user data like their name business name how their business word and what problem they are facing then tel them our experts will call you soon."
   },
   "partner1": {
     "id": "partner1",
@@ -25,5 +27,19 @@
     "supportEmail": "support@partner.com",
     "supportPhone": "+911234567890",
     "copyrightText": "© 2026 Partner AI. All rights reserved."
+  },
+  "growvo.in": {
+    "id": "reseller_1784957742554",
+    "appName": "Growvo",
+    "logoUrl": "/uploads/1785475332449_G logo.png",
+    "logoHeight": 54,
+    "faviconUrl": "favicon.ico",
+    "authHeroUrl": "",
+    "primaryColor": "#FF6B4A",
+    "secondaryColor": "#ae3115",
+    "supportEmail": "admin@growvo.in",
+    "supportPhone": "",
+    "copyrightText": "© 2026 Growvo. All rights reserved.",
+    "demoSystemPrompt": "You are an Al Voice Assistant for Growvo. Politely answer visitor questions about our services in warm, friendly Hinglish ..."
   }
 }
