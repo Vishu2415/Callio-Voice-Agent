@@ -4217,8 +4217,35 @@ app.post('/make-call', async (req, res) => {
 
   // Wallet Low-Balance Blocking
   const activeClientId = req.body.client_id || req.body.clientId || null;
-  if (activeClientId && clientsDb.has(activeClientId)) {
-    const client = clientsDb.get(activeClientId);
+  const client = activeClientId && clientsDb.has(activeClientId) ? clientsDb.get(activeClientId) : null;
+
+  // Resolve active provider from request or client settings
+  if (!req.body.provider || req.body.provider === 'vobiz' || req.body.provider === 'default') {
+    if (client && client.provider) {
+      provider = client.provider;
+    }
+  }
+
+  // Resolve Exotel credentials from client if provider is Exotel
+  if (provider === 'exotel') {
+    if (!exotelApiKey) exotelApiKey = client?.exotel_api_key || defaultCallConfig.exotelApiKey;
+    if (!exotelApiToken) exotelApiToken = client?.exotel_api_token || defaultCallConfig.exotelApiToken;
+    if (!exotelAccountSid) exotelAccountSid = client?.exotel_account_sid || defaultCallConfig.exotelAccountSid;
+    if (!exotelSubdomain) exotelSubdomain = client?.exotel_subdomain || defaultCallConfig.exotelSubdomain || 'api.exotel.com';
+    if (!exotelCallerId) exotelCallerId = client?.phone_number || client?.exotel_caller_id || defaultCallConfig.exotelCallerId;
+  }
+
+  // Resolve Twilio credentials from client if provider is Twilio
+  let activeTwilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+  let activeTwilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+  let activeTwilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+  if (provider === 'twilio' && client) {
+    if (client.twilio_account_sid) activeTwilioAccountSid = client.twilio_account_sid;
+    if (client.twilio_auth_token) activeTwilioAuthToken = client.twilio_auth_token;
+    if (client.phone_number) activeTwilioPhoneNumber = client.phone_number;
+  }
+
+  if (activeClientId && client) {
     if (client.balance !== undefined && client.balance <= 0) {
       console.warn(`[Outbound Call Blocked] 🚫 Call blocked for client: ${client.name} (ID: ${activeClientId}) due to low balance: ₹${client.balance}`);
       return res.status(402).json({ success: false, error: 'Insufficient wallet balance. Please recharge your account.' });
@@ -4492,7 +4519,7 @@ app.post('/make-call', async (req, res) => {
     console.log(`[Twilio REST API] Attempting outbound call to: ${normalizedTo} using callback: ${publicUrl}/incoming-call`);
     
     try {
-      const authHeader = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
+      const authHeader = Buffer.from(`${activeTwilioAccountSid}:${activeTwilioAuthToken}`).toString('base64');
       
       let callbackUrl = publicUrl.trim();
       if (!callbackUrl.startsWith('http://') && !callbackUrl.startsWith('https://')) {
@@ -4503,13 +4530,13 @@ app.post('/make-call', async (req, res) => {
       
       const params = new URLSearchParams();
       params.append('To', normalizedTo);
-      params.append('From', process.env.TWILIO_PHONE_NUMBER);
+      params.append('From', activeTwilioPhoneNumber);
       params.append('Url', callbackUrlWithQuery);
       if (recordCall) {
         params.append('Record', 'true');
       }
       
-      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Calls.json`;
+      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${activeTwilioAccountSid}/Calls.json`;
       
       const response = await fetch(twilioUrl, {
         method: 'POST',
@@ -5656,10 +5683,12 @@ async function executeBroadcastCalls(broadcastId, agent, contacts, reqBody = {})
       resolvedName = 'Customer';
     }
 
-    console.log(`[Broadcast Engine ${broadcastId}] Queuing call to ${contact.phone} (${resolvedName}) (${i+1}/${contacts.length})...`);
+    const activeClientId = reqBody.clientId || agent.clientId || record.clientId || null;
+    const clientObj = activeClientId && clientsDb.has(activeClientId) ? clientsDb.get(activeClientId) : null;
+    const callProvider = reqBody.provider || clientObj?.provider || defaultCallConfig.telephonyProvider || 'vobiz';
 
     const callPayload = {
-      provider: defaultCallConfig.telephonyProvider || 'vobiz',
+      provider: callProvider,
       to: contact.phone,
       name: resolvedName || 'Customer',
       publicUrl: reqBody.publicUrl || defaultCallConfig.publicUrl || '',
@@ -5667,18 +5696,18 @@ async function executeBroadcastCalls(broadcastId, agent, contacts, reqBody = {})
       systemInstruction: finalInstruction,
       recordCall: true,
       model: agent.model || defaultCallConfig.model || 'gemini-3.1-flash-live-preview',
-      clientId: reqBody.clientId || agent.clientId || null,
+      clientId: activeClientId,
       broadcastId: broadcastId,
 
-      exotelApiKey: reqBody.exotelApiKey || defaultCallConfig.exotelApiKey,
-      exotelApiToken: reqBody.exotelApiToken || defaultCallConfig.exotelApiToken,
-      exotelAccountSid: reqBody.exotelAccountSid || defaultCallConfig.exotelAccountSid,
-      exotelSubdomain: reqBody.exotelSubdomain || defaultCallConfig.exotelSubdomain || 'api.exotel.com',
-      exotelCallerId: reqBody.exotelCallerId || defaultCallConfig.exotelCallerId,
+      exotelApiKey: reqBody.exotelApiKey || clientObj?.exotel_api_key || defaultCallConfig.exotelApiKey,
+      exotelApiToken: reqBody.exotelApiToken || clientObj?.exotel_api_token || defaultCallConfig.exotelApiToken,
+      exotelAccountSid: reqBody.exotelAccountSid || clientObj?.exotel_account_sid || defaultCallConfig.exotelAccountSid,
+      exotelSubdomain: reqBody.exotelSubdomain || clientObj?.exotel_subdomain || defaultCallConfig.exotelSubdomain || 'api.exotel.com',
+      exotelCallerId: reqBody.exotelCallerId || clientObj?.phone_number || clientObj?.exotel_caller_id || defaultCallConfig.exotelCallerId,
 
-      vobizAuthId: reqBody.vobizAuthId || defaultCallConfig.vobizAuthId,
-      vobizAuthToken: reqBody.vobizAuthToken || defaultCallConfig.vobizAuthToken,
-      vobizCallerId: reqBody.vobizCallerId || defaultCallConfig.vobizCallerId
+      vobizAuthId: reqBody.vobizAuthId || clientObj?.vobiz_sub_auth_id || defaultCallConfig.vobizAuthId,
+      vobizAuthToken: reqBody.vobizAuthToken || clientObj?.vobiz_sub_auth_token || defaultCallConfig.vobizAuthToken,
+      vobizCallerId: reqBody.vobizCallerId || clientObj?.phone_number || defaultCallConfig.vobizCallerId
     };
 
     try {
@@ -6781,7 +6810,24 @@ app.post('/api/admin/update-pricing', (req, res) => {
 
 // 11A1. Admin - Advanced Client Update (Plan, Status, Details)
 app.post('/api/admin/update-client', (req, res) => {
-  const { clientId, plan, status, name, email, phone_number, vobiz_sub_auth_id, vobiz_sub_auth_token } = req.body;
+  const { 
+    clientId, 
+    plan, 
+    status, 
+    name, 
+    email, 
+    phone_number, 
+    provider,
+    vobiz_sub_auth_id, 
+    vobiz_sub_auth_token,
+    exotel_api_key,
+    exotel_api_token,
+    exotel_account_sid,
+    exotel_subdomain,
+    twilio_account_sid,
+    twilio_auth_token
+  } = req.body;
+
   if (!clientId) {
     return res.status(400).json({ success: false, error: 'clientId is required.' });
   }
@@ -6821,8 +6867,20 @@ app.post('/api/admin/update-client', (req, res) => {
       syncVobizNumberWebhook(phone_number, clientId);
     }
   }
+
+  // Multi-Provider & Telephony Credentials
+  if (provider !== undefined) client.provider = provider;
   if (vobiz_sub_auth_id !== undefined) client.vobiz_sub_auth_id = vobiz_sub_auth_id;
   if (vobiz_sub_auth_token !== undefined) client.vobiz_sub_auth_token = vobiz_sub_auth_token;
+
+  if (exotel_api_key !== undefined) client.exotel_api_key = exotel_api_key;
+  if (exotel_api_token !== undefined) client.exotel_api_token = exotel_api_token;
+  if (exotel_account_sid !== undefined) client.exotel_account_sid = exotel_account_sid;
+  if (exotel_subdomain !== undefined) client.exotel_subdomain = exotel_subdomain || 'api.exotel.com';
+
+  if (twilio_account_sid !== undefined) client.twilio_account_sid = twilio_account_sid;
+  if (twilio_auth_token !== undefined) client.twilio_auth_token = twilio_auth_token;
+
   if (req.body.password && req.body.password.trim() !== '') {
     client.password = hashPassword(req.body.password.trim());
   }
@@ -6830,9 +6888,7 @@ app.post('/api/admin/update-client', (req, res) => {
   clientsDb.set(clientId, client);
   saveClients();
 
-
-
-  console.log(`[Admin Update Client] Client ${client.name} (ID: ${clientId}) updated: plan=${client.plan}, status=${client.status}`);
+  console.log(`[Admin Update Client] Client ${client.name} (ID: ${clientId}) updated: provider=${client.provider || 'vobiz'}, number=${client.phone_number}`);
   res.json({ success: true, client });
 });
 
@@ -8005,7 +8061,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     }
   }
 
-  function initializeGemini(voice, systemInstruction, name = '', callSid = '', model = 'gemini-3.1-flash-live-preview') {
+  async function initializeGemini(voice, systemInstruction, name = '', callSid = '', model = 'gemini-3.1-flash-live-preview') {
     let inactivityTimeout = null;
     agentSpeakingUntil = Date.now();
     
@@ -8045,42 +8101,78 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     let cleanName = name ? name.trim() : '';
     const callState = activeCalls.get(callSid);
 
+    // Real-time fetch of prior call context from Growlio CRM
+    let crmContextInstruction = '';
+    let targetPhone = '';
+    if (callState) {
+      if (callState.direction === 'incoming') {
+        targetPhone = (callState.from && !isVirtualNumber(callState.from)) ? callState.from : (callState.customerNumber || '');
+      } else {
+        targetPhone = (callState.to && !isVirtualNumber(callState.to)) ? callState.to : (callState.customerNumber || '');
+      }
+    }
+    if (!targetPhone) {
+      targetPhone = (callState && callState.from && !isVirtualNumber(callState.from)) ? callState.from : ((callState && callState.to && !isVirtualNumber(callState.to)) ? callState.to : '');
+    }
+
+    if (targetPhone) {
+      try {
+        const crmRes = await fetch(`https://growlio.in/api/crm/calling-agent/context?phone=${encodeURIComponent(targetPhone)}`, {
+          headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        if (crmRes.ok) {
+          const crmData = await crmRes.json();
+          if (crmData && crmData.aiCallContext && crmData.aiCallContext.trim()) {
+            crmContextInstruction = `\n\n[PREVIOUS CALL & WHATSAPP CHAT CONTEXT MEMORY WITH THIS SPECIFIC CALLER (${targetPhone})]:\n${crmData.aiCallContext.trim()}\n\n[CRITICAL RECALL DIRECTIVE]: You have previously interacted with THIS specific customer (via WhatsApp and/or Phone Calls)! Read the conversation history and CRM notes above carefully. If the customer mentions their WhatsApp chat, asks "Kya baat hui thi?", "Mera kya status hai?", or asks about pricing/demo discussed on chat/call, you MUST refer directly to the conversation memory above! Greet them warmly and acknowledge what was discussed or inquired (e.g., "Welcome back! Humne pehle WhatsApp/Call par [topic] discuss kiya tha..."). Offer to continue from there. DO NOT act like a first-time stranger!`;
+            console.log(`[CRM Memory Sync] Fetched prior context for caller ${targetPhone}: ${crmData.aiCallContext.substring(0, 100)}...`);
+          }
+          if (crmData && crmData.customerName && (!cleanName || cleanName.toLowerCase() === 'incoming caller' || /^[+\d\s\-\(\)]+$/.test(cleanName))) {
+            cleanName = crmData.customerName;
+            console.log(`[CRM Memory Sync] Resolved caller name from CRM: "${cleanName}"`);
+          }
+        }
+      } catch (err) {
+        console.error(`[CRM Memory Sync Error] Failed to fetch context for ${targetPhone}:`, err.message);
+      }
+    }
+
     // Deep resolution of customer name if cleanName is missing or just a phone number
     if (!cleanName || /^[+\d\s\-\(\)]+$/.test(cleanName)) {
       if (callState && callState.customerName && !/^[+\d\s\-\(\)]+$/.test(callState.customerName)) {
         cleanName = callState.customerName;
-      } else {
-        const targetPhone = (callState && callState.to && !isVirtualNumber(callState.to)) ? callState.to : ((callState && callState.from && !isVirtualNumber(callState.from)) ? callState.from : '');
-        if (targetPhone) {
-          const matched = findContactByPhone(targetPhone);
-          if (matched && matched.name && !/^[+\d\s\-\(\)]+$/.test(matched.name)) {
-            cleanName = matched.name;
-          } else {
-            for (const c of activeCalls.values()) {
-              if (c && c.customerName && !/^[+\d\s\-\(\)]+$/.test(c.customerName) && cleanAndComparePhone(c.to || c.from || c.customerNumber, targetPhone)) {
-                cleanName = c.customerName;
-                break;
-              }
-            }
-          }
-        }
       }
     }
 
+    // Filter single-letter names, numbers, or generic placeholders to avoid misnaming callers
+    if (cleanName && (
+        cleanName.length <= 1 || 
+        cleanName.toLowerCase() === 'v' || 
+        cleanName.toLowerCase().includes('callback') || 
+        cleanName.toLowerCase().includes('customer') || 
+        cleanName.toLowerCase().includes('lead') || 
+        cleanName.toLowerCase().includes('incoming') || 
+        cleanName.toLowerCase().includes('unknown') || 
+        cleanName.toLowerCase().includes('caller') || 
+        cleanName.toLowerCase().includes('saas')
+    )) {
+      cleanName = '';
+    }
+
     const isPhoneNumber = /^[+\d\s\-\(\)]+$/.test(cleanName);
-    const isDefaultLead = cleanName.toLowerCase() === 'saas lead' || cleanName.toLowerCase() === 'saas' || cleanName.toLowerCase() === 'customer' || cleanName.toLowerCase() === 'a customer';
+    const isDefaultLead = !cleanName || isPhoneNumber;
     
     if (cleanName && !isPhoneNumber && !isDefaultLead) {
       const direction = (callState && callState.direction) || 'incoming';
       const firstName = getFirstName(cleanName);
-      if (firstName && firstName.toLowerCase() !== 'saas' && firstName.toLowerCase() !== 'lead') {
+      if (firstName && firstName.toLowerCase() !== 'saas' && firstName.toLowerCase() !== 'lead' && !firstName.toLowerCase().includes('callback')) {
         greetingInstruction = `\n\n[CALL RECIPIENT (CUSTOMER IDENTITY)]: You are currently speaking with customer "${cleanName}" (First Name: "${firstName}"). You KNOW their name is "${firstName}". If they ask "Mera naam kya hai?", "Who am I?", or "Do you know my name?", you MUST answer warmly: "Aapka naam ${firstName} hai!". Greet them by their first name "${firstName}" immediately at the start of the call. [IMPORTANT]: Do NOT confuse your AI agent identity/business name with the customer's name.`;
         if (callState) callState.customerName = cleanName;
       }
     }
-    const toolRule = `\n\n[CRITICAL TOOL RULE]: If the user says goodbye, bye, or asks to hang up/cut the call, YOU MUST IMMEDIATELY CALL THE 'hangupCall' TOOL to end the connection. Do not wait or ask for confirmation.\n\n[VOICEMAIL RULE]: If you hear an automated voicemail greeting (e.g., 'forwarded to voicemail', 'leave a message', 'record your message', 'after the tone'), YOU MUST IMMEDIATELY CALL THE 'hangupCall' TOOL. DO NOT PITCH THE EVENT. DO NOT LEAVE A VOICEMAIL MESSAGE. Just call hangupCall immediately!`;
+    const toolRule = `\n\n[CRITICAL TOOL RULE]: If the user says goodbye, bye, or asks to hang up/cut the call, YOU MUST say a warm polite 1-sentence goodbye (e.g. "Theek hai, aapse baat karke accha laga, bye!") and IMMEDIATELY call the 'hangupCall' TOOL to end the connection. Do not wait or ask for confirmation.\n\n[VOICEMAIL RULE]: If you hear an automated voicemail greeting, call hangupCall immediately!`;
+    const closingRule = `\n\n[NATURAL CLOSING & GOODBYE DIRECTIVE]: Whenever ending the call or after scheduling a callback, always speak a polite, natural, short goodbye in Hindi/Hinglish (e.g., "Theek hai, aapse baat karke accha laga, bye! / Theek hai, hum aapko scheduled time par call karenge, have a great day, bye!"). NEVER say technical phrases like "Call ending now" or "tool executed". Keep it 100% human and warm.`;
     const instantGreetingRule = `\n\n[CRITICAL INSTANT GREETING RULE]: As soon as the call connects, IMMEDIATELY speak your opening greeting within 0.5 seconds! Do NOT delay or wait. Speak your opening hello instantly.`;
-    const finalInstruction = `${systemInstruction}${greetingInstruction}${toolRule}${instantGreetingRule}\n\n[CRITICAL GRAMMAR RULE]: ${genderRule}`;
+    const finalInstruction = `${systemInstruction}${crmContextInstruction}${greetingInstruction}${toolRule}${closingRule}${instantGreetingRule}\n\n[CRITICAL GRAMMAR RULE]: ${genderRule}`;
     
     const validLiveModels = ['gemini-2.0-flash-exp', 'gemini-3.1-flash-live-preview', 'gemini-2.0-flash-realtime-exp'];
     let resolvedModel = (model && validLiveModels.includes(model.trim())) ? model.trim() : 'gemini-3.1-flash-live-preview';
@@ -8353,7 +8445,7 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               const toolResponse = {
                 toolResponse: {
                   functionResponses: [{
-                    response: { output: { success: true, message: `Call ending now.` } },
+                    response: { output: { success: true, message: `Say a polite 1-sentence goodbye (e.g. 'Theek hai, aapse baat karke accha laga, bye!') and end.` } },
                     id: call.id
                   }]
                 }
@@ -8398,20 +8490,23 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 else cleanIso += 'Z';
               }
 
+              const rawCustomerName = callState?.customerName || callState?.name || settings?.name || '';
+              const cleanStoredName = (rawCustomerName && !rawCustomerName.toLowerCase().includes('callback') && !rawCustomerName.toLowerCase().includes('customer') && !rawCustomerName.toLowerCase().includes('unknown') && !rawCustomerName.toLowerCase().includes('lead') && !rawCustomerName.toLowerCase().includes('caller')) ? rawCustomerName.trim() : '';
+
               // 2. Persist callback to local callbacks_db.json
               const cbId = `cb_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
               const cbRecord = {
                 id: cbId,
                 callSid,
                 phone: customerPhone,
-                name: callState?.name || '',
+                name: cleanStoredName,
                 requestedTime,
                 isoTime: cleanIso,
                 notes,
                 scheduledAt: cleanIso,
                 status: 'pending',      // pending → dialing → dialed/failed
                 leadId: settings?.leadId || null,
-                saasApiUrl: settings?.saasApiUrl || null,
+                saasApiUrl: settings?.saasApiUrl || defaultCallConfig.saasApiUrl || 'https://growlio.in/api',
                 agentId: settings?.agentId || null,
                 provider: settings?.provider || defaultCallConfig.telephonyProvider || 'vobiz',
                 clientId: settings?.clientId || callState?.clientId || null,
@@ -8422,27 +8517,26 @@ Follow these rules strictly to sound completely human, lively, and emotional:
               console.log(`[ScheduleCallback] ✅ Callback saved to DB: ID=${cbId}, Phone=${customerPhone}, At=${cleanIso}`);
 
               // 2. Notify DigiNext CRM (fire-and-forget)
-              if (settings?.saasApiUrl) {
-                fetch(`${settings.saasApiUrl}/crm/calling-agent/schedule-callback`, {
-                  method: 'POST',
-                  headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${defaultCallConfig.apiKey || ''}`
-                  },
-                  body: JSON.stringify({
-                    callbackId: cbRecord.id,
-                    leadId: settings.leadId || null,
-                    phone: cbRecord.phone,
-                    name: cbRecord.name,
-                    scheduledAt: isoTime,
-                    requestedTime,
-                    notes
-                  })
-                }).then(r => {
-                  if (r.ok) console.log(`[ScheduleCallback] CRM notified successfully.`);
-                  else console.warn(`[ScheduleCallback] CRM notification returned ${r.status}`);
-                }).catch(err => console.warn(`[ScheduleCallback] CRM notification failed: ${err.message}`));
-              }
+              const crmUrl = settings?.saasApiUrl || defaultCallConfig.saasApiUrl || 'https://growlio.in/api';
+              fetch(`${crmUrl}/crm/calling-agent/schedule-callback`, {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${defaultCallConfig.apiKey || ''}`
+                },
+                body: JSON.stringify({
+                  callbackId: cbRecord.id,
+                  leadId: settings?.leadId || null,
+                  phone: cbRecord.phone,
+                  name: cbRecord.name,
+                  scheduledAt: cleanIso,
+                  requestedTime,
+                  notes
+                })
+              }).then(r => {
+                if (r.ok) console.log(`[ScheduleCallback] CRM notified successfully.`);
+                else console.warn(`[ScheduleCallback] CRM notification returned ${r.status}`);
+              }).catch(err => console.warn(`[ScheduleCallback] CRM notification failed: ${err.message}`));
 
               // 3. Send tool response back to Gemini
               const cbToolResponse = {
@@ -9414,12 +9508,14 @@ setInterval(async () => {
     }
 
     // Append callback context
-    callbackInstruction += `\n\n[CALLBACK CONTEXT] This is a scheduled callback call. The user ${cb.name || 'the customer'} had previously requested to be called back at "${cb.requestedTime}".${cb.notes ? ' Note: ' + cb.notes : ''} Greet them warmly, remind them of the callback request, and continue the conversation.`;
+    const cleanCbName = (cb.name && !cb.name.toLowerCase().includes('callback') && !cb.name.toLowerCase().includes('customer') && !cb.name.toLowerCase().includes('lead') && !cb.name.toLowerCase().includes('unknown')) ? cb.name.trim() : '';
+    const userDisplayName = cleanCbName ? `customer "${cleanCbName}"` : 'the customer';
+    callbackInstruction += `\n\n[CALLBACK CONTEXT] This is a scheduled callback call. You are calling back ${userDisplayName} who had previously requested to be called back at "${cb.requestedTime}".${cb.notes ? ' Note: ' + cb.notes : ''} Greet them warmly, remind them of the callback request, and continue the conversation.`;
 
     const makeCallPayload = {
       provider: cb.provider || defaultCallConfig.telephonyProvider || 'vobiz',
       to: cb.phone,
-      name: cb.name || 'Callback Customer',
+      name: cleanCbName,
       publicUrl: defaultCallConfig.publicUrl || '',
       voice: agent?.voice || defaultCallConfig.voice,
       systemInstruction: callbackInstruction,

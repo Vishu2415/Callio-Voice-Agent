@@ -3718,18 +3718,72 @@
           </select>
         </div>
 
-        <div id="assign-number-vobiz-creds-container" style="border-top: 1px dashed var(--border-color); padding-top: 12px; margin-top: 15px; margin-bottom: 12px;">
+        <!-- Telephony Provider Selector -->
+        <div id="assign-number-provider-row" style="margin-bottom: 14px; border-top: 1px dashed var(--border-color); padding-top: 14px;">
+          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+            📡 Select Telephony Provider
+          </label>
+          <select id="assign-number-provider-select" class="premium-modal-input premium-modal-select" onchange="window.onTelephonyProviderChange(this.value)">
+            <option value="vobiz" style="background: var(--bg-surface); color: var(--text-main);">⚡ Vobiz Telecom (Default)</option>
+            <option value="exotel" style="background: var(--bg-surface); color: var(--text-main);">🏢 Exotel (India &amp; Global)</option>
+            <option value="twilio" style="background: var(--bg-surface); color: var(--text-main);">🌐 Twilio (International / US)</option>
+          </select>
+        </div>
 
-          <div style="font-size: 0.82rem; font-weight: 600; color: var(--color-cyan); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+        <!-- Vobiz Credentials Container -->
+        <div id="assign-number-vobiz-creds-container" style="background: rgba(6, 182, 212, 0.04); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 12px; padding: 12px; margin-bottom: 14px;">
+          <div style="font-size: 0.82rem; font-weight: 700; color: var(--color-cyan); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
             🔑 Custom Vobiz Account Credentials <span style="font-size: 0.7rem; font-weight: normal; color: var(--text-muted);">(Optional)</span>
           </div>
           <div style="margin-bottom: 10px;">
             <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Vobiz Auth ID (API Username)</label>
             <input type="text" id="assign-number-auth-id" class="premium-modal-input" placeholder="e.g. MA_5VY3LRDW (Blank = Default Global)">
           </div>
-          <div style="margin-bottom: 15px;">
+          <div style="margin-bottom: 4px;">
             <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Vobiz Auth Token (API Password)</label>
             <input type="password" id="assign-number-auth-token" class="premium-modal-input" placeholder="e.g. your_vobiz_token (Blank = Default Global)">
+          </div>
+        </div>
+
+        <!-- Exotel Credentials Container -->
+        <div id="assign-number-exotel-creds-container" style="display: none; background: rgba(249, 115, 22, 0.04); border: 1px solid rgba(249, 115, 22, 0.25); border-radius: 12px; padding: 12px; margin-bottom: 14px;">
+          <div style="font-size: 0.82rem; font-weight: 700; color: #f97316; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            🏢 Custom Exotel Account Credentials
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div>
+              <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Exotel API Key *</label>
+              <input type="text" id="assign-number-exotel-api-key" class="premium-modal-input" placeholder="e.g. 1a2b3c4d5e...">
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Exotel API Token *</label>
+              <input type="password" id="assign-number-exotel-api-token" class="premium-modal-input" placeholder="••••••••••••">
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px;">
+            <div>
+              <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Exotel Account SID *</label>
+              <input type="text" id="assign-number-exotel-account-sid" class="premium-modal-input" placeholder="e.g. your_account_sid">
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Subdomain / Cluster</label>
+              <input type="text" id="assign-number-exotel-subdomain" class="premium-modal-input" placeholder="api.exotel.com (or api.in.exotel.com)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Twilio Credentials Container -->
+        <div id="assign-number-twilio-creds-container" style="display: none; background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 12px; margin-bottom: 14px;">
+          <div style="font-size: 0.82rem; font-weight: 700; color: #ef4444; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            🌐 Custom Twilio Account Credentials
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Twilio Account SID</label>
+            <input type="text" id="assign-number-twilio-account-sid" class="premium-modal-input" placeholder="e.g. ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+          </div>
+          <div style="margin-bottom: 4px;">
+            <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Twilio Auth Token</label>
+            <input type="password" id="assign-number-twilio-auth-token" class="premium-modal-input" placeholder="••••••••••••">
           </div>
         </div>
 

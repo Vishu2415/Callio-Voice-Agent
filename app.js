@@ -9785,7 +9785,16 @@ async function fetchAdminClients() {
       const deleteActionBtn = `<button onclick="window.deleteClient('${client.id}', '${escapeHtml(client.name)}')" class="admin-action-btn admin-action-btn-delete" title="Delete Client">🗑️</button>`;
 
       const isWL = window.isWhitelabelDomain();
-      const customCredsBadge = (!isWL && client.vobiz_sub_auth_id) ? `<br><span style="font-size: 0.65rem; color: var(--color-cyan); background: rgba(6, 182, 212, 0.1); padding: 1px 4px; border-radius: 4px; font-weight: 600; display: inline-block; margin-top: 2px;">🔑 Custom Vobiz</span>` : '';
+      let customCredsBadge = '';
+      if (!isWL) {
+        if (client.provider === 'exotel' || client.exotel_api_key || client.exotel_account_sid) {
+          customCredsBadge = `<br><span style="font-size: 0.65rem; color: #f97316; background: rgba(249, 115, 22, 0.12); border: 1px solid rgba(249, 115, 22, 0.25); padding: 1px 5px; border-radius: 4px; font-weight: 700; display: inline-block; margin-top: 2px;">🏢 Custom Exotel</span>`;
+        } else if (client.provider === 'twilio' || client.twilio_account_sid) {
+          customCredsBadge = `<br><span style="font-size: 0.65rem; color: #ef4444; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.25); padding: 1px 5px; border-radius: 4px; font-weight: 700; display: inline-block; margin-top: 2px;">🌐 Custom Twilio</span>`;
+        } else if (client.vobiz_sub_auth_id) {
+          customCredsBadge = `<br><span style="font-size: 0.65rem; color: var(--color-cyan); background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.25); padding: 1px 5px; border-radius: 4px; font-weight: 700; display: inline-block; margin-top: 2px;">⚡ Custom Vobiz</span>`;
+        }
+      }
       const resellerBadge = client.reseller_name ? `<span style="font-size: 0.65rem; color: #c084fc; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); padding: 1px 5px; border-radius: 4px; font-weight: 600; margin-left: 6px; display: inline-block;">🏷️ ${escapeHtml(client.reseller_name)}</span>` : '';
       const assignBtnText = isWL ? '📱 Assign Number' : '📞 Telephony & Credentials';
 
@@ -9812,7 +9821,7 @@ async function fetchAdminClients() {
           <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
             <button onclick="window.openRechargeModal('${client.id}', '${escapeHtml(client.name)}')" class="admin-action-btn admin-action-btn-recharge">Recharge</button>
             <button onclick="window.openPricingModal('${client.id}', '${escapeHtml(client.name)}', ${rates.rate_per_minute}, ${rates.rate_recording_per_minute}, ${rates.rate_per_session}, '${client.plan || 'basic'}')" class="admin-action-btn admin-action-btn-pricing">Pricing &amp; Plan</button>
-            <button onclick="window.openAssignNumberModal('${client.id}', '${escapeHtml(client.name)}', '${escapeHtml(client.phone_number || '')}', '${escapeHtml(client.vobiz_sub_auth_id || '')}', '${escapeHtml(client.vobiz_sub_auth_token || '')}')" class="admin-action-btn" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c084fc;">${assignBtnText}</button>
+            <button onclick="window.openAssignNumberModal('${client.id}', '${escapeHtml(client.name)}', '${escapeHtml(client.phone_number || '')}', '${escapeHtml(client.vobiz_sub_auth_id || '')}', '${escapeHtml(client.vobiz_sub_auth_token || '')}', '${escapeHtml(client.provider || '')}', '${escapeHtml(client.exotel_api_key || '')}', '${escapeHtml(client.exotel_api_token || '')}', '${escapeHtml(client.exotel_account_sid || '')}', '${escapeHtml(client.exotel_subdomain || '')}', '${escapeHtml(client.twilio_account_sid || '')}', '${escapeHtml(client.twilio_auth_token || '')}')" class="admin-action-btn" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c084fc;">${assignBtnText}</button>
             <button onclick="window.adminResetPassword('${client.id}', '${escapeHtml(client.name)}')" class="admin-action-btn" style="background: rgba(234, 179, 8, 0.15); border: 1px solid rgba(234, 179, 8, 0.3); color: #facc15;">🔑 Password</button>
             <button onclick="impersonateUser('${client.id}')" class="admin-action-btn admin-action-btn-impersonate">Impersonate</button>
             ${statusActionBtn}
@@ -9853,7 +9862,7 @@ window.submitRecharge = async function(event) {
     });
     const data = await res.json();
     if (data.success) {
-      alert('Wallet recharged successfully!');
+      alert(`Successfully recharged ₹${amount} for ${data.client.name}! New Balance: ₹${data.client.balance}`);
       window.closeRechargeModal();
       fetchAdminClients(); // Refresh client table in Admin Panel
     } else {
@@ -9918,10 +9927,16 @@ window.applyWhitelabelUiRestrictions = function() {
     resellerTab.style.display = isWL ? 'none' : 'inline-block';
   }
 
-  // 4. Modal Vobiz Credentials Container
+  // 4. Modal Telephony Provider & Credentials Containers
+  const providerRow = document.getElementById('assign-number-provider-row');
   const vobizCredsSection = document.getElementById('assign-number-vobiz-creds-container');
-  if (vobizCredsSection) {
-    vobizCredsSection.style.display = isWL ? 'none' : 'block';
+  const exotelCredsSection = document.getElementById('assign-number-exotel-creds-container');
+  const twilioCredsSection = document.getElementById('assign-number-twilio-creds-container');
+  if (providerRow) providerRow.style.display = isWL ? 'none' : 'block';
+  if (isWL) {
+    if (vobizCredsSection) vobizCredsSection.style.display = 'none';
+    if (exotelCredsSection) exotelCredsSection.style.display = 'none';
+    if (twilioCredsSection) twilioCredsSection.style.display = 'none';
   }
 
   // 5. Modal Header Title
@@ -9931,18 +9946,65 @@ window.applyWhitelabelUiRestrictions = function() {
   }
 };
 
-// --- Assign Number & Telephony Credentials Modal ---
-window.openAssignNumberModal = function(clientId, clientName, currentNumber, subAuthId, subAuthToken) {
-  window.applyWhitelabelUiRestrictions();
-  document.getElementById('assign-number-client-id').value = clientId;
-  document.getElementById('assign-number-client-name').value = clientName;
-  document.getElementById('assign-number-new-input').value = currentNumber || '';
-  document.getElementById('assign-number-quick-select').value = '';
-  document.getElementById('assign-number-auth-id').value = subAuthId || '';
-  document.getElementById('assign-number-auth-token').value = subAuthToken || '';
-  document.getElementById('admin-assign-number-modal').style.display = 'flex';
+// Toggle provider credentials section inside assign number modal
+window.onTelephonyProviderChange = function(provider) {
+  const isWL = window.isWhitelabelDomain();
+  if (isWL) return;
+  const vobizContainer = document.getElementById('assign-number-vobiz-creds-container');
+  const exotelContainer = document.getElementById('assign-number-exotel-creds-container');
+  const twilioContainer = document.getElementById('assign-number-twilio-creds-container');
+
+  if (vobizContainer) vobizContainer.style.display = provider === 'vobiz' ? 'block' : 'none';
+  if (exotelContainer) exotelContainer.style.display = provider === 'exotel' ? 'block' : 'none';
+  if (twilioContainer) twilioContainer.style.display = provider === 'twilio' ? 'block' : 'none';
 };
 
+// --- Assign Number & Telephony Credentials Modal ---
+window.openAssignNumberModal = function(clientId, clientName, currentNumber, subAuthId, subAuthToken, provider, exotelApiKey, exotelApiToken, exotelAccountSid, exotelSubdomain, twilioAccountSid, twilioAuthToken) {
+  window.applyWhitelabelUiRestrictions();
+
+  let activeProvider = provider || 'vobiz';
+  if (!provider) {
+    if (exotelApiKey || exotelAccountSid) activeProvider = 'exotel';
+    else if (twilioAccountSid) activeProvider = 'twilio';
+    else activeProvider = 'vobiz';
+  }
+
+  document.getElementById('assign-number-client-id').value = clientId || '';
+  document.getElementById('assign-number-client-name').value = clientName || '';
+  document.getElementById('assign-number-new-input').value = currentNumber || '';
+  document.getElementById('assign-number-quick-select').value = '';
+
+  const providerSelect = document.getElementById('assign-number-provider-select');
+  if (providerSelect) {
+    providerSelect.value = activeProvider;
+  }
+  window.onTelephonyProviderChange(activeProvider);
+
+  // Vobiz
+  const vAuthIdEl = document.getElementById('assign-number-auth-id');
+  const vAuthTokEl = document.getElementById('assign-number-auth-token');
+  if (vAuthIdEl) vAuthIdEl.value = subAuthId || '';
+  if (vAuthTokEl) vAuthTokEl.value = subAuthToken || '';
+
+  // Exotel
+  const exoKeyEl = document.getElementById('assign-number-exotel-api-key');
+  const exoTokEl = document.getElementById('assign-number-exotel-api-token');
+  const exoSidEl = document.getElementById('assign-number-exotel-account-sid');
+  const exoSubEl = document.getElementById('assign-number-exotel-subdomain');
+  if (exoKeyEl) exoKeyEl.value = exotelApiKey || '';
+  if (exoTokEl) exoTokEl.value = exotelApiToken || '';
+  if (exoSidEl) exoSidEl.value = exotelAccountSid || '';
+  if (exoSubEl) exoSubEl.value = exotelSubdomain || 'api.exotel.com';
+
+  // Twilio
+  const twiSidEl = document.getElementById('assign-number-twilio-account-sid');
+  const twiTokEl = document.getElementById('assign-number-twilio-auth-token');
+  if (twiSidEl) twiSidEl.value = twilioAccountSid || '';
+  if (twiTokEl) twiTokEl.value = twilioAuthToken || '';
+
+  document.getElementById('admin-assign-number-modal').style.display = 'flex';
+};
 
 window.closeAssignNumberModal = function() {
   document.getElementById('admin-assign-number-modal').style.display = 'none';
@@ -9952,8 +10014,18 @@ window.submitAssignNumberUpdate = async function(event) {
   event.preventDefault();
   const clientId = document.getElementById('assign-number-client-id').value;
   const phoneNumber = document.getElementById('assign-number-new-input').value.trim();
-  const vobizSubAuthId = document.getElementById('assign-number-auth-id').value.trim();
-  const vobizSubAuthToken = document.getElementById('assign-number-auth-token').value.trim();
+  const provider = document.getElementById('assign-number-provider-select')?.value || 'vobiz';
+
+  const vobizSubAuthId = document.getElementById('assign-number-auth-id')?.value.trim() || '';
+  const vobizSubAuthToken = document.getElementById('assign-number-auth-token')?.value.trim() || '';
+
+  const exotelApiKey = document.getElementById('assign-number-exotel-api-key')?.value.trim() || '';
+  const exotelApiToken = document.getElementById('assign-number-exotel-api-token')?.value.trim() || '';
+  const exotelAccountSid = document.getElementById('assign-number-exotel-account-sid')?.value.trim() || '';
+  const exotelSubdomain = document.getElementById('assign-number-exotel-subdomain')?.value.trim() || 'api.exotel.com';
+
+  const twilioAccountSid = document.getElementById('assign-number-twilio-account-sid')?.value.trim() || '';
+  const twilioAuthToken = document.getElementById('assign-number-twilio-auth-token')?.value.trim() || '';
 
   try {
     const res = await fetch('/api/admin/update-client', {
@@ -9962,8 +10034,15 @@ window.submitAssignNumberUpdate = async function(event) {
       body: JSON.stringify({
         clientId,
         phone_number: phoneNumber,
+        provider,
         vobiz_sub_auth_id: vobizSubAuthId,
-        vobiz_sub_auth_token: vobizSubAuthToken
+        vobiz_sub_auth_token: vobizSubAuthToken,
+        exotel_api_key: exotelApiKey,
+        exotel_api_token: exotelApiToken,
+        exotel_account_sid: exotelAccountSid,
+        exotel_subdomain: exotelSubdomain,
+        twilio_account_sid: twilioAccountSid,
+        twilio_auth_token: twilioAuthToken
       })
     });
     const data = await res.json();
