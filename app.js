@@ -3738,102 +3738,68 @@ window.openContactMemoryModal = async function(phone, name) {
     const logs = Array.isArray(mem.recent_logs) ? mem.recent_logs : [];
     const totalCalls = mem.total_calls_count || logs.length;
     const relationshipSummary = mem.overall_relationship_summary || mem.latest_call_summary || 'No recorded conversation summary yet.';
+    const latestLog = logs.length > 0 ? logs[0] : null;
+
+    let sentimentColor = 'rgba(6,182,212,0.15)';
+    let sentimentTextColor = '#06b6d4';
+    let sentimentText = 'NEUTRAL';
+    if (latestLog && latestLog.customer_sentiment) {
+      sentimentText = latestLog.customer_sentiment;
+      if (sentimentText === 'POSITIVE') {
+        sentimentColor = 'rgba(34,197,94,0.15)';
+        sentimentTextColor = '#22c55e';
+      } else if (sentimentText === 'NEGATIVE') {
+        sentimentColor = 'rgba(239,68,68,0.15)';
+        sentimentTextColor = '#ef4444';
+      }
+    }
+
+    // Format markdown-like headings and bullets cleanly
+    let formattedSummaryHtml = escapeHtml(relationshipSummary)
+      .replace(/###\s*([^\n]+)/g, '<div style="font-size: 0.92rem; font-weight: 800; color: var(--color-cyan, #06b6d4); margin-top: 10px; margin-bottom: 4px;">$1</div>')
+      .replace(/\*\*([^\*]+)\*\*/g, '<strong style="color: var(--text-main, #fff); font-weight: 700;">$1</strong>')
+      .replace(/•\s*([^\n]+)/g, '<div style="display: flex; gap: 8px; margin-bottom: 4px;"><span style="color: var(--color-coral, #ff6b4a);">•</span><span>$1</span></div>')
+      .replace(/\n\n/g, '<br/>');
 
     let html = `
-      <!-- Top AI Rolling Summary Banner -->
-      <div style="background: linear-gradient(135deg, rgba(255, 107, 74, 0.08), rgba(6, 182, 212, 0.08)); border: 1px solid rgba(255, 107, 74, 0.25); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="background: rgba(255,107,74,0.2); color: #ff6b4a; font-size: 0.72rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(255,107,74,0.4); text-transform: uppercase; letter-spacing: 0.4px;">
-              🧠 Rolling AI Memory
-            </span>
-            <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-main);">
-              ${totalCalls} Call${totalCalls === 1 ? '' : 's'} Total
-            </span>
-          </div>
-          ${mem.last_call_at ? `<div style="font-size: 0.75rem; color: var(--text-muted);">Last Call: <strong>${new Date(mem.last_call_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</strong> (${mem.last_call_direction || 'CONNECTED'})</div>` : ''}
+      <!-- Top Overview Badges Bar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 16px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 14px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="background: rgba(255,107,74,0.2); color: #ff6b4a; font-size: 0.75rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(255,107,74,0.4); text-transform: uppercase; letter-spacing: 0.4px;">
+            🧠 Unified AI Memory
+          </span>
+          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-main);">
+            📞 ${totalCalls} Call${totalCalls === 1 ? '' : 's'} Logged
+          </span>
         </div>
-        <div style="font-size: 0.88rem; line-height: 1.55; color: var(--text-main); font-weight: 500;">
-          ${escapeHtml(relationshipSummary)}
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; font-weight: 700; background: ${sentimentColor}; color: ${sentimentTextColor};">
+            ${sentimentText}
+          </span>
+          ${mem.last_call_at ? `<span style="font-size: 0.75rem; color: var(--text-muted);">📅 ${new Date(mem.last_call_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} (${mem.last_call_direction || 'CONNECTED'})</span>` : ''}
         </div>
       </div>
 
-      <!-- Call History Timeline Section -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
-        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
-          <span>📜</span> Call History & Summaries (${logs.length})
-        </h4>
+      <!-- Single Comprehensive Rolling AI Summary Card -->
+      <div style="background: linear-gradient(135deg, rgba(255, 107, 74, 0.06), rgba(6, 182, 212, 0.06)); border: 1px solid rgba(255, 107, 74, 0.25); border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+        <div style="font-size: 0.86rem; line-height: 1.6; color: var(--text-main); font-weight: 400;">
+          ${formattedSummaryHtml}
+        </div>
       </div>
+
+      <!-- Latest Audio Recording Player (if available) -->
+      ${latestLog && latestLog.recording_url ? `
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+              <span>🎧</span> Latest Call Audio Recording
+            </div>
+            <span style="font-size: 0.74rem; color: var(--text-muted); font-family: var(--font-mono);">${latestLog.duration_seconds || 0}s</span>
+          </div>
+          <audio controls src="${escapeHtml(latestLog.recording_url)}" style="width: 100%; height: 34px; border-radius: 6px;"></audio>
+        </div>
+      ` : ''}
     `;
-
-    if (logs.length === 0) {
-      html += `
-        <div style="text-align: center; padding: 30px 16px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); border-radius: 12px;">
-          <div style="font-size: 1.8rem; margin-bottom: 6px;">📞</div>
-          <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">No Recorded Calls Yet</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; max-width: 320px; margin-left: auto; margin-right: auto;">
-            When this contact receives an inbound call or an outbound/broadcast call is placed, the isolated AI summary will appear here automatically.
-          </div>
-        </div>
-      `;
-    } else {
-      html += `<div style="display: flex; flex-direction: column; gap: 12px;">`;
-      logs.forEach((log, idx) => {
-        const dateStr = log.created_at ? new Date(log.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-        const durSec = log.duration_seconds || 0;
-        const durStr = durSec > 0 ? `${Math.floor(durSec / 60)}m ${durSec % 60}s` : `${durSec}s`;
-        
-        let sentimentColor = 'rgba(156,163,175,0.2)';
-        let sentimentTextColor = '#9ca3af';
-        const s = (log.customer_sentiment || '').toUpperCase();
-        if (s === 'POSITIVE') {
-          sentimentColor = 'rgba(34,197,94,0.15)';
-          sentimentTextColor = '#22c55e';
-        } else if (s === 'NEGATIVE') {
-          sentimentColor = 'rgba(239,68,68,0.15)';
-          sentimentTextColor = '#ef4444';
-        } else if (s === 'NEUTRAL') {
-          sentimentColor = 'rgba(6,182,212,0.15)';
-          sentimentTextColor = '#06b6d4';
-        }
-
-        const cleanSummary = (log.call_summary || '').replace(/\*\*/g, '').trim() || 'Connected call completed.';
-
-        html += `
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-weight: 700; font-size: 0.82rem; color: var(--text-main);">
-                  Call #${logs.length - idx}
-                </span>
-                <span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 6px; font-weight: 700; background: rgba(255,255,255,0.06); color: var(--text-muted); border: 1px solid var(--border-color);">
-                  ${log.call_direction || 'CONNECTED'}
-                </span>
-                <span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 6px; font-weight: 700; background: ${sentimentColor}; color: ${sentimentTextColor};">
-                  ${log.customer_sentiment || 'NEUTRAL'}
-                </span>
-              </div>
-              <div style="font-size: 0.76rem; color: var(--text-muted); font-family: var(--font-mono);">
-                ⏱️ ${durStr} &nbsp;•&nbsp; 📅 ${dateStr}
-              </div>
-            </div>
-
-            <!-- Summary Text -->
-            <div style="font-size: 0.84rem; line-height: 1.5; color: var(--text-main); white-space: pre-line; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
-              ${escapeHtml(cleanSummary)}
-            </div>
-
-            <!-- Audio Recording (if present) -->
-            ${log.recording_url ? `
-              <div style="margin-top: 4px;">
-                <audio controls src="${escapeHtml(log.recording_url)}" style="width: 100%; height: 32px; border-radius: 6px;"></audio>
-              </div>
-            ` : ''}
-          </div>
-        `;
-      });
-      html += `</div>`;
-    }
 
     elBody.innerHTML = html;
   } catch (err) {

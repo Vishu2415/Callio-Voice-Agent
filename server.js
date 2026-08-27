@@ -785,6 +785,58 @@ ${logsFormatted}
 4. Do NOT ask basic introductory questions that the customer already answered in previous calls!`;
 }
 
+function buildUnifiedCustomerSummary(logs, contactName = 'Customer', phone = '') {
+  if (!Array.isArray(logs) || logs.length === 0) {
+    return 'No previous call recordings or discussions found for this contact.';
+  }
+
+  const allPoints = [];
+  let detectedIntent = '';
+  let latestVerdict = '';
+  let latestNextAction = '';
+  let overallSentiment = 'NEUTRAL';
+
+  // Process from oldest to newest to understand chronological evolution
+  const chronological = [...logs].reverse();
+  chronological.forEach(l => {
+    const sum = l.call_summary || '';
+    if (!sum) return;
+
+    if (sum.includes('NOT INTERESTED')) latestVerdict = 'Not Interested / Busy currently';
+    else if (sum.includes('HIGH') || sum.includes('INTERESTED') || sum.includes('DEMO')) latestVerdict = 'Interested in AI Voice Agent Demo & Pricing';
+    else if (sum.includes('UNDECIDED') || sum.includes('CALLBACK')) latestVerdict = 'Follow-up Callback Scheduled';
+
+    if (l.customer_sentiment === 'POSITIVE') overallSentiment = 'POSITIVE';
+
+    // Extract Key Points cleanly
+    const lines = sum.split('\n');
+    lines.forEach(line => {
+      const clean = line.replace(/^[\*\-\•\d\.\s]+/, '').trim();
+      if (clean && clean.length > 8 && !clean.toUpperCase().startsWith('VERDICT') && !clean.toUpperCase().startsWith('CUSTOMER_NAME') && !clean.toUpperCase().startsWith('NEXT ACTION')) {
+        if (!allPoints.includes(clean)) allPoints.push(clean);
+      }
+      if (clean.toLowerCase().includes('demo') || clean.toLowerCase().includes('pricing') || clean.toLowerCase().includes('plan') || clean.toLowerCase().includes('voice')) {
+        if (!detectedIntent) detectedIntent = clean;
+      }
+      if (line.toUpperCase().includes('NEXT ACTION:')) {
+        latestNextAction = line.replace(/.*?NEXT ACTION:\s*/i, '').replace(/[\*\_]/g, '').trim();
+      }
+    });
+  });
+
+  const name = contactName || 'Customer';
+  const pointsFormatted = allPoints.slice(0, 4).map(p => `• ${p}`).join('\n');
+
+  return `### 📌 Customer Profile & Intent:
+${name} has interacted ${logs.length} time(s). ${detectedIntent ? `Primary interest: ${detectedIntent}.` : 'Inquired about AI Voice Agent solutions.'}
+
+### 💬 Unified Conversation Summary:
+${pointsFormatted || `• Discussed service offerings and customer requirements across ${logs.length} interaction(s).`}
+
+### 🎯 Current Status & Next Steps:
+${latestNextAction || `Latest Outcome: ${latestVerdict || 'Follow-up as needed'}. Continue conversation seamlessly from previous context.`}`;
+}
+
 // --- Universal Post-Call Memory Aggregator & Updater ---
 function updateContactMemoryOnCallEnd(callState) {
   if (!callState) return;
@@ -882,18 +934,12 @@ function updateContactMemoryOnCallEnd(callState) {
     existingMemory.contact_name = callState.customerName;
   }
 
-  // Re-roll relationship summary
+  // Re-roll consolidated single relationship summary
   const allLogsForContact = Array.from(contactCallLogsDb.values())
     .filter(l => l.contact_phone === phoneKey || (l.raw_phone && normalizeContactPhone(l.raw_phone) === phoneKey))
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-  const recentSummaries = allLogsForContact.slice(0, 4).map((l, idx) => {
-    const dateStr = new Date(l.created_at).toISOString().split('T')[0];
-    const cleanSum = (l.call_summary || '').split('\n')[0].replace(/[\*\_]/g, '').trim();
-    return `Call ${allLogsForContact.length - idx} (${dateStr}, ${l.call_direction}): ${cleanSum || 'Connected call'}`;
-  }).reverse();
-
-  existingMemory.overall_relationship_summary = `Customer has completed ${existingMemory.total_calls_count} calls. Recent summary: ${recentSummaries.join(' | ')}`;
+  existingMemory.overall_relationship_summary = buildUnifiedCustomerSummary(allLogsForContact, existingMemory.contact_name, phoneKey);
   existingMemory.updated_at = new Date().toISOString();
 
   contactsMemoryDb.set(phoneKey, existingMemory);
@@ -991,13 +1037,7 @@ function syncHistoricalCallsToMemory() {
         if (contact && contact.name) mem.contact_name = contact.name;
       }
 
-      const recentSummaries = logs.slice(0, 3).map((l, idx) => {
-        const dateStr = new Date(l.created_at).toISOString().split('T')[0];
-        const cleanSum = (l.call_summary || '').split('\n')[0].replace(/[\*\_]/g, '').trim();
-        return `[${dateStr} | ${l.call_direction}]: ${cleanSum || 'Connected call'}`;
-      }).reverse();
-
-      mem.overall_relationship_summary = `Customer has completed ${logs.length} previous call(s). Recent history: ${recentSummaries.join('; ')}`;
+      mem.overall_relationship_summary = buildUnifiedCustomerSummary(logs, mem.contact_name, phoneKey);
     }
   }
   saveContactsMemory();
