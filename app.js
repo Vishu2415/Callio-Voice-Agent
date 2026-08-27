@@ -3505,6 +3505,14 @@ window.filterContactsByTag = function(tag, btnEl) {
   window.renderAllContactsTable();
 };
 
+window.contactsCurrentPage = 1;
+window.CONTACTS_PAGE_SIZE = 30;
+
+window.goToContactsPage = function(pageNum) {
+  window.contactsCurrentPage = pageNum;
+  window.renderAllContactsTable();
+};
+
 window.renderAllContactsTable = function() {
   const tbody = document.getElementById('all-contacts-table-body');
   if (!tbody) return;
@@ -3547,8 +3555,71 @@ window.renderAllContactsTable = function() {
   }
 
   const list = window.getFilteredContactsList();
+  const totalItems = list.length;
+  const pageSize = window.CONTACTS_PAGE_SIZE || 30;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
 
-  if (list.length === 0) {
+  if (window.contactsCurrentPage > totalPages) {
+    window.contactsCurrentPage = totalPages;
+  }
+  if (window.contactsCurrentPage < 1) {
+    window.contactsCurrentPage = 1;
+  }
+
+  const startIndex = (window.contactsCurrentPage - 1) * pageSize;
+  const paginatedList = list.slice(startIndex, startIndex + pageSize);
+
+  // Update Pagination Controls Info & Buttons
+  const paginationInfo = document.getElementById('contacts-pagination-info');
+  const paginationButtons = document.getElementById('contacts-pagination-buttons');
+  if (paginationInfo) {
+    if (totalItems === 0) {
+      paginationInfo.innerText = 'Showing 0-0 of 0 contacts';
+    } else {
+      const startDisplay = startIndex + 1;
+      const endDisplay = Math.min(startIndex + pageSize, totalItems);
+      paginationInfo.innerText = `Showing ${startDisplay}-${endDisplay} of ${totalItems} contacts (Page ${window.contactsCurrentPage} of ${totalPages})`;
+    }
+  }
+
+  if (paginationButtons) {
+    if (totalPages <= 1) {
+      paginationButtons.innerHTML = '';
+    } else {
+      let btnsHtml = `
+        <button class="btn btn-secondary" onclick="window.goToContactsPage(${window.contactsCurrentPage - 1})" ${window.contactsCurrentPage === 1 ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' : 'style="cursor: pointer;"'} style="padding: 5px 12px; font-size: 0.78rem; border-radius: 8px; font-weight: 600;">
+          ◀ Prev
+        </button>
+      `;
+
+      for (let p = 1; p <= totalPages; p++) {
+        if (totalPages > 7) {
+          if (p !== 1 && p !== totalPages && Math.abs(p - window.contactsCurrentPage) > 2) {
+            if (p === 2 || p === totalPages - 1) {
+              btnsHtml += `<span style="color: var(--text-muted); padding: 0 4px;">...</span>`;
+            }
+            continue;
+          }
+        }
+        const isCurrent = p === window.contactsCurrentPage;
+        btnsHtml += `
+          <button class="btn ${isCurrent ? 'btn-primary' : 'btn-secondary'}" onclick="window.goToContactsPage(${p})" style="padding: 5px 11px; font-size: 0.78rem; border-radius: 8px; font-weight: 700; ${isCurrent ? 'background: var(--color-cyan, #06b6d4); color: #000;' : 'cursor: pointer;'}">
+            ${p}
+          </button>
+        `;
+      }
+
+      btnsHtml += `
+        <button class="btn btn-secondary" onclick="window.goToContactsPage(${window.contactsCurrentPage + 1})" ${window.contactsCurrentPage === totalPages ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' : 'style="cursor: pointer;"'} style="padding: 5px 12px; font-size: 0.78rem; border-radius: 8px; font-weight: 600;">
+          Next ▶
+        </button>
+      `;
+
+      paginationButtons.innerHTML = btnsHtml;
+    }
+  }
+
+  if (totalItems === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="5" style="text-align: center; padding: 3.5rem 1.5rem; color: var(--text-muted);">
@@ -3567,7 +3638,7 @@ window.renderAllContactsTable = function() {
   }
 
   let html = '';
-  list.forEach(c => {
+  paginatedList.forEach(c => {
     const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }) : '—';
     const tags = window.getContactTagsArray(c).filter(t => t && t.toLowerCase() !== 'default');
 
@@ -3597,7 +3668,10 @@ window.renderAllContactsTable = function() {
           </div>
         </td>
         <td style="color: var(--text-muted); font-size: 0.82rem;">${dateStr}</td>
-        <td style="text-align: right;">
+        <td style="text-align: right; white-space: nowrap;">
+          <button class="btn btn-secondary" onclick="window.openContactMemoryModal('${escapeHtml(c.phone || '')}', '${escapeHtml(c.name || '')}')" title="View Call Summary & Memory" style="padding: 4px 10px; font-size: 0.75rem; font-weight: 700; border-radius: 7px; background: rgba(255, 107, 74, 0.12); color: #ff6b4a; border: 1px solid rgba(255, 107, 74, 0.3); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; transition: all 0.2s;">
+            🧠 Summary
+          </button>
           <button class="btn btn-secondary btn-icon" onclick="window.openEditContactModal('${c.id}')" title="Edit Contact Name, Phone & Tags" style="padding: 4px 8px; color: var(--color-cyan); border-color: rgba(6,182,212,0.2); background: rgba(6,182,212,0.08); border-radius: 6px; cursor: pointer; margin-right: 4px;">
             ✏️
           </button>
@@ -3610,6 +3684,147 @@ window.renderAllContactsTable = function() {
   });
 
   tbody.innerHTML = html;
+};
+
+// --- Contact Call Summary & AI Memory Modal ---
+window.openContactMemoryModal = async function(phone, name) {
+  const modal = document.getElementById('contact-memory-modal');
+  const elName = document.getElementById('cm-contact-name');
+  const elPhone = document.getElementById('cm-contact-phone');
+  const elBody = document.getElementById('cm-modal-body');
+  if (!modal || !elBody) return;
+
+  if (elName) elName.innerText = name || 'Contact';
+  if (elPhone) elPhone.innerText = phone || '—';
+  
+  modal.style.display = 'flex';
+  elBody.innerHTML = `
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 0; gap: 12px;">
+      <div class="loading-spinner" style="width: 32px; height: 32px; border: 3px solid rgba(255,107,74,0.2); border-top-color: var(--color-coral, #ff6b4a); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Fetching AI memory & call history...</div>
+    </div>
+  `;
+
+  try {
+    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+    const res = await fetch(`/api/contacts/${encodeURIComponent(cleanPhone)}/memory`);
+    const data = await res.json();
+
+    if (!data.success) {
+      elBody.innerHTML = `<div style="color: var(--color-red); text-align: center; padding: 20px;">Failed to load memory: ${escapeHtml(data.error || 'Unknown error')}</div>`;
+      return;
+    }
+
+    const mem = data.memory || {};
+    const logs = Array.isArray(mem.recent_logs) ? mem.recent_logs : [];
+    const totalCalls = mem.total_calls_count || logs.length;
+    const relationshipSummary = mem.overall_relationship_summary || mem.latest_call_summary || 'No recorded conversation summary yet.';
+
+    let html = `
+      <!-- Top AI Rolling Summary Banner -->
+      <div style="background: linear-gradient(135deg, rgba(255, 107, 74, 0.08), rgba(6, 182, 212, 0.08)); border: 1px solid rgba(255, 107, 74, 0.25); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="background: rgba(255,107,74,0.2); color: #ff6b4a; font-size: 0.72rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(255,107,74,0.4); text-transform: uppercase; letter-spacing: 0.4px;">
+              🧠 Rolling AI Memory
+            </span>
+            <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-main);">
+              ${totalCalls} Call${totalCalls === 1 ? '' : 's'} Total
+            </span>
+          </div>
+          ${mem.last_call_at ? `<div style="font-size: 0.75rem; color: var(--text-muted);">Last Call: <strong>${new Date(mem.last_call_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</strong> (${mem.last_call_direction || 'CONNECTED'})</div>` : ''}
+        </div>
+        <div style="font-size: 0.88rem; line-height: 1.55; color: var(--text-main); font-weight: 500;">
+          ${escapeHtml(relationshipSummary)}
+        </div>
+      </div>
+
+      <!-- Call History Timeline Section -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+          <span>📜</span> Call History & Summaries (${logs.length})
+        </h4>
+      </div>
+    `;
+
+    if (logs.length === 0) {
+      html += `
+        <div style="text-align: center; padding: 30px 16px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); border-radius: 12px;">
+          <div style="font-size: 1.8rem; margin-bottom: 6px;">📞</div>
+          <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">No Recorded Calls Yet</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; max-width: 320px; margin-left: auto; margin-right: auto;">
+            When this contact receives an inbound call or an outbound/broadcast call is placed, the isolated AI summary will appear here automatically.
+          </div>
+        </div>
+      `;
+    } else {
+      html += `<div style="display: flex; flex-direction: column; gap: 12px;">`;
+      logs.forEach((log, idx) => {
+        const dateStr = log.created_at ? new Date(log.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+        const durSec = log.duration_seconds || 0;
+        const durStr = durSec > 0 ? `${Math.floor(durSec / 60)}m ${durSec % 60}s` : `${durSec}s`;
+        
+        let sentimentColor = 'rgba(156,163,175,0.2)';
+        let sentimentTextColor = '#9ca3af';
+        const s = (log.customer_sentiment || '').toUpperCase();
+        if (s === 'POSITIVE') {
+          sentimentColor = 'rgba(34,197,94,0.15)';
+          sentimentTextColor = '#22c55e';
+        } else if (s === 'NEGATIVE') {
+          sentimentColor = 'rgba(239,68,68,0.15)';
+          sentimentTextColor = '#ef4444';
+        } else if (s === 'NEUTRAL') {
+          sentimentColor = 'rgba(6,182,212,0.15)';
+          sentimentTextColor = '#06b6d4';
+        }
+
+        const cleanSummary = (log.call_summary || '').replace(/\*\*/g, '').trim() || 'Connected call completed.';
+
+        html += `
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-weight: 700; font-size: 0.82rem; color: var(--text-main);">
+                  Call #${logs.length - idx}
+                </span>
+                <span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 6px; font-weight: 700; background: rgba(255,255,255,0.06); color: var(--text-muted); border: 1px solid var(--border-color);">
+                  ${log.call_direction || 'CONNECTED'}
+                </span>
+                <span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 6px; font-weight: 700; background: ${sentimentColor}; color: ${sentimentTextColor};">
+                  ${log.customer_sentiment || 'NEUTRAL'}
+                </span>
+              </div>
+              <div style="font-size: 0.76rem; color: var(--text-muted); font-family: var(--font-mono);">
+                ⏱️ ${durStr} &nbsp;•&nbsp; 📅 ${dateStr}
+              </div>
+            </div>
+
+            <!-- Summary Text -->
+            <div style="font-size: 0.84rem; line-height: 1.5; color: var(--text-main); white-space: pre-line; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
+              ${escapeHtml(cleanSummary)}
+            </div>
+
+            <!-- Audio Recording (if present) -->
+            ${log.recording_url ? `
+              <div style="margin-top: 4px;">
+                <audio controls src="${escapeHtml(log.recording_url)}" style="width: 100%; height: 32px; border-radius: 6px;"></audio>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+
+    elBody.innerHTML = html;
+  } catch (err) {
+    elBody.innerHTML = `<div style="color: var(--color-red); text-align: center; padding: 20px;">Error loading memory: ${escapeHtml(err.message)}</div>`;
+  }
+};
+
+window.closeContactMemoryModal = function() {
+  const modal = document.getElementById('contact-memory-modal');
+  if (modal) modal.style.display = 'none';
 };
 
 // Sub-Tab Switcher: All Contacts vs Tag Management
