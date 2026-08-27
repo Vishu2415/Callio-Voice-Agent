@@ -4196,6 +4196,24 @@
       var modal = document.getElementById('edit-contact-modal-v2');
       if (modal) modal.style.setProperty('display', 'none', 'important');
     };
+
+    window.closeContactMemoryModal = function() {
+      var modal = document.getElementById('contact-memory-modal');
+      if (modal) modal.style.setProperty('display', 'none', 'important');
+    };
+
+    window.openContactMemoryModalById = function(contactId) {
+      if (typeof window.getAllContactsList === 'function') {
+        var all = window.getAllContactsList();
+        var contact = all.find(function(c) { return c && (c.id === contactId || c.phone === contactId); });
+        var phone = contact ? (contact.phone || '') : contactId;
+        var name = contact ? (contact.name || '') : 'Contact';
+        if (typeof window.openContactMemoryModal === 'function') {
+          window.openContactMemoryModal(phone, name);
+          return;
+        }
+      }
+    };
   </script>
 
   <!-- Modal: Contact Call Summary & AI Memory -->

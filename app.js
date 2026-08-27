@@ -3669,7 +3669,7 @@ window.renderAllContactsTable = function() {
         </td>
         <td style="color: var(--text-muted); font-size: 0.82rem;">${dateStr}</td>
         <td style="text-align: right; white-space: nowrap;">
-          <button class="btn btn-secondary" onclick="window.openContactMemoryModal('${escapeHtml(c.phone || '')}', '${escapeHtml(c.name || '')}')" title="View Call Summary & Memory" style="padding: 4px 10px; font-size: 0.75rem; font-weight: 700; border-radius: 7px; background: rgba(255, 107, 74, 0.12); color: #ff6b4a; border: 1px solid rgba(255, 107, 74, 0.3); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; transition: all 0.2s;">
+          <button class="btn btn-secondary" onclick="window.openContactMemoryModalById('${c.id}')" title="View Call Summary & Memory" style="padding: 4px 10px; font-size: 0.75rem; font-weight: 700; border-radius: 7px; background: rgba(255, 107, 74, 0.12); color: #ff6b4a; border: 1px solid rgba(255, 107, 74, 0.3); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; transition: all 0.2s;">
             🧠 Summary
           </button>
           <button class="btn btn-secondary btn-icon" onclick="window.openEditContactModal('${c.id}')" title="Edit Contact Name, Phone & Tags" style="padding: 4px 8px; color: var(--color-cyan); border-color: rgba(6,182,212,0.2); background: rgba(6,182,212,0.08); border-radius: 6px; cursor: pointer; margin-right: 4px;">
@@ -3687,6 +3687,14 @@ window.renderAllContactsTable = function() {
 };
 
 // --- Contact Call Summary & AI Memory Modal ---
+window.openContactMemoryModalById = function(contactId) {
+  const all = (typeof window.getAllContactsList === 'function') ? window.getAllContactsList() : [];
+  const contact = all.find(c => c && (c.id === contactId || c.phone === contactId));
+  const phone = contact ? (contact.phone || '') : contactId;
+  const name = contact ? (contact.name || '') : 'Contact';
+  window.openContactMemoryModal(phone, name);
+};
+
 window.openContactMemoryModal = async function(phone, name) {
   const modal = document.getElementById('contact-memory-modal');
   const elName = document.getElementById('cm-contact-name');
@@ -3697,7 +3705,11 @@ window.openContactMemoryModal = async function(phone, name) {
   if (elName) elName.innerText = name || 'Contact';
   if (elPhone) elPhone.innerText = phone || '—';
   
-  modal.style.display = 'flex';
+  modal.style.setProperty('display', 'flex', 'important');
+  modal.onclick = function(e) {
+    if (e.target === modal) window.closeContactMemoryModal();
+  };
+
   elBody.innerHTML = `
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 0; gap: 12px;">
       <div class="loading-spinner" style="width: 32px; height: 32px; border: 3px solid rgba(255,107,74,0.2); border-top-color: var(--color-coral, #ff6b4a); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
