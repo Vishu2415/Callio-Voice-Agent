@@ -1627,24 +1627,47 @@ ${formattedTranscript}`;
 
     let extractedName = null;
 
+    // Collect agent names and system terms to blacklist
+    const agentNames = Array.from(agentsDb.values()).map(a => (a.name || '').toLowerCase());
+    if (defaultCallConfig.name) agentNames.push(defaultCallConfig.name.toLowerCase());
+    if (callState.agentName) agentNames.push(callState.agentName.toLowerCase());
+
+    const blacklist = [
+      'agent', 'user', 'call', 'caller', 'hello', 'hi', 'telephony', 'ai', 'callio', 'vobiz', 'growlio',
+      'theek', 'hoon', 'sharma', 'ji', 'sir', 'madam', 'customer', 'incoming', 'outgoing', 'unknown',
+      'shruti', 'shruti sharma', 'kavya', 'priya', 'rohan', 'rahul sharma',
+      ...agentNames
+    ];
+
     // 1. Try extracting name from Gemini response
     const nameMatch = rawSummaryText.match(/\*\*(?:CUSTOMER_NAME|Customer Name):\*\*\s*([^\n]+)/i) || 
                       rawSummaryText.match(/(?:CUSTOMER_NAME|Customer Name):\s*([^\n]+)/i);
     if (nameMatch) {
       const rawName = nameMatch[1].trim().replace(/[\*\_\"]/g, '');
       if (rawName && !rawName.toUpperCase().includes('UNKNOWN') && rawName.length >= 2 && rawName.length <= 40) {
-        extractedName = rawName;
+        const low = rawName.toLowerCase();
+        const isAgentOrInvalid = blacklist.some(b => b && (low === b || low.includes(b) || b.includes(low)));
+        if (!isAgentOrInvalid) {
+          extractedName = rawName;
+        } else {
+          console.log(`[Summary Engine] ⚠️ Discarded blacklisted/agent name from Gemini output: "${rawName}"`);
+        }
       }
     }
 
-    // 2. Fallback regex extraction on formattedTranscript (Hindi & English patterns)
-    if (!extractedName) {
-      const introRegex = /(?:mera naam|my name is|i am|main|this is|call me)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)/i;
-      const match = formattedTranscript.match(introRegex);
+    // 2. Fallback regex extraction on USER turns only
+    if (!extractedName && Array.isArray(callState.transcript)) {
+      const userTurnsText = callState.transcript
+        .filter(t => t && t.role === 'user')
+        .map(t => t.text)
+        .join(' ');
+      
+      const introRegex = /(?:mera naam|my name is|naam mera|this is)\s+([A-Za-z\u0900-\u097F]+(?:\s+[A-Za-z\u0900-\u097F]+)?)/i;
+      const match = userTurnsText.match(introRegex);
       if (match && match[1]) {
         const candidate = match[1].trim();
-        const blacklist = ['agent', 'user', 'call', 'hello', 'hi', 'telephony', 'ai', 'callio', 'vobiz'];
-        if (candidate && candidate.length >= 2 && !blacklist.includes(candidate.toLowerCase())) {
+        const low = candidate.toLowerCase();
+        if (candidate.length >= 2 && !blacklist.some(b => b && (low === b || low.includes(b) || b.includes(low)))) {
           extractedName = candidate;
         }
       }
@@ -8609,23 +8632,28 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     }
 
     if (targetPhone) {
-      try {
-        const crmRes = await fetch(`https://growlio.in/api/crm/calling-agent/context?phone=${encodeURIComponent(targetPhone)}`, {
-          headers: { 'ngrok-skip-browser-warning': 'true' }
-        });
-        if (crmRes.ok) {
-          const crmData = await crmRes.json();
-          if (crmData && crmData.aiCallContext && crmData.aiCallContext.trim()) {
-            crmContextInstruction = `\n\n[PREVIOUS CALL & WHATSAPP CHAT CONTEXT MEMORY WITH THIS SPECIFIC CALLER (${targetPhone})]:\n${crmData.aiCallContext.trim()}\n\n[CRITICAL RECALL DIRECTIVE]: You have previously interacted with THIS specific customer (via WhatsApp and/or Phone Calls)! Read the conversation history and CRM notes above carefully. If the customer mentions their WhatsApp chat, asks "Kya baat hui thi?", "Mera kya status hai?", or asks about pricing/demo discussed on chat/call, you MUST refer directly to the conversation memory above! Greet them warmly and acknowledge what was discussed or inquired (e.g., "Welcome back! Humne pehle WhatsApp/Call par [topic] discuss kiya tha..."). Offer to continue from there. DO NOT act like a first-time stranger!`;
-            console.log(`[CRM Memory Sync] Fetched prior context for caller ${targetPhone}: ${crmData.aiCallContext.substring(0, 100)}...`);
+      const contactExistsInCallio = findContactByPhone(targetPhone, callState?.clientId);
+      if (contactExistsInCallio) {
+        try {
+          const crmRes = await fetch(`https://growlio.in/api/crm/calling-agent/context?phone=${encodeURIComponent(targetPhone)}`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+          });
+          if (crmRes.ok) {
+            const crmData = await crmRes.json();
+            if (crmData && crmData.aiCallContext && crmData.aiCallContext.trim()) {
+              crmContextInstruction = `\n\n[PREVIOUS CALL & WHATSAPP CHAT CONTEXT MEMORY WITH THIS SPECIFIC CALLER (${targetPhone})]:\n${crmData.aiCallContext.trim()}\n\n[CRITICAL RECALL DIRECTIVE]: If the customer mentions prior discussions or WhatsApp chat, you can refer to the notes above. Greet them warmly and assist them.`;
+              console.log(`[CRM Memory Sync] Fetched prior context for caller ${targetPhone}: ${crmData.aiCallContext.substring(0, 100)}...`);
+            }
+            if (crmData && crmData.customerName && (!cleanName || cleanName.toLowerCase() === 'incoming caller' || /^[+\d\s\-\(\)]+$/.test(cleanName))) {
+              cleanName = crmData.customerName;
+              console.log(`[CRM Memory Sync] Resolved caller name from CRM: "${cleanName}"`);
+            }
           }
-          if (crmData && crmData.customerName && (!cleanName || cleanName.toLowerCase() === 'incoming caller' || /^[+\d\s\-\(\)]+$/.test(cleanName))) {
-            cleanName = crmData.customerName;
-            console.log(`[CRM Memory Sync] Resolved caller name from CRM: "${cleanName}"`);
-          }
+        } catch (err) {
+          console.error(`[CRM Memory Sync Error] Failed to fetch context for ${targetPhone}:`, err.message);
         }
-      } catch (err) {
-        console.error(`[CRM Memory Sync Error] Failed to fetch context for ${targetPhone}:`, err.message);
+      } else {
+        console.log(`[CRM Memory Sync] Target phone ${targetPhone} is not in local contactsDb. Treating as brand-new caller with no external CRM context.`);
       }
     }
 
