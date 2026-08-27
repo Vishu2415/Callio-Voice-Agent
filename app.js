@@ -3385,6 +3385,15 @@ async function fetchGroups() {
     console.error("Failed to fetch groups", e);
   }
 }
+window.fetchGroups = fetchGroups;
+
+// Periodic light sync for Contacts tab
+setInterval(() => {
+  const activeTab = document.documentElement.getAttribute('data-active-tab') || localStorage.getItem('activeTab');
+  if (activeTab === 'tab-contacts' && typeof fetchGroups === 'function') {
+    fetchGroups();
+  }
+}, 8000);
 
 window.contactsSelectedTag = 'all';
 

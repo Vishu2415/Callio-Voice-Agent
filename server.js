@@ -1674,8 +1674,25 @@ ${formattedTranscript}`;
 
       if (candidatePhone) {
         const normKey = normalizePhoneKey(candidatePhone);
-        let existingContact = null;
+        const targetClientId = callState.clientId || null;
 
+        // Resolve appropriate group for this client
+        let clientGroupId = null;
+        if (targetClientId) {
+          for (const [gId, g] of groupsDb.entries()) {
+            if (g && g.clientId === targetClientId) {
+              clientGroupId = gId;
+              break;
+            }
+          }
+        }
+        if (!clientGroupId) {
+          for (const [gId, g] of groupsDb.entries()) {
+            if (g) { clientGroupId = gId; break; }
+          }
+        }
+
+        let existingContact = null;
         for (const contact of contactsDb.values()) {
           if (contact && contact.phone && normalizePhoneKey(contact.phone) === normKey) {
             existingContact = contact;
@@ -1685,10 +1702,13 @@ ${formattedTranscript}`;
 
         if (existingContact) {
           existingContact.name = extractedName;
+          if (clientGroupId && (!existingContact.groupId || existingContact.groupId === 'default')) {
+            existingContact.groupId = clientGroupId;
+          }
           existingContact.updatedAt = Date.now();
           contactsDb.set(existingContact.id, existingContact);
           saveContacts();
-          console.log(`[Auto Contact Save] ✏️ Updated existing contact ${existingContact.id} with detected name: "${extractedName}"`);
+          console.log(`[Auto Contact Save] ✏️ Updated existing contact ${existingContact.id} with detected name: "${extractedName}" in group ${existingContact.groupId}`);
 
           // Sync into groupsDb if nested
           if (existingContact.groupId && groupsDb.has(existingContact.groupId)) {
@@ -1699,25 +1719,21 @@ ${formattedTranscript}`;
             }
           }
         } else {
-          let groupId = 'default';
-          for (const [gId, g] of groupsDb.entries()) {
-            if (g) { groupId = gId; break; }
-          }
-
           const newContactId = `cont_ai_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
           const newContact = {
             id: newContactId,
-            groupId: groupId,
+            groupId: clientGroupId || 'default',
             phone: candidatePhone,
             name: extractedName,
             tag: 'AI Auto-Saved',
             notes: `Auto-saved from AI call on ${new Date().toLocaleDateString()}`,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            updatedAt: Date.now()
           };
 
           contactsDb.set(newContactId, newContact);
           saveContacts();
-          console.log(`[Auto Contact Save] 🌟 Auto-created NEW Contact: "${extractedName}" (${candidatePhone})`);
+          console.log(`[Auto Contact Save] 🌟 Auto-created NEW Contact: "${extractedName}" (${candidatePhone}) in group ${newContact.groupId}`);
         }
 
         // Also update contactsMemoryDb
