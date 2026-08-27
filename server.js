@@ -1684,12 +1684,19 @@ ${formattedTranscript}`;
         }
 
         if (existingContact) {
-          if (!existingContact.name || existingContact.name === candidatePhone || normalizePhoneKey(existingContact.name) === normKey) {
-            existingContact.name = extractedName;
-            existingContact.updatedAt = Date.now();
-            contactsDb.set(existingContact.id, existingContact);
-            saveContacts();
-            console.log(`[Auto Contact Save] ✏️ Updated existing contact ${existingContact.id} with name: "${extractedName}"`);
+          existingContact.name = extractedName;
+          existingContact.updatedAt = Date.now();
+          contactsDb.set(existingContact.id, existingContact);
+          saveContacts();
+          console.log(`[Auto Contact Save] ✏️ Updated existing contact ${existingContact.id} with detected name: "${extractedName}"`);
+
+          // Sync into groupsDb if nested
+          if (existingContact.groupId && groupsDb.has(existingContact.groupId)) {
+            const grp = groupsDb.get(existingContact.groupId);
+            if (grp && Array.isArray(grp.contacts)) {
+              const item = grp.contacts.find(c => c.id === existingContact.id || normalizePhoneKey(c.phone) === normKey);
+              if (item) { item.name = extractedName; saveGroups(); }
+            }
           }
         } else {
           let groupId = 'default';
@@ -1711,6 +1718,16 @@ ${formattedTranscript}`;
           contactsDb.set(newContactId, newContact);
           saveContacts();
           console.log(`[Auto Contact Save] 🌟 Auto-created NEW Contact: "${extractedName}" (${candidatePhone})`);
+        }
+
+        // Also update contactsMemoryDb
+        const pKey = normalizeContactPhone(candidatePhone);
+        if (pKey && contactsMemoryDb.has(pKey)) {
+          const mem = contactsMemoryDb.get(pKey);
+          mem.contact_name = extractedName;
+          contactsMemoryDb.set(pKey, mem);
+          saveContactsMemory();
+          console.log(`[Auto Contact Save] 🧠 Updated Memory Profile name for ${pKey} -> "${extractedName}"`);
         }
 
         callState.customerName = extractedName;
@@ -8810,28 +8827,29 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 return;
               }
 
-              // Hard hang-up detection: if user explicitly commands to stop/cut call
-              const userWantsHangup = /\b(hang up|cut the call|end the call|stop calling me|don't call again|disconnect the call|call mat karna dobara)\b/i.test(transText);
+              // Hard hang-up detection: if user explicitly commands to stop/cut call or says goodbye
+              const userWantsHangup = /\b(hang up|cut the call|end the call|stop calling me|don't call again|disconnect the call|call mat karna dobara|bye\b|bye bye|goodbye|ok bye|theek hai bye|alvida|cut kar do|call cut|call rakh do|rakhta hoon|rakh raha hoon|rakh do)\b/i.test(transText);
               if (userWantsHangup && !callState._terminating) {
-                console.log(`[Hard Hangup Detected] User said: "${transText}". Injecting hangup instruction to Gemini...`);
+                console.log(`[Hangup Trigger Detected] User said: "${transText}". Scheduling farewell & call hangup...`);
                 callState._terminating = true;
                 if (inactivityTimeout) { clearTimeout(inactivityTimeout); inactivityTimeout = null; }
-                // Inject a forcing instruction to Gemini to say goodbye and call hangupCall
+                
+                // Inject a forcing instruction to Gemini to say a polite 1-sentence goodbye and call hangupCall
                 if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
                   const hangupPrompt = {
                     clientContent: {
-                      turns: [{ role: 'user', parts: [{ text: 'The user wants to end the call. Say a brief polite goodbye in one sentence, then IMMEDIATELY call the hangupCall tool.' }] }],
+                      turns: [{ role: 'user', parts: [{ text: 'The user is saying goodbye or wants to end the call. Say a warm polite 1-sentence goodbye in Hinglish (e.g. "Theek hai, aapse baat karke accha laga, bye!") and IMMEDIATELY call the hangupCall tool.' }] }],
                       turnComplete: true
                     }
                   };
                   try { geminiWs.send(JSON.stringify(hangupPrompt)); } catch(e) {}
                 }
 
-                // Fallback timer: force terminate call after 4 seconds if Gemini does not trigger toolCall
+                // Fallback timer: force terminate call after 3 seconds so call cuts cleanly
                 callState._fallbackHangupTimer = setTimeout(() => {
-                  console.log(`[Hard Hangup Fallback] Gemini failed to trigger toolCall in 4s. Forcing call termination for CallSid: ${callSid}`);
+                  console.log(`[Hangup Fallback] Terminating call cleanly for CallSid: ${callSid}`);
                   terminateActiveCall(callSid, ws, geminiWs, ws.provider || 'twilio', 'completed');
-                }, 4000);
+                }, 3000);
               }
 
               scheduleSaveCalls();
@@ -8855,6 +8873,27 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                   callState.transcript.push({ role: 'user', text: uText });
                 }
                 scheduleSaveCalls();
+
+                // Also check if user said goodbye in userTurn
+                const userSaidBye = /\b(bye\b|bye bye|goodbye|ok bye|theek hai bye|alvida|cut kar do|call cut|call rakh do|rakhta hoon|rakh raha hoon)\b/i.test(uText);
+                if (userSaidBye && !callState._terminating) {
+                  console.log(`[UserTurn Bye Detected] User said: "${uText}". Initiating termination...`);
+                  callState._terminating = true;
+                  if (inactivityTimeout) { clearTimeout(inactivityTimeout); inactivityTimeout = null; }
+                  if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
+                    try {
+                      geminiWs.send(JSON.stringify({
+                        clientContent: {
+                          turns: [{ role: 'user', parts: [{ text: 'The user said goodbye. Say a quick polite 1-sentence goodbye in Hinglish and end.' }] }],
+                          turnComplete: true
+                        }
+                      }));
+                    } catch(e) {}
+                  }
+                  callState._fallbackHangupTimer = setTimeout(() => {
+                    terminateActiveCall(callSid, ws, geminiWs, ws.provider || 'twilio', 'completed');
+                  }, 3000);
+                }
               }
             }
           }
@@ -8874,6 +8913,18 @@ Follow these rules strictly to sound completely human, lively, and emotional:
                 callState.transcript.push({ role: 'agent', text: transText });
               }
               scheduleSaveCalls();
+
+              // Auto-hangup when agent says goodbye
+              const agentGoodbye = /\b(bye\b|goodbye|alvida|phir baat karte hain|have a great day|have a nice day|aapka din shubh ho|take care)\b/i.test(transText);
+              if (agentGoodbye && !callState._terminating) {
+                console.log(`[Agent Goodbye Detected] Agent said: "${transText}". Scheduling clean hangup in 2.5s...`);
+                callState._terminating = true;
+                if (inactivityTimeout) { clearTimeout(inactivityTimeout); inactivityTimeout = null; }
+                setTimeout(() => {
+                  console.log(`[Agent Goodbye Hangup] Disconnecting call ${callSid} cleanly after farewell.`);
+                  terminateActiveCall(callSid, ws, geminiWs, ws.provider || 'twilio', 'completed');
+                }, 2500);
+              }
             }
           }
         }
