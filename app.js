@@ -3702,10 +3702,17 @@ window.openContactMemoryModal = async function(phone, name) {
   const elBody = document.getElementById('cm-modal-body');
   if (!modal || !elBody) return;
 
+  if (modal.parentElement !== document.body) {
+    document.body.appendChild(modal);
+  }
+
   if (elName) elName.innerText = name || 'Contact';
   if (elPhone) elPhone.innerText = phone || '—';
   
   modal.style.setProperty('display', 'flex', 'important');
+  modal.style.setProperty('opacity', '1', 'important');
+  modal.style.setProperty('visibility', 'visible', 'important');
+  modal.style.setProperty('z-index', '99999999', 'important');
   modal.onclick = function(e) {
     if (e.target === modal) window.closeContactMemoryModal();
   };

@@ -4053,6 +4053,8 @@
           <button type="submit" id="btn-save-single-contact-v2" class="btn" style="flex: 2; height: 46px; border-radius: 14px; background: linear-gradient(135deg, #FF6B4A, #ea580c); border: none; color: #fff; font-weight: 800; font-size: 0.92rem; cursor: pointer; box-shadow: 0 8px 24px rgba(234, 88, 12, 0.4);">💾 Save Contact</button>
         </div>
       </form>
+    </div>
+  </div>
 
   <!-- Modal: Edit Single Contact V2 -->
   <div id="edit-contact-modal-v2" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 100000; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;">
@@ -4100,7 +4102,30 @@
           </div>
         </div>
       </form>
+    </div>
+  </div>
 
+  <!-- Modal: Contact Call Summary & AI Memory -->
+  <div id="contact-memory-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 100000; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;">
+    <div class="vb-card" style="background: var(--bg-surface, #111827); border: 1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius: 20px; width: 100%; max-width: 680px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.6); position: relative;">
+      <!-- Header -->
+      <div style="padding: 18px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, rgba(255, 107, 74, 0.18), rgba(255, 138, 0, 0.18)); border: 1px solid rgba(255, 107, 74, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+            🧠
+          </div>
+          <div>
+            <h3 id="cm-contact-name" style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main, #fff);">Contact Name</h3>
+            <div id="cm-contact-phone" style="font-size: 0.82rem; color: var(--color-cyan, #06b6d4); font-family: var(--font-mono); font-weight: 600;">+91 9876543210</div>
+          </div>
+        </div>
+        <button onclick="window.closeContactMemoryModal()" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); border-radius: 50%; width: 32px; height: 32px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</button>
+      </div>
+
+      <!-- Scrollable Body -->
+      <div id="cm-modal-body" style="padding: 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
+        <!-- Dynamically rendered -->
+      </div>
     </div>
   </div>
 
@@ -4203,42 +4228,15 @@
     };
 
     window.openContactMemoryModalById = function(contactId) {
-      if (typeof window.getAllContactsList === 'function') {
-        var all = window.getAllContactsList();
-        var contact = all.find(function(c) { return c && (c.id === contactId || c.phone === contactId); });
-        var phone = contact ? (contact.phone || '') : contactId;
-        var name = contact ? (contact.name || '') : 'Contact';
-        if (typeof window.openContactMemoryModal === 'function') {
-          window.openContactMemoryModal(phone, name);
-          return;
-        }
+      var all = (typeof window.getAllContactsList === 'function') ? window.getAllContactsList() : [];
+      var contact = all.find(function(c) { return c && (String(c.id) === String(contactId) || String(c.phone) === String(contactId)); });
+      var phone = contact ? (contact.phone || '') : contactId;
+      var name = contact ? (contact.name || '') : 'Contact';
+      if (typeof window.openContactMemoryModal === 'function') {
+        window.openContactMemoryModal(phone, name);
       }
     };
   </script>
-
-  <!-- Modal: Contact Call Summary & AI Memory -->
-  <div id="contact-memory-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 100000; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;">
-    <div class="vb-card" style="background: var(--bg-surface, #111827); border: 1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius: 20px; width: 100%; max-width: 680px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.6); position: relative;">
-      <!-- Header -->
-      <div style="padding: 18px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div style="width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, rgba(255, 107, 74, 0.18), rgba(255, 138, 0, 0.18)); border: 1px solid rgba(255, 107, 74, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-            🧠
-          </div>
-          <div>
-            <h3 id="cm-contact-name" style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main, #fff);">Contact Name</h3>
-            <div id="cm-contact-phone" style="font-size: 0.82rem; color: var(--color-cyan, #06b6d4); font-family: var(--font-mono); font-weight: 600;">+91 9876543210</div>
-          </div>
-        </div>
-        <button onclick="window.closeContactMemoryModal()" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); border-radius: 50%; width: 32px; height: 32px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</button>
-      </div>
-
-      <!-- Scrollable Body -->
-      <div id="cm-modal-body" style="padding: 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
-        <!-- Dynamically rendered -->
-      </div>
-    </div>
-  </div>
 
 </body>
 
