@@ -3792,7 +3792,7 @@ window.openContactMemoryModal = async function(phone, name) {
         <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
-              <span>🎧</span> Latest Call Audio Recording
+              <span>🎧</span> Latest Call Audio Recording (${latestLog.call_direction || 'CALL'} • ${latestLog.created_at ? new Date(latestLog.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Recent'})
             </div>
             <span style="font-size: 0.74rem; color: var(--text-muted); font-family: var(--font-mono);">${latestLog.duration_seconds || 0}s</span>
           </div>
