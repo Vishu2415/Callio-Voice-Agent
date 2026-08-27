@@ -8632,6 +8632,9 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     const toolRule = `\n\n[CRITICAL TOOL RULE]: If the user says goodbye, bye, or asks to hang up/cut the call, YOU MUST say a warm polite 1-sentence goodbye (e.g. "Theek hai, aapse baat karke accha laga, bye!") and IMMEDIATELY call the 'hangupCall' TOOL to end the connection. Do not wait or ask for confirmation.\n\n[VOICEMAIL RULE]: If you hear an automated voicemail greeting, call hangupCall immediately!`;
     const closingRule = `\n\n[NATURAL CLOSING & GOODBYE DIRECTIVE]: Whenever ending the call or after scheduling a callback, always speak a polite, natural, short goodbye in Hindi/Hinglish (e.g., "Theek hai, aapse baat karke accha laga, bye! / Theek hai, hum aapko scheduled time par call karenge, have a great day, bye!"). NEVER say technical phrases like "Call ending now" or "tool executed". Keep it 100% human and warm.`;
     const memoryContextInstruction = getContactMemoryPromptContext(targetPhone, callState?.clientId);
+    const instantGreetingRule = (callState && (callState.direction === 'outgoing' || callState.direction === 'outbound' || callState.broadcastId))
+      ? `\n\n[INSTANT FIRST TURN GREETING DIRECTIVE]: This is an OUTBOUND call. As soon as the customer answers or says Hello, immediately introduce yourself warmly and state the purpose of the call concisely.`
+      : `\n\n[INBOUND GREETING DIRECTIVE]: This is an INBOUND call. Greet the caller warmly and ask how you can help them today.`;
     const finalInstruction = `${systemInstruction}${crmContextInstruction}${memoryContextInstruction}${greetingInstruction}${toolRule}${closingRule}${instantGreetingRule}\n\n[CRITICAL GRAMMAR RULE]: ${genderRule}`;
     
     const validLiveModels = ['gemini-2.0-flash-exp', 'gemini-3.1-flash-live-preview', 'gemini-2.0-flash-realtime-exp'];
