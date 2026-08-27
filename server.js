@@ -154,6 +154,26 @@ function saveBroadcasts() {
 const BRANDING_DB_FILE = './branding_db.json';
 const brandingDb = new Map();
 
+// --- Universal Rolling AI Memory & Contact Call Logs Databases ---
+const CONTACT_CALL_LOGS_DB_FILE = './contact_call_logs_db.json';
+const CONTACTS_MEMORY_DB_FILE = './contacts_memory_db.json';
+const contactCallLogsDb = new Map();
+const contactsMemoryDb = new Map();
+
+function loadContactCallLogs() {
+  loadDatabase(CONTACT_CALL_LOGS_DB_FILE, contactCallLogsDb);
+}
+function saveContactCallLogs() {
+  saveDatabase(CONTACT_CALL_LOGS_DB_FILE, contactCallLogsDb);
+}
+
+function loadContactsMemory() {
+  loadDatabase(CONTACTS_MEMORY_DB_FILE, contactsMemoryDb);
+}
+function saveContactsMemory() {
+  saveDatabase(CONTACTS_MEMORY_DB_FILE, contactsMemoryDb);
+}
+
 const ENTERPRISE_INQUIRIES_FILE = './enterprise_inquiries_db.json';
 let enterpriseInquiries = [];
 
@@ -693,6 +713,298 @@ loadTrialLimits();
 loadTrialLeads();
 loadEnterpriseInquiries();
 loadBranding();
+loadContactCallLogs();
+loadContactsMemory();
+
+function normalizeContactPhone(phoneStr) {
+  if (!phoneStr) return '';
+  let digits = String(phoneStr).replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    digits = digits.substring(2);
+  } else if (digits.length > 10) {
+    digits = digits.slice(-10);
+  }
+  return digits;
+}
+
+// --- Universal Pre-Call Memory Injection ---
+function getContactMemoryPromptContext(targetPhone, clientId = null) {
+  if (!targetPhone) return '';
+  const phoneKey = normalizeContactPhone(targetPhone);
+  if (!phoneKey) return '';
+
+  const memory = contactsMemoryDb.get(phoneKey);
+  const totalCalls = memory ? (memory.total_calls_count || 0) : 0;
+  
+  // Resolve contact name from memory or contactsDb
+  let contactName = memory?.contact_name || '';
+  if (!contactName) {
+    const contact = findContactByPhone(targetPhone, clientId);
+    if (contact && contact.name && !/^[+\d\s\-\(\)]+$/.test(contact.name)) {
+      contactName = contact.name;
+    }
+  }
+
+  // Fetch recent call logs sorted descending by time
+  const logs = Array.from(contactCallLogsDb.values())
+    .filter(l => l.contact_phone === phoneKey || (l.raw_phone && normalizeContactPhone(l.raw_phone) === phoneKey))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 4);
+
+  const effectivePastCalls = Math.max(totalCalls, logs.length);
+
+  if (effectivePastCalls === 0 && logs.length === 0) {
+    return `\n\n### CUSTOMER MEMORY & CONVERSATION HISTORY:
+- Customer Phone: ${targetPhone}
+- Total Past Calls: 0 (First-Time Caller)
+${contactName ? `- Customer Name: "${contactName}"\n` : ''}
+### CONVERSATION MEMORY DIRECTIVES:
+- This is a new first-time customer. Greet them warmly and introduce yourself clearly.`;
+  }
+
+  const logsFormatted = logs.map((l, i) => {
+    const d = new Date(l.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const cleanSum = (l.call_summary || '').split('\n')[0].replace(/[\*\_]/g, '').trim().substring(0, 160);
+    return `  * [${d} | ${l.call_direction || 'CONNECTED'}]: ${cleanSum || 'Connected call'} (Sentiment: ${l.customer_sentiment || 'NEUTRAL'})`;
+  }).join('\n');
+
+  const relationshipSummary = memory?.overall_relationship_summary || memory?.latest_call_summary || 'Prior phone interactions completed.';
+  const customerNotes = memory?.customer_preferences?.notes || '';
+
+  return `\n\n### CUSTOMER MEMORY & CONVERSATION HISTORY:
+- Customer Phone: ${targetPhone}
+- Total Past Calls: ${effectivePastCalls}
+${contactName ? `- Customer Name: "${contactName}"\n` : ''}- Overall Relationship Summary: ${relationshipSummary}
+${customerNotes ? `- Customer Notes/Preferences: ${customerNotes}\n` : ''}- Recent Previous Calls:
+${logsFormatted}
+
+### CONVERSATION MEMORY DIRECTIVES:
+1. You have interacted with THIS specific customer ${effectivePastCalls} times before!
+2. Greet them warmly and acknowledge previous conversation history (e.g., "${contactName ? `Hello ${contactName}! ` : ''}Welcome back, nice speaking with you again!").
+3. Seamlessly follow up and refer back to previous conversation topics and discussion points above!
+4. Do NOT ask basic introductory questions that the customer already answered in previous calls!`;
+}
+
+// --- Universal Post-Call Memory Aggregator & Updater ---
+function updateContactMemoryOnCallEnd(callState) {
+  if (!callState) return;
+
+  const systemNumbers = ['917971442441', '7971442441', '971442441'];
+  function isSysNum(ph) {
+    if (!ph) return true;
+    const c = String(ph).replace(/\D/g, '');
+    return !c || c.length < 8 || systemNumbers.some(n => c === n || c.endsWith(n) || n.endsWith(c));
+  }
+
+  const rawPhone = [callState.customerNumber, callState.phone, callState.to, callState.from]
+    .find(p => p && !isSysNum(p)) || callState.to || callState.from;
+  
+  if (!rawPhone) return;
+  const phoneKey = normalizeContactPhone(rawPhone);
+  if (!phoneKey) return;
+
+  const callId = callState.callSid || callState.id || `call_${Date.now()}`;
+  const transcript = Array.isArray(callState.transcript) ? callState.transcript : [];
+  const duration = callState.duration || 0;
+  const summary = callState.summary || '';
+  const recordingUrl = callState.recordingUrl || '';
+
+  // Determine Direction
+  let direction = 'INBOUND';
+  if (callState.broadcastId) {
+    direction = 'OUTBOUND_BROADCAST';
+  } else if (callState.direction === 'outgoing' || callState.direction === 'outbound') {
+    direction = 'OUTBOUND_SINGLE';
+  } else if (callState.direction === 'incoming' || callState.direction === 'inbound') {
+    direction = 'INBOUND';
+  }
+
+  // Determine Sentiment
+  let sentiment = 'NEUTRAL';
+  const upperSummary = (summary || '').toUpperCase();
+  if (upperSummary.includes('NOT INTERESTED') || upperSummary.includes('NEGATIVE') || upperSummary.includes('ANGRY')) {
+    sentiment = 'NEGATIVE';
+  } else if (upperSummary.includes('INTERESTED') || upperSummary.includes('POSITIVE') || upperSummary.includes('DEMO') || upperSummary.includes('CONFIRMED') || upperSummary.includes('BUY')) {
+    sentiment = 'POSITIVE';
+  }
+
+  // Extract key discussion points
+  const discussionPoints = [];
+  if (summary) {
+    summary.split('\n').forEach(line => {
+      const clean = line.replace(/^[\*\-\•\d\.\s]+/, '').trim();
+      if (clean && clean.length > 6 && !clean.toUpperCase().startsWith('VERDICT') && !clean.toUpperCase().startsWith('CUSTOMER_NAME')) {
+        discussionPoints.push(clean);
+      }
+    });
+  }
+
+  // 1. Save detailed call log
+  const logId = `clog_${callId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const logEntry = {
+    id: logId,
+    contact_phone: phoneKey,
+    raw_phone: rawPhone,
+    call_id: callId,
+    clientId: callState.clientId || null,
+    call_direction: direction,
+    duration_seconds: duration,
+    recording_url: recordingUrl,
+    transcript: transcript,
+    call_summary: summary,
+    customer_sentiment: sentiment,
+    key_discussion_points: discussionPoints.slice(0, 5),
+    created_at: callState.endedAt || callState.startedAt || new Date().toISOString()
+  };
+
+  contactCallLogsDb.set(logId, logEntry);
+  saveContactCallLogs();
+
+  // 2. Update consolidated memory
+  const existingMemory = contactsMemoryDb.get(phoneKey) || {
+    phone_number: phoneKey,
+    raw_phone: rawPhone,
+    clientId: callState.clientId || null,
+    contact_name: callState.customerName || callState.name || '',
+    total_calls_count: 0,
+    last_call_at: null,
+    last_call_direction: null,
+    overall_relationship_summary: '',
+    latest_call_summary: '',
+    customer_preferences: {}
+  };
+
+  existingMemory.total_calls_count = (existingMemory.total_calls_count || 0) + 1;
+  existingMemory.last_call_at = logEntry.created_at;
+  existingMemory.last_call_direction = direction;
+  existingMemory.latest_call_summary = summary;
+  if (callState.customerName && (!existingMemory.contact_name || existingMemory.contact_name.length < 2)) {
+    existingMemory.contact_name = callState.customerName;
+  }
+
+  // Re-roll relationship summary
+  const allLogsForContact = Array.from(contactCallLogsDb.values())
+    .filter(l => l.contact_phone === phoneKey || (l.raw_phone && normalizeContactPhone(l.raw_phone) === phoneKey))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const recentSummaries = allLogsForContact.slice(0, 4).map((l, idx) => {
+    const dateStr = new Date(l.created_at).toISOString().split('T')[0];
+    const cleanSum = (l.call_summary || '').split('\n')[0].replace(/[\*\_]/g, '').trim();
+    return `Call ${allLogsForContact.length - idx} (${dateStr}, ${l.call_direction}): ${cleanSum || 'Connected call'}`;
+  }).reverse();
+
+  existingMemory.overall_relationship_summary = `Customer has completed ${existingMemory.total_calls_count} calls. Recent summary: ${recentSummaries.join(' | ')}`;
+  existingMemory.updated_at = new Date().toISOString();
+
+  contactsMemoryDb.set(phoneKey, existingMemory);
+  saveContactsMemory();
+
+  console.log(`[Rolling AI Memory] 🧠 Updated Memory Profile for ${phoneKey} (${existingMemory.contact_name || 'Customer'}): Total Calls = ${existingMemory.total_calls_count}`);
+}
+
+// --- Historical Backfill on Startup ---
+function syncHistoricalCallsToMemory() {
+  let logsCount = 0;
+  for (const [callSid, callState] of activeCalls.entries()) {
+    if (!callState || callState.status !== 'completed') continue;
+    const hasTurns = Array.isArray(callState.transcript) && callState.transcript.length > 0;
+    if (!hasTurns && (!callState.duration || callState.duration <= 0)) continue;
+
+    const rawPhone = [callState.customerNumber, callState.phone, callState.to, callState.from]
+      .find(p => p && !isVirtualNumber(p)) || callState.to || callState.from;
+    if (!rawPhone) continue;
+
+    const phoneKey = normalizeContactPhone(rawPhone);
+    if (!phoneKey) continue;
+
+    const logId = `clog_${callSid.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    if (!contactCallLogsDb.has(logId)) {
+      let direction = 'INBOUND';
+      if (callState.broadcastId) direction = 'OUTBOUND_BROADCAST';
+      else if (callState.direction === 'outgoing' || callState.direction === 'outbound') direction = 'OUTBOUND_SINGLE';
+
+      let sentiment = 'NEUTRAL';
+      const sumUpper = (callState.summary || '').toUpperCase();
+      if (sumUpper.includes('NOT INTERESTED') || sumUpper.includes('NEGATIVE')) sentiment = 'NEGATIVE';
+      else if (sumUpper.includes('INTERESTED') || sumUpper.includes('POSITIVE') || sumUpper.includes('DEMO')) sentiment = 'POSITIVE';
+
+      contactCallLogsDb.set(logId, {
+        id: logId,
+        contact_phone: phoneKey,
+        raw_phone: rawPhone,
+        call_id: callSid,
+        clientId: callState.clientId || null,
+        call_direction: direction,
+        duration_seconds: callState.duration || 0,
+        recording_url: callState.recordingUrl || '',
+        transcript: callState.transcript || [],
+        call_summary: callState.summary || '',
+        customer_sentiment: sentiment,
+        key_discussion_points: [],
+        created_at: callState.endedAt || callState.startedAt || new Date().toISOString()
+      });
+      logsCount++;
+    }
+  }
+
+  if (logsCount > 0) {
+    saveContactCallLogs();
+    console.log(`[Memory Engine Startup] Backfilled ${logsCount} historical call logs.`);
+  }
+
+  // Populate contactsMemoryDb from contactCallLogsDb
+  for (const log of contactCallLogsDb.values()) {
+    const phoneKey = log.contact_phone;
+    if (!phoneKey) continue;
+
+    let mem = contactsMemoryDb.get(phoneKey);
+    if (!mem) {
+      mem = {
+        phone_number: phoneKey,
+        raw_phone: log.raw_phone || phoneKey,
+        clientId: log.clientId || null,
+        contact_name: '',
+        total_calls_count: 0,
+        last_call_at: log.created_at,
+        last_call_direction: log.call_direction,
+        overall_relationship_summary: '',
+        latest_call_summary: '',
+        customer_preferences: {}
+      };
+      contactsMemoryDb.set(phoneKey, mem);
+    }
+  }
+
+  for (const [phoneKey, mem] of contactsMemoryDb.entries()) {
+    const logs = Array.from(contactCallLogsDb.values())
+      .filter(l => l.contact_phone === phoneKey)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    mem.total_calls_count = logs.length;
+    if (logs.length > 0) {
+      mem.last_call_at = logs[0].created_at;
+      mem.last_call_direction = logs[0].call_direction;
+      mem.latest_call_summary = logs[0].call_summary;
+
+      if (!mem.contact_name) {
+        const contact = findContactByPhone(mem.raw_phone || phoneKey, mem.clientId);
+        if (contact && contact.name) mem.contact_name = contact.name;
+      }
+
+      const recentSummaries = logs.slice(0, 3).map((l, idx) => {
+        const dateStr = new Date(l.created_at).toISOString().split('T')[0];
+        const cleanSum = (l.call_summary || '').split('\n')[0].replace(/[\*\_]/g, '').trim();
+        return `[${dateStr} | ${l.call_direction}]: ${cleanSum || 'Connected call'}`;
+      }).reverse();
+
+      mem.overall_relationship_summary = `Customer has completed ${logs.length} previous call(s). Recent history: ${recentSummaries.join('; ')}`;
+    }
+  }
+  saveContactsMemory();
+  console.log(`[Memory Engine Startup] Synced memory profiles for ${contactsMemoryDb.size} unique contacts.`);
+}
+
+syncHistoricalCallsToMemory();
 
 function cleanAndComparePhone(p1, p2) {
   if (!p1 || !p2) return false;
@@ -1376,6 +1688,12 @@ ${formattedTranscript}`;
     console.error(`[Summary Engine Exception] for call ${callSid}:`, err.message);
     callState.summary = generateLocalTranscriptSummary(callState.transcript);
     scheduleSaveCalls();
+  } finally {
+    try {
+      updateContactMemoryOnCallEnd(callState);
+    } catch (memErr) {
+      console.error(`[Rolling Memory Sync Error] for call ${callSid}:`, memErr.message);
+    }
   }
 }
 
@@ -5201,6 +5519,108 @@ function handleContactDelete(req, res) {
 app.delete('/api/contacts/:id', authMiddleware('contacts'), handleContactDelete);
 app.delete('/api/groups/:groupId/contacts/:id', authMiddleware('contacts'), handleContactDelete);
 
+// --- UNIVERSAL CONTACT MEMORY & MULTI-CALL LOGS REST APIs ---
+
+// GET /api/contacts/:phone/memory - Retrieve consolidated customer memory & rolling context
+app.get('/api/contacts/:phone/memory', authMiddleware('contacts'), (req, res) => {
+  const { phone } = req.params;
+  const phoneKey = normalizeContactPhone(phone);
+  if (!phoneKey) {
+    return res.status(400).json({ success: false, error: 'Valid phone number parameter required' });
+  }
+
+  const memory = contactsMemoryDb.get(phoneKey) || {
+    phone_number: phoneKey,
+    raw_phone: phone,
+    contact_name: '',
+    total_calls_count: 0,
+    last_call_at: null,
+    last_call_direction: null,
+    overall_relationship_summary: 'No previous calls recorded for this contact.',
+    latest_call_summary: '',
+    customer_preferences: {}
+  };
+
+  const logs = Array.from(contactCallLogsDb.values())
+    .filter(l => l.contact_phone === phoneKey || (l.raw_phone && normalizeContactPhone(l.raw_phone) === phoneKey))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  res.json({
+    success: true,
+    memory: {
+      ...memory,
+      recent_calls_count: logs.length,
+      recent_logs: logs.slice(0, 5)
+    }
+  });
+});
+
+// GET /api/contacts/:phone/call-logs - Retrieve full history of call logs for a specific phone number
+app.get('/api/contacts/:phone/call-logs', authMiddleware('contacts'), (req, res) => {
+  const { phone } = req.params;
+  const phoneKey = normalizeContactPhone(phone);
+  if (!phoneKey) {
+    return res.status(400).json({ success: false, error: 'Valid phone number parameter required' });
+  }
+
+  const logs = Array.from(contactCallLogsDb.values())
+    .filter(l => l.contact_phone === phoneKey || (l.raw_phone && normalizeContactPhone(l.raw_phone) === phoneKey))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  res.json({
+    success: true,
+    phone: phoneKey,
+    total_logs: logs.length,
+    call_logs: logs
+  });
+});
+
+// POST /api/contacts/:phone/memory - Manually update or enrich contact preferences and notes
+app.post('/api/contacts/:phone/memory', express.json(), authMiddleware('contacts'), (req, res) => {
+  const { phone } = req.params;
+  const phoneKey = normalizeContactPhone(phone);
+  if (!phoneKey) {
+    return res.status(400).json({ success: false, error: 'Valid phone number parameter required' });
+  }
+
+  const { contact_name, preferences, notes, overall_relationship_summary } = req.body;
+
+  let memory = contactsMemoryDb.get(phoneKey);
+  if (!memory) {
+    memory = {
+      phone_number: phoneKey,
+      raw_phone: phone,
+      clientId: req.body.clientId || null,
+      contact_name: contact_name || '',
+      total_calls_count: 0,
+      last_call_at: null,
+      last_call_direction: null,
+      overall_relationship_summary: overall_relationship_summary || '',
+      latest_call_summary: '',
+      customer_preferences: preferences || {}
+    };
+  }
+
+  if (contact_name !== undefined) memory.contact_name = contact_name;
+  if (overall_relationship_summary !== undefined) memory.overall_relationship_summary = overall_relationship_summary;
+  if (preferences !== undefined) {
+    memory.customer_preferences = {
+      ...(memory.customer_preferences || {}),
+      ...preferences
+    };
+  }
+  if (notes !== undefined) {
+    memory.customer_preferences = memory.customer_preferences || {};
+    memory.customer_preferences.notes = notes;
+  }
+  memory.updated_at = new Date().toISOString();
+
+  contactsMemoryDb.set(phoneKey, memory);
+  saveContactsMemory();
+
+  res.json({ success: true, memory });
+});
+
 // --- UNIVERSAL TAG MANAGEMENT API ---
 // GET /api/tags - Get all tags with contact counts
 app.get('/api/tags', (req, res) => {
@@ -8171,8 +8591,8 @@ Follow these rules strictly to sound completely human, lively, and emotional:
     }
     const toolRule = `\n\n[CRITICAL TOOL RULE]: If the user says goodbye, bye, or asks to hang up/cut the call, YOU MUST say a warm polite 1-sentence goodbye (e.g. "Theek hai, aapse baat karke accha laga, bye!") and IMMEDIATELY call the 'hangupCall' TOOL to end the connection. Do not wait or ask for confirmation.\n\n[VOICEMAIL RULE]: If you hear an automated voicemail greeting, call hangupCall immediately!`;
     const closingRule = `\n\n[NATURAL CLOSING & GOODBYE DIRECTIVE]: Whenever ending the call or after scheduling a callback, always speak a polite, natural, short goodbye in Hindi/Hinglish (e.g., "Theek hai, aapse baat karke accha laga, bye! / Theek hai, hum aapko scheduled time par call karenge, have a great day, bye!"). NEVER say technical phrases like "Call ending now" or "tool executed". Keep it 100% human and warm.`;
-    const instantGreetingRule = `\n\n[CRITICAL INSTANT GREETING RULE]: As soon as the call connects, IMMEDIATELY speak your opening greeting within 0.5 seconds! Do NOT delay or wait. Speak your opening hello instantly.`;
-    const finalInstruction = `${systemInstruction}${crmContextInstruction}${greetingInstruction}${toolRule}${closingRule}${instantGreetingRule}\n\n[CRITICAL GRAMMAR RULE]: ${genderRule}`;
+    const memoryContextInstruction = getContactMemoryPromptContext(targetPhone, callState?.clientId);
+    const finalInstruction = `${systemInstruction}${crmContextInstruction}${memoryContextInstruction}${greetingInstruction}${toolRule}${closingRule}${instantGreetingRule}\n\n[CRITICAL GRAMMAR RULE]: ${genderRule}`;
     
     const validLiveModels = ['gemini-2.0-flash-exp', 'gemini-3.1-flash-live-preview', 'gemini-2.0-flash-realtime-exp'];
     let resolvedModel = (model && validLiveModels.includes(model.trim())) ? model.trim() : 'gemini-3.1-flash-live-preview';
